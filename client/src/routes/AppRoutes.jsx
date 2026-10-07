@@ -40,6 +40,7 @@ const ReviewsPage = lazy(() => import('../pages/customer/ReviewsPage'));
 const ImpactPage = lazy(() => import('../pages/customer/ImpactPage'));
 
 // 3. Lazy-loaded Admin Pages
+const AdminLoginPage = lazy(() => import('../pages/admin/AdminLoginPage'));
 const AdminDashboard = lazy(() => import('../pages/admin/AdminDashboard'));
 const AdminUsersPage = lazy(() => import('../pages/admin/AdminUsersPage'));
 const AdminItemsPage = lazy(() => import('../pages/admin/AdminItemsPage'));
@@ -349,7 +350,8 @@ export const AppRoutes = () => {
       />
       <Route path="/customer/profile" element={<Navigate to="/profile" replace />} />
 
-      {/* 3. ADMIN PORTAL ROUTES (PROTECTED ADMIN) */}
+      {/* 3. ADMIN PORTAL ROUTES */}
+      <Route path="/admin/login" element={<AdminLoginPage />} />
       <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
       <Route
         path="/admin/dashboard"

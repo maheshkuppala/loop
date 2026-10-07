@@ -831,6 +831,25 @@ export const LoginPage = () => {
               <span>Create New Account</span>
               <ArrowRight size={16} />
             </Link>
+
+            {/* Admin Login Portal Link */}
+            <div style={{ marginTop: '1rem', paddingTop: '10px' }}>
+              <Link
+                to="/admin/login"
+                style={{
+                  fontSize: '0.8rem',
+                  color: '#047857',
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <span>Admin Governance Portal Login</span>
+                <ArrowRight size={13} />
+              </Link>
+            </div>
           </div>
         </div>
       </main>
