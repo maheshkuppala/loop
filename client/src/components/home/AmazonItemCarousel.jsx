@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, ArrowRight, Sparkles, MapPin } from 'lucide-react';
+import { ArrowRight, Sparkles, MapPin } from 'lucide-react';
 import Button from '../common/Button';
 import Badge from '../common/Badge';
 
@@ -31,24 +31,16 @@ export const AmazonItemCarousel = ({ items = [] }) => {
   const totalItems = items.length;
   const maxIndex = Math.max(0, totalItems - itemsPerPage);
 
-  // Auto-scroll logic every 3.5 seconds
+  // Automatic smooth infinite rotation timer (scrolls automatically every 3 seconds)
   useEffect(() => {
     if (isPaused || totalItems <= itemsPerPage) return;
 
     const timer = setInterval(() => {
       setCurrentIndex((prev) => (prev >= maxIndex ? 0 : prev + 1));
-    }, 3500);
+    }, 3000);
 
     return () => clearInterval(timer);
   }, [isPaused, maxIndex, totalItems, itemsPerPage]);
-
-  const handleNext = () => {
-    setCurrentIndex((prev) => (prev >= maxIndex ? 0 : prev + 1));
-  };
-
-  const handlePrev = () => {
-    setCurrentIndex((prev) => (prev <= 0 ? maxIndex : prev - 1));
-  };
 
   const getSharingBadgeVariant = (type) => {
     switch (type) {
@@ -114,55 +106,8 @@ export const AmazonItemCarousel = ({ items = [] }) => {
             </p>
           </div>
 
-          {/* Navigation Controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <button
-              type="button"
-              onClick={handlePrev}
-              style={{
-                background: '#ffffff',
-                border: '1px solid var(--color-slate-200)',
-                borderRadius: '50%',
-                width: '42px',
-                height: '42px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                color: 'var(--color-slate-700)',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
-                transition: 'all 0.2s'
-              }}
-              className="carousel-arrow-btn"
-              aria-label="Previous items"
-            >
-              <ChevronLeft size={22} />
-            </button>
-
-            <button
-              type="button"
-              onClick={handleNext}
-              style={{
-                background: 'var(--color-primary-600)',
-                border: 'none',
-                borderRadius: '50%',
-                width: '42px',
-                height: '42px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                color: '#ffffff',
-                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
-                transition: 'all 0.2s'
-              }}
-              className="carousel-arrow-btn-primary"
-              aria-label="Next items"
-            >
-              <ChevronRight size={22} />
-            </button>
-
-            <Link to="/browse" style={{ textDecoration: 'none', marginLeft: '0.5rem' }}>
+          <div>
+            <Link to="/browse" style={{ textDecoration: 'none' }}>
               <Button variant="outline" size="sm" iconRight={ArrowRight} className="browse-hover-highlight-btn">
                 View All Catalog
               </Button>
@@ -177,7 +122,7 @@ export const AmazonItemCarousel = ({ items = [] }) => {
             style={{
               display: 'flex',
               transform: `translateX(-${currentIndex * (100 / itemsPerPage)}%)`,
-              transition: 'transform 0.5s cubic-bezier(0.25, 1, 0.5, 1)',
+              transition: 'transform 0.6s cubic-bezier(0.25, 1, 0.5, 1)',
               gap: '1.25rem'
             }}
           >
@@ -295,14 +240,6 @@ export const AmazonItemCarousel = ({ items = [] }) => {
         }
         .amazon-item-card:hover .amazon-card-img {
           transform: scale(1.05);
-        }
-        .carousel-arrow-btn:hover {
-          background-color: var(--color-slate-100) !important;
-          transform: translateY(-1px);
-        }
-        .carousel-arrow-btn-primary:hover {
-          background-color: var(--color-primary-700) !important;
-          transform: translateY(-1px);
         }
       `}</style>
     </section>
