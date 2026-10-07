@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Search, HelpCircle, Menu, X, ArrowRight } from 'lucide-react';
+import { Search, HelpCircle, Menu, X } from 'lucide-react';
 import Button from '../common/Button';
 import LooopLogo from '../common/LooopLogo';
 
@@ -54,7 +54,7 @@ export const Navbar = () => {
         }}
       >
         {/* LOOOP Brand Mark */}
-        <LooopLogo size="md" showTagline={true} linkTo="/" />
+        <LooopLogo size="md" showTagline={false} linkTo="/" />
 
         {/* Desktop Primary Navigation */}
         <nav
@@ -197,12 +197,6 @@ export const Navbar = () => {
             </Button>
           </Link>
 
-          <Link to="/register" style={{ textDecoration: 'none' }}>
-            <Button variant="primary" size="sm" iconRight={ArrowRight}>
-              Get Started
-            </Button>
-          </Link>
-
           {/* Mobile Menu Toggle Button */}
           <button
             type="button"
@@ -302,11 +296,6 @@ export const Navbar = () => {
             <Link to="/login" onClick={() => setMobileMenuOpen(false)} style={{ textDecoration: 'none' }}>
               <Button variant="secondary" size="sm" style={{ width: '100%' }}>
                 Login
-              </Button>
-            </Link>
-            <Link to="/register" onClick={() => setMobileMenuOpen(false)} style={{ textDecoration: 'none' }}>
-              <Button variant="primary" size="sm" style={{ width: '100%' }} iconRight={ArrowRight}>
-                Get Started
               </Button>
             </Link>
           </div>
