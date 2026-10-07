@@ -439,8 +439,7 @@ exports.sendOtp = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: 'A 6-digit verification code has been dispatched to your email.',
-      simulated: !!brevoResult.simulated,
-      demoCode: (process.env.NODE_ENV !== 'production' || brevoResult.simulated) ? code : undefined
+      simulated: !!brevoResult.simulated
     });
   } catch (error) {
     console.error('sendOtp error:', error);

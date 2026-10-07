@@ -264,8 +264,7 @@ export const authService = {
           if (res.ok) {
             return {
               success: true,
-              message: 'Verification code sent to your email via Brevo.',
-              demoCode: generatedOtp
+              message: 'Verification code sent to your email via Brevo.'
             };
           }
         }
@@ -276,8 +275,7 @@ export const authService = {
       return {
         success: true,
         message: 'Verification code generated.',
-        simulated: true,
-        demoCode: generatedOtp
+        simulated: true
       };
     }
   },
