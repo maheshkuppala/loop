@@ -28,9 +28,16 @@ export const signInWithGoogle = async () => {
     const result = await signInWithPopup(auth, googleProvider);
     return result.user;
   } catch (error) {
+    console.warn('[Firebase Google Auth]', error.code, error.message);
+    if (error.code === 'auth/unauthorized-domain') {
+      const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'loop-five-azure.vercel.app';
+      throw new Error(`Domain "${currentHost}" is not added to Firebase Authorized Domains yet.`);
+    }
+    if (error.code === 'auth/popup-closed-by-user') {
+      throw new Error('Google Sign-in was cancelled.');
+    }
     if (error.code === 'auth/popup-blocked') {
-      await signInWithRedirect(auth, googleProvider);
-      return null;
+      throw new Error('Popup blocked by browser. Please allow popups or use Email OTP.');
     }
     throw error;
   }

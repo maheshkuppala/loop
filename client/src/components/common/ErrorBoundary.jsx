@@ -32,16 +32,29 @@ export class ErrorBoundary extends React.Component {
     }
   };
 
+  handleClearSession = () => {
+    try {
+      localStorage.removeItem('looop_token');
+      localStorage.removeItem('looop_user');
+      sessionStorage.clear();
+    } catch {
+      // ignore
+    }
+    window.location.href = '/login';
+  };
+
   render() {
     if (this.state.hasError) {
       if (this.props.fallback) {
         return this.props.fallback;
       }
 
+      const errorMessage = this.state.error?.message || this.state.error?.toString() || 'Unknown runtime error';
+
       return (
         <div
           style={{
-            minHeight: '60vh',
+            minHeight: '75vh',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -51,18 +64,19 @@ export class ErrorBoundary extends React.Component {
         >
           <div
             style={{
-              maxWidth: '480px',
+              maxWidth: '520px',
+              width: '100%',
               padding: '2.5rem',
               backgroundColor: '#ffffff',
               borderRadius: '1.25rem',
-              border: '1px solid rgba(226, 232, 240, 0.8)',
+              border: '1px solid rgba(226, 232, 240, 0.9)',
               boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.03)'
             }}
           >
             <div
               style={{
-                width: '56px',
-                height: '56px',
+                width: '60px',
+                height: '60px',
                 borderRadius: '50%',
                 backgroundColor: 'rgba(239, 68, 68, 0.1)',
                 color: '#ef4444',
@@ -70,14 +84,14 @@ export class ErrorBoundary extends React.Component {
                 alignItems: 'center',
                 justifyContent: 'center',
                 margin: '0 auto 1.25rem',
-                fontSize: '1.75rem'
+                fontSize: '1.85rem'
               }}
             >
               ⚠️
             </div>
             <h2
               style={{
-                fontSize: '1.35rem',
+                fontSize: '1.4rem',
                 fontWeight: 700,
                 color: '#1e293b',
                 marginBottom: '0.75rem'
@@ -90,16 +104,19 @@ export class ErrorBoundary extends React.Component {
                 fontSize: '0.925rem',
                 color: '#64748b',
                 lineHeight: 1.5,
-                marginBottom: '1.75rem'
+                marginBottom: '1.5rem'
               }}
             >
               An unexpected display issue occurred in this section. Your account, items, and transactions are safe.
             </p>
+
             <div
               style={{
                 display: 'flex',
+                flexWrap: 'wrap',
                 gap: '0.75rem',
-                justifyContent: 'center'
+                justifyContent: 'center',
+                marginBottom: '1.5rem'
               }}
             >
               <button
@@ -113,8 +130,7 @@ export class ErrorBoundary extends React.Component {
                   backgroundColor: '#10b981',
                   border: 'none',
                   borderRadius: '0.5rem',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.15s ease'
+                  cursor: 'pointer'
                 }}
               >
                 Reload Page
@@ -130,13 +146,56 @@ export class ErrorBoundary extends React.Component {
                   backgroundColor: '#f1f5f9',
                   border: '1px solid #cbd5e1',
                   borderRadius: '0.5rem',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.15s ease'
+                  cursor: 'pointer'
                 }}
               >
                 Go to Home
               </button>
+              <button
+                type="button"
+                onClick={this.handleClearSession}
+                style={{
+                  padding: '0.625rem 1.25rem',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#dc2626',
+                  backgroundColor: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '0.5rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Reset Session & Login
+              </button>
             </div>
+
+            {/* Expandable Technical Information */}
+            <details
+              style={{
+                textAlign: 'left',
+                backgroundColor: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '0.5rem',
+                padding: '0.75rem 1rem',
+                fontSize: '0.78rem',
+                color: '#64748b'
+              }}
+            >
+              <summary style={{ fontWeight: 600, color: '#334155', cursor: 'pointer' }}>
+                Technical Details
+              </summary>
+              <div
+                style={{
+                  marginTop: '0.5rem',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-all',
+                  fontFamily: 'monospace',
+                  color: '#b91c1c'
+                }}
+              >
+                {errorMessage}
+              </div>
+            </details>
           </div>
         </div>
       );
