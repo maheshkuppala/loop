@@ -190,14 +190,56 @@ export const authService = {
       const response = await api.post('/auth/otp/send', { email: cleanEmail });
       return response.data;
     } catch {
-      const simulatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      sessionStorage.setItem(`looop_otp_${cleanEmail}`, simulatedOtp);
-      console.log(`[LOOOP OTP Ready for Brevo] Verification code for ${cleanEmail}: ${simulatedOtp}`);
+      // Direct Brevo API dispatch fallback
+      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      sessionStorage.setItem(`looop_otp_${cleanEmail}`, generatedOtp);
+
+      try {
+        const brevoPayload = {
+          sender: { name: 'LOOOP Community', email: 'looop.support@gmail.com' },
+          to: [{ email: cleanEmail }],
+          subject: `Your LOOOP Verification Code: ${generatedOtp}`,
+          htmlContent: `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 14px;">
+              <h2 style="color: #065f46; text-align: center; margin-top: 0;">LOOOP Verification</h2>
+              <p style="color: #475569; font-size: 15px;">Your one-time login verification code is:</p>
+              <div style="text-align: center; font-size: 36px; font-weight: 800; letter-spacing: 6px; color: #047857; padding: 18px; background: #ecfdf5; border-radius: 10px; margin: 20px 0;">
+                ${generatedOtp}
+              </div>
+              <p style="color: #64748b; font-size: 13px;">This code expires in 5 minutes. If you did not request this, please ignore this email.</p>
+            </div>
+          `
+        };
+
+        const clientBrevoKey = import.meta.env?.VITE_BREVO_API_KEY;
+        if (clientBrevoKey) {
+          const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+              'api-key': clientBrevoKey
+            },
+            body: JSON.stringify(brevoPayload)
+          });
+
+          if (res.ok) {
+            return {
+              success: true,
+              message: 'Verification code sent to your email via Brevo.',
+              demoCode: generatedOtp
+            };
+          }
+        }
+      } catch (brevoErr) {
+        console.warn('Direct Brevo client dispatch failed:', brevoErr);
+      }
+
       return {
         success: true,
-        message: 'Verification code generated (Brevo ready).',
+        message: 'Verification code generated.',
         simulated: true,
-        demoCode: simulatedOtp
+        demoCode: generatedOtp
       };
     }
   },

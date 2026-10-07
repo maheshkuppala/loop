@@ -14,12 +14,15 @@ const BREVO_SENDER_NAME = process.env.BREVO_SENDER_NAME || 'LOOOP Community';
  * @param {string} recipientName - Optional recipient name
  */
 async function sendOtpEmail(toEmail, otpCode, recipientName = 'LOOOP Member') {
+  const apiKey = process.env.BREVO_API_KEY;
+  const senderEmail = process.env.BREVO_SENDER_EMAIL || 'looop.support@gmail.com';
+  const senderName = process.env.BREVO_SENDER_NAME || 'looop';
+
   // If Brevo API key is not configured, simulate dispatch safely
-  if (!BREVO_API_KEY || BREVO_API_KEY.includes('your_brevo')) {
+  if (!apiKey || apiKey.includes('your_brevo')) {
     console.log(`[Brevo Email Service - Ready for API Key]`);
     console.log(`📨 Simulation to: ${toEmail}`);
     console.log(`🔑 Verification Code: ${otpCode}`);
-    console.log(`ℹ️ To activate real emails, add BREVO_API_KEY=xkeysib-... to server/.env`);
     return {
       success: true,
       simulated: true,
@@ -65,7 +68,7 @@ async function sendOtpEmail(toEmail, otpCode, recipientName = 'LOOOP Member') {
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
-        'api-key': BREVO_API_KEY
+        'api-key': apiKey
       },
       body: JSON.stringify(payload)
     });
