@@ -64,10 +64,12 @@ const closeDB = async () => {
 const getDBStatus = () => {
   const pgStatus = getPostgresStatus();
   const mongoReady = mongoose.connection ? mongoose.connection.readyState : 0;
+  const isConn = pgStatus.isConnected || mongoReady === 1;
   
   return {
     engine: 'PostgreSQL',
-    isConnected: pgStatus.isConnected || mongoReady === 1,
+    isConnected: isConn,
+    stateName: isConn ? 'connected' : 'disconnected',
     postgres: pgStatus,
     mongodb: {
       isConnected: mongoReady === 1,

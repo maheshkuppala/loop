@@ -66,6 +66,15 @@ export const LoginPage = () => {
   const [rotateX, setRotateX] = useState(0);
   const [rotateY, setRotateY] = useState(0);
 
+  // Auto pre-fill email if passed in query param (e.g. from Register email already owned popup)
+  useEffect(() => {
+    const paramEmail = searchParams.get('email');
+    if (paramEmail) {
+      setEmail(paramEmail);
+      setOtpEmail(paramEmail);
+    }
+  }, [location.search]);
+
   // OTP Countdown timer
   useEffect(() => {
     let timer;

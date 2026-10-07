@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   User,
@@ -19,7 +19,9 @@ import {
   Check,
   Circle,
   Key,
-  Repeat
+  Repeat,
+  ShieldAlert,
+  Send
 } from 'lucide-react';
 import LooopLogo from '../../components/common/LooopLogo';
 import Button from '../../components/common/Button';
@@ -45,6 +47,14 @@ export const RegisterPage = () => {
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
+  // OTP Registration Step State: 'form' | 'otp'
+  const [regStep, setRegStep] = useState('form');
+  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
+  const [otpCountdown, setOtpCountdown] = useState(60);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [simulatedCodeHint, setSimulatedCodeHint] = useState('');
+  const otpInputRefs = useRef([]);
+
   // Field interaction tracking (only show blur errors after user touches field)
   const [touched, setTouched] = useState({});
 
@@ -57,6 +67,17 @@ export const RegisterPage = () => {
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState('');
   const [isDuplicateEmail, setIsDuplicateEmail] = useState(false);
+
+  // OTP Countdown timer
+  useEffect(() => {
+    let timer;
+    if (regStep === 'otp' && otpCountdown > 0) {
+      timer = setInterval(() => {
+        setOtpCountdown((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [regStep, otpCountdown]);
 
   // Password Requirement Checks
   const hasMinLength = password.length >= 8;
@@ -204,18 +225,125 @@ export const RegisterPage = () => {
     setIsSubmitting(true);
 
     try {
-      // Call decoupled authService layer (POST /api/auth/register)
-      const response = await authService.register({
+      // 1. Check duplicate email first across database
+      const check = await authService.checkEmailExists(email.trim());
+      if (check.exists) {
+        setIsDuplicateEmail(true);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 2. Dispatch Brevo Email OTP
+      const res = await authService.sendRegisterOtp({
         name: name.trim(),
         email: email.trim(),
         password
       });
 
+      if (!res.success && res.isDuplicate) {
+        setIsDuplicateEmail(true);
+        return;
+      }
+
+      if (res.demoCode) {
+        setSimulatedCodeHint(res.demoCode);
+      }
+
+      setRegStep('otp');
+      setOtpCountdown(60);
+      addToast({
+        title: 'Verification Code Dispatched',
+        message: 'A 6-digit OTP code has been sent to your email address via Brevo.',
+        variant: 'info'
+      });
+      setTimeout(() => otpInputRefs.current[0]?.focus(), 150);
+    } catch (err) {
+      let errorMsg = "We couldn't dispatch your verification code right now. Please try again.";
+      const status = err.response?.status;
+      const respMsg = err.response?.data?.message || err.message || '';
+
+      if (
+        status === 409 ||
+        respMsg.toLowerCase().includes('already exists') ||
+        respMsg.toLowerCase().includes('already registered')
+      ) {
+        setIsDuplicateEmail(true);
+        return;
+      } else if (respMsg) {
+        errorMsg = respMsg;
+      }
+      setServerError(errorMsg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setServerError('');
+    setIsSendingOtp(true);
+    try {
+      const res = await authService.sendOtp(email.trim());
+      setOtpCountdown(60);
+      if (res.demoCode) {
+        setSimulatedCodeHint(res.demoCode);
+      }
+      addToast({
+        title: 'Code Resent via Brevo',
+        message: 'A new 6-digit verification code has been dispatched to your email.',
+        variant: 'info'
+      });
+    } catch (err) {
+      setServerError('Failed to resend verification code. Please try again.');
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const handleOtpDigitChange = (index, value) => {
+    const val = value.slice(-1);
+    const newDigits = [...otpDigits];
+    newDigits[index] = val;
+    setOtpDigits(newDigits);
+
+    if (val && index < 5) {
+      otpInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index, e) => {
+    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
+      otpInputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleOtpPaste = (e) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').trim().slice(0, 6);
+    if (/^\d+$/.test(pasted)) {
+      const newDigits = pasted.split('').concat(Array(6).fill('')).slice(0, 6);
+      setOtpDigits(newDigits);
+      otpInputRefs.current[Math.min(pasted.length, 5)]?.focus();
+    }
+  };
+
+  const handleVerifyOtpSubmit = async (e) => {
+    e.preventDefault();
+    const code = otpDigits.join('');
+    if (code.length < 6) {
+      setServerError('Please enter the full 6-digit verification code.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setServerError('');
+
+    try {
+      const response = await authService.completeRegisterWithOtp(email.trim(), code);
       if (response && response.token && response.user) {
         register(response.user, response.token);
         addToast({
-          title: 'Welcome to LOOOP!',
-          message: 'Your account has been created successfully.',
+          title: 'Account Created & Verified!',
+          message: `Welcome to LOOOP, ${response.user.name || 'Member'}! Your account details have been securely saved to the database.`,
           variant: 'success'
         });
         if (redirectUrl) {
@@ -226,32 +354,10 @@ export const RegisterPage = () => {
           navigate('/dashboard');
         }
       } else {
-        throw new Error('Unexpected response from registration server.');
+        throw new Error('Verification completed but account creation failed.');
       }
     } catch (err) {
-      // Professional error presentation
-      let errorMsg = "We couldn't create your account right now. Please try again.";
-
-      const status = err.response?.status;
-      const respMsg = err.response?.data?.message || '';
-
-      if (
-        status === 409 ||
-        respMsg.toLowerCase().includes('already exists') ||
-        respMsg.toLowerCase().includes('already registered') ||
-        err.message?.toLowerCase().includes('already exists')
-      ) {
-        errorMsg = 'An account with this email already exists. Please login instead.';
-        setIsDuplicateEmail(true);
-      } else if (respMsg) {
-        errorMsg = respMsg;
-      } else if (err.message && !err.message.includes('404')) {
-        errorMsg = err.message;
-      } else {
-        errorMsg = 'Unable to connect to registration server. Please ensure the backend is running.';
-      }
-
-      setServerError(errorMsg);
+      setServerError(err.message || 'Invalid or expired verification code. Please check and try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -894,12 +1000,173 @@ export const RegisterPage = () => {
               </div>
             )}
 
-            {/* Google Quick Sign-Up */}
-            <div style={{ marginBottom: '1.25rem' }}>
-              <button
-                type="button"
-                onClick={handleGoogleSignIn}
-                disabled={isGoogleLoading}
+            {regStep === 'otp' ? (
+              /* Step 2: Brevo Email OTP Verification */
+              <div style={{ animation: 'fadeIn 0.3s ease' }}>
+                <button
+                  type="button"
+                  onClick={() => setRegStep('form')}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--color-primary-700)',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    marginBottom: '1rem',
+                    padding: 0
+                  }}
+                >
+                  <ArrowLeft size={16} /> Back to account details
+                </button>
+
+                <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+                  <div style={{
+                    width: '60px',
+                    height: '60px',
+                    borderRadius: '50%',
+                    backgroundColor: '#ecfdf5',
+                    color: '#047857',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 1rem auto',
+                    border: '1px solid #a7f3d0'
+                  }}>
+                    <ShieldCheck size={32} />
+                  </div>
+                  <h2 style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--color-slate-900)' }}>
+                    Verify Your Email Address
+                  </h2>
+                  <p style={{ fontSize: '0.875rem', color: 'var(--color-slate-600)', marginTop: '6px', lineHeight: 1.5 }}>
+                    We have dispatched a 6-digit verification code via <strong>Brevo Email</strong> to:
+                  </p>
+                  <div style={{
+                    display: 'inline-block',
+                    marginTop: '8px',
+                    padding: '4px 14px',
+                    backgroundColor: '#f1f5f9',
+                    borderRadius: '20px',
+                    fontSize: '0.875rem',
+                    fontWeight: 700,
+                    color: '#0f172a',
+                    border: '1px solid #cbd5e1'
+                  }}>
+                    {email}
+                  </div>
+                </div>
+
+                {simulatedCodeHint && (
+                  <div style={{
+                    padding: '10px 14px',
+                    borderRadius: '10px',
+                    backgroundColor: '#eff6ff',
+                    border: '1px solid #bfdbfe',
+                    color: '#1e40af',
+                    fontSize: '0.825rem',
+                    marginBottom: '1.25rem',
+                    textAlign: 'center'
+                  }}>
+                    💡 <strong>Development Code Hint:</strong> <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: '1.05rem', letterSpacing: '3px' }}>{simulatedCodeHint}</span>
+                  </div>
+                )}
+
+                {serverError && (
+                  <div style={{
+                    padding: '10px 14px',
+                    borderRadius: '10px',
+                    backgroundColor: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    color: '#991b1b',
+                    fontSize: '0.85rem',
+                    marginBottom: '1.25rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <AlertCircle size={18} style={{ flexShrink: 0 }} />
+                    <span>{serverError}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleVerifyOtpSubmit}>
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '1.5rem' }}>
+                    {otpDigits.map((digit, idx) => (
+                      <input
+                        key={idx}
+                        ref={(el) => (otpInputRefs.current[idx] = el)}
+                        type="text"
+                        maxLength={1}
+                        value={digit}
+                        onChange={(e) => handleOtpDigitChange(idx, e.target.value)}
+                        onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                        onPaste={idx === 0 ? handleOtpPaste : undefined}
+                        style={{
+                          width: '44px',
+                          height: '52px',
+                          textAlign: 'center',
+                          fontSize: '1.35rem',
+                          fontWeight: 800,
+                          borderRadius: '10px',
+                          border: '2px solid #cbd5e1',
+                          backgroundColor: '#ffffff',
+                          color: '#0f172a',
+                          outline: 'none',
+                          transition: 'all 0.2s'
+                        }}
+                        className="auth-input"
+                      />
+                    ))}
+                  </div>
+
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="lg"
+                    loading={isSubmitting}
+                    disabled={isSubmitting || otpDigits.join('').length < 6}
+                    style={{ width: '100%' }}
+                    iconRight={ArrowRight}
+                  >
+                    {isSubmitting ? 'Verifying & Saving Account...' : 'Complete Account Registration'}
+                  </Button>
+                </form>
+
+                <div style={{ marginTop: '1.25rem', textAlign: 'center', fontSize: '0.85rem', color: '#64748b' }}>
+                  <span>Didn't receive the email code? </span>
+                  {otpCountdown > 0 ? (
+                    <span style={{ fontWeight: 600, color: '#047857' }}>Resend in {otpCountdown}s</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleResendOtp}
+                      disabled={isSendingOtp}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#047857',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        textDecoration: 'underline'
+                      }}
+                    >
+                      {isSendingOtp ? 'Sending...' : 'Resend Code via Brevo Email'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* Step 1: Account Info Registration Form */
+              <div>
+                {/* Google Quick Sign-Up */}
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <button
+                    type="button"
+                    onClick={handleGoogleSignIn}
+                    disabled={isGoogleLoading}
                 style={{
                   width: '100%',
                   padding: '12px 18px',
@@ -1372,12 +1639,14 @@ export const RegisterPage = () => {
                   loading={isSubmitting}
                   disabled={isSubmitting}
                   style={{ width: '100%' }}
-                  iconRight={!isSubmitting ? ArrowRight : undefined}
+                  iconRight={!isSubmitting ? Send : undefined}
                 >
-                  {isSubmitting ? 'Creating account...' : 'Create Account'}
+                  {isSubmitting ? 'Verifying email & sending code...' : 'Send Verification Code via Brevo'}
                 </Button>
               </div>
             </form>
+          </div>
+        )}
 
             {/* Bottom: Already have an account? Login */}
             <div
@@ -1404,6 +1673,93 @@ export const RegisterPage = () => {
           </div>
         </div>
       </main>
+
+      {/* Email Already Owned Modal Pop-up */}
+      {isDuplicateEmail && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '1.5rem',
+          animation: 'fadeIn 0.25s ease-out'
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '24px',
+            maxWidth: '460px',
+            width: '100%',
+            padding: '2.25rem 2rem',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.3)',
+            border: '1px solid #e2e8f0',
+            textAlign: 'center',
+            animation: 'scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+          }}>
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              backgroundColor: '#fef2f2',
+              color: '#dc2626',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1.25rem auto',
+              border: '1px solid #fecaca'
+            }}>
+              <Mail size={32} />
+            </div>
+
+            <h3 style={{ fontSize: '1.35rem', fontWeight: 900, color: '#0f172a', marginBottom: '0.5rem', letterSpacing: '-0.02em' }}>
+              Email Already Owned
+            </h3>
+
+            <p style={{ fontSize: '0.925rem', color: '#475569', lineHeight: 1.6, marginBottom: '1.75rem' }}>
+              The email address <strong style={{ color: '#0f172a', fontWeight: 700 }}>{email}</strong> is already registered to an existing account in our database. Please log in with your credentials or try registering with a different email.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <Button
+                variant="primary"
+                size="lg"
+                style={{ width: '100%' }}
+                onClick={() => navigate(`/login?email=${encodeURIComponent(email)}`)}
+                iconRight={ArrowRight}
+              >
+                Sign In to Your Account
+              </Button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDuplicateEmail(false);
+                  setServerError('');
+                }}
+                style={{
+                  padding: '0.75rem',
+                  borderRadius: '12px',
+                  border: '1.5px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                  color: '#334155',
+                  fontWeight: 700,
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Try a Different Email
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Embedded Component Micro-Interactions & 3D Floating Keyframes */}
       <style>{`

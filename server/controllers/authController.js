@@ -122,6 +122,43 @@ exports.login = async (req, res) => {
   }
 };
 
+exports.checkEmail = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email || !EMAIL_REGEX.test(String(email).trim())) {
+      return res.status(400).json({ success: false, message: 'Valid email address is required.' });
+    }
+
+    const cleanEmail = String(email).toLowerCase().trim();
+    let exists = false;
+
+    // 1. Check PostgreSQL
+    try {
+      const pgCheck = await pgQuery('SELECT id FROM users WHERE LOWER(email) = $1 LIMIT 1', [cleanEmail]);
+      if (pgCheck && pgCheck.rows && pgCheck.rows.length > 0) {
+        exists = true;
+      }
+    } catch {}
+
+    // 2. Check MongoDB
+    if (!exists && mongoose.connection && mongoose.connection.readyState === 1) {
+      try {
+        const mongoUser = await User.findOne({ email: cleanEmail });
+        if (mongoUser) exists = true;
+      } catch {}
+    }
+
+    return res.status(200).json({
+      success: true,
+      exists,
+      message: exists ? 'An account with this email address already exists.' : 'Email is available.'
+    });
+  } catch (error) {
+    console.error('checkEmail error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to check email status.' });
+  }
+};
+
 exports.register = async (req, res) => {
   try {
     const { name, email, password } = req.body;

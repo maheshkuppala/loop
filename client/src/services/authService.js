@@ -338,6 +338,107 @@ export const authService = {
   },
 
   /**
+   * Check if an email address is already owned by an existing user in Neon DB, Mongo, or Local Storage
+   * @param {string} email
+   * @returns {Promise<{ exists: boolean, user?: Object, message?: string }>}
+   */
+  checkEmailExists: async (email) => {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    if (!cleanEmail) return { exists: false };
+
+    // 1. Check Super Admins & Known Accounts
+    const superAdmins = ['looop.support@gmail.com', 'maheshkuppala321@gmail.com', 'admin@looop.community'];
+    if (superAdmins.includes(cleanEmail)) {
+      return { exists: true, message: 'An account with this email address already exists.' };
+    }
+
+    // 2. Check Neon PostgreSQL Database
+    try {
+      const dbUser = await neonDb.getUserByEmail(cleanEmail);
+      if (dbUser) {
+        return { exists: true, user: dbUser, message: 'An account with this email address already exists in database.' };
+      }
+    } catch (pgErr) {
+      console.warn('[authService] Neon check warning:', pgErr.message);
+    }
+
+    // 3. Check Backend API
+    try {
+      const res = await api.post('/auth/check-email', { email: cleanEmail });
+      if (res.data && res.data.exists) {
+        return { exists: true, message: res.data.message || 'An account with this email address already exists.' };
+      }
+    } catch (apiErr) {
+      // Ignore API check errors for resilient offline behavior
+    }
+
+    // 4. Check Local Storage Registered Users
+    const localUsers = getLocalUsers();
+    const localMatch = localUsers.find((u) => u.email.toLowerCase() === cleanEmail);
+    if (localMatch) {
+      return { exists: true, user: localMatch, message: 'An account with this email address already exists.' };
+    }
+
+    return { exists: false };
+  },
+
+  /**
+   * Send Brevo Email OTP for new registration after verifying email uniqueness
+   */
+  sendRegisterOtp: async (userData) => {
+    const cleanEmail = (userData.email || '').trim().toLowerCase();
+    const cleanName = (userData.name || '').trim();
+    const cleanPass = userData.password || '';
+
+    // Check duplicate email first
+    const check = await authService.checkEmailExists(cleanEmail);
+    if (check.exists) {
+      return {
+        success: false,
+        isDuplicate: true,
+        message: 'An account with this email already exists. Please log in instead.'
+      };
+    }
+
+    // Save pending registration payload locally
+    sessionStorage.setItem('looop_pending_reg', JSON.stringify({
+      name: cleanName,
+      email: cleanEmail,
+      password: cleanPass
+    }));
+
+    // Send 6-digit OTP code via Brevo Service
+    const otpRes = await authService.sendOtp(cleanEmail);
+    return {
+      success: true,
+      message: 'Verification code sent to your email address via Brevo.',
+      demoCode: otpRes.demoCode
+    };
+  },
+
+  /**
+   * Complete registration after verifying 6-digit OTP code
+   */
+  completeRegisterWithOtp: async (email, otpCode) => {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const pendingRaw = sessionStorage.getItem('looop_pending_reg');
+    const pending = pendingRaw ? JSON.parse(pendingRaw) : { email: cleanEmail };
+
+    // Verify OTP code
+    await authService.verifyOtp(cleanEmail, otpCode);
+
+    // Perform final account creation & database persistence
+    const regResult = await authService.register({
+      name: pending.name || cleanEmail.split('@')[0],
+      email: cleanEmail,
+      password: pending.password || 'VerifiedUser123!'
+    });
+
+    sessionStorage.removeItem('looop_pending_reg');
+    return regResult;
+  },
+
+  /**
    * Register a new user account with direct Neon PostgreSQL cloud persistence
    * @param {Object} userData - { name, email, password }
    * @returns {Promise<Object>} - Session with { token, user }
