@@ -218,6 +218,8 @@ export const RegisterPage = () => {
         });
         if (redirectUrl) {
           navigate(redirectUrl);
+        } else if (response.user.role === 'admin' || response.user.role === 'ADMIN') {
+          navigate('/admin/dashboard');
         } else {
           navigate('/dashboard');
         }
@@ -225,7 +227,7 @@ export const RegisterPage = () => {
         throw new Error('Unexpected response from registration server.');
       }
     } catch (err) {
-      // Professional error presentation (no raw stack traces or fake bypasses)
+      // Professional error presentation
       let errorMsg = "We couldn't create your account right now. Please try again.";
 
       const status = err.response?.status;

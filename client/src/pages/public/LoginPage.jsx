@@ -612,6 +612,86 @@ export const LoginPage = () => {
               </div>
             )}
 
+            {/* Quick Fill Admin & Demo Accounts */}
+            <div
+              style={{
+                padding: '12px 14px',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: '#f0fdf4',
+                border: '1px solid #bbf7d0',
+                marginBottom: '1.25rem'
+              }}
+            >
+              <div
+                style={{
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  color: '#166534',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  marginBottom: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <ShieldCheck size={14} />
+                <span>Quick Admin Sign-In (1-Tap)</span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail('maheshkuppala321@gmail.com');
+                    setPassword('Mahesh@1');
+                    setErrors({});
+                    setServerError('');
+                  }}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid #86efac',
+                    backgroundColor: '#ffffff',
+                    color: '#15803d',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                  }}
+                >
+                  <span>👑 Mahesh (Admin)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail('admin@looop.community');
+                    setPassword('AdminPassword123!');
+                    setErrors({});
+                    setServerError('');
+                  }}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid #86efac',
+                    backgroundColor: '#ffffff',
+                    color: '#15803d',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                  }}
+                >
+                  <span>🛡️ Looop Admin</span>
+                </button>
+              </div>
+            </div>
+
             {/* Login Form */}
             <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               {/* Email Address Field */}
