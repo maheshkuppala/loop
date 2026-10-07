@@ -197,7 +197,7 @@ export const Navbar = () => {
             </Button>
           </Link>
 
-          <Link to="/register" style={{ textDecoration: 'none' }}>
+          <Link to="/login" style={{ textDecoration: 'none' }}>
             <Button variant="primary" size="sm" iconRight={ArrowRight}>
               Get Started
             </Button>
@@ -304,7 +304,7 @@ export const Navbar = () => {
                 Login
               </Button>
             </Link>
-            <Link to="/register" onClick={() => setMobileMenuOpen(false)} style={{ textDecoration: 'none' }}>
+            <Link to="/login" onClick={() => setMobileMenuOpen(false)} style={{ textDecoration: 'none' }}>
               <Button variant="primary" size="sm" style={{ width: '100%' }} iconRight={ArrowRight}>
                 Get Started
               </Button>
