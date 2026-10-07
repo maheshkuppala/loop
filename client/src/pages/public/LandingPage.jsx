@@ -210,7 +210,16 @@ export const LandingPage = () => {
                     variant="outline"
                     size="lg"
                     iconRight={ArrowRight}
-                    className="browse-hover-highlight-btn"
+                    style={{
+                      backgroundColor: '#ecfdf5',
+                      borderColor: 'var(--color-primary-500)',
+                      borderWidth: '2px',
+                      color: 'var(--color-primary-700)',
+                      fontWeight: 700,
+                      boxShadow: '0 4px 14px rgba(16, 185, 129, 0.22)',
+                      transition: 'all 0.25s ease'
+                    }}
+                    className="highlighted-share-btn"
                   >
                     Browse Items
                   </Button>
