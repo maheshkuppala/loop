@@ -82,7 +82,7 @@ export const LoginPage = () => {
   const handleAuthSuccess = (userData, authToken, welcomeName) => {
     login(userData, authToken);
     addToast({
-      title: 'Welcome Back!',
+      title: 'Welcome to LOOOP!',
       message: `Signed in successfully as ${welcomeName || userData.name || userData.email}.`,
       variant: 'success'
     });

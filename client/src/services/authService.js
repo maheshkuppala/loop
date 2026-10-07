@@ -573,7 +573,7 @@ export const authService = {
       const brevoPayload = {
         sender: { name: 'LOOOP Community', email: 'looop.support@gmail.com' },
         to: [{ email: cleanEmail, name: cleanName }],
-        subject: `Welcome Back to LOOOP, ${cleanName}!`,
+        subject: `Welcome to LOOOP, ${cleanName}!`,
         htmlContent: `
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
             <div style="text-align: center; margin-bottom: 20px;">
