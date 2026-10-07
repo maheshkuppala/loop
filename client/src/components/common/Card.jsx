@@ -3,12 +3,13 @@ import React from 'react';
 export const Card = ({
   children,
   interactive = false,
+  hoverable = false,
   glass = false,
   className = '',
   onClick,
   ...props
 }) => {
-  const interactiveClass = interactive ? 'card-interactive' : '';
+  const interactiveClass = (interactive || hoverable) ? 'card-interactive' : '';
   const glassClass = glass ? 'card-glass' : '';
 
   return (
