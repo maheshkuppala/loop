@@ -30,11 +30,26 @@ class SocketService {
       this.socket.disconnect();
     }
 
-    const socketUrl =
-      import.meta.env.VITE_SOCKET_URL ||
-      (typeof window !== 'undefined' && window.location.port === '3000'
+    const rawSocketUrl = import.meta.env?.VITE_SOCKET_URL;
+    let socketUrl = '';
+    if (rawSocketUrl && typeof rawSocketUrl === 'string') {
+      let cleaned = rawSocketUrl.trim().replace(/^['"]|['"]$/g, '').trim();
+      if (!/^https?:\/\//i.test(cleaned) && !cleaned.startsWith('ws://') && !cleaned.startsWith('wss://')) {
+        cleaned = `https://${cleaned}`;
+      }
+      cleaned = cleaned.replace(/\/api\/?$/i, '').replace(/\/+$/, '');
+      try {
+        socketUrl = new URL(cleaned).origin;
+      } catch {
+        socketUrl = '';
+      }
+    }
+
+    if (!socketUrl) {
+      socketUrl = typeof window !== 'undefined' && window.location.port === '3000'
         ? 'http://localhost:5000'
-        : '');
+        : (typeof window !== 'undefined' ? window.location.origin : '');
+    }
 
     this.socket = io(socketUrl, {
       auth: {

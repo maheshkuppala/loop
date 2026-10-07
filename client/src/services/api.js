@@ -4,14 +4,40 @@ import axios from 'axios';
  * Central Axios API Client for LOOOP
  * Configured with baseURL from VITE_API_URL, Bearer token injection, and error formatting
  */
-const API_BASE_URL = (import.meta.env && import.meta.env.VITE_API_URL) || '/api';
+/**
+ * Robust URL sanitizer to prevent browser 'Failed to construct URL' crashes
+ * Handles missing protocols, quotes, trailing slashes, and malformed inputs gracefully.
+ */
+export const sanitizeApiBaseUrl = (rawUrl) => {
+  if (!rawUrl || typeof rawUrl !== 'string') return '/api';
+  let cleaned = rawUrl.trim().replace(/^['"]|['"]$/g, '').trim();
+  if (!cleaned) return '/api';
+  if (cleaned.startsWith('postgres://') || cleaned.startsWith('postgresql://')) {
+    console.warn('[LOOOP Config] PostgreSQL URI was supplied to frontend VITE_API_URL. Falling back to /api');
+    return '/api';
+  }
+  if (cleaned.startsWith('/')) return cleaned.replace(/\/+$/, '');
+  if (!/^https?:\/\//i.test(cleaned)) cleaned = 'https://' + cleaned;
+  cleaned = cleaned.replace(/\/+$/, '');
+  try {
+    const parsed = new URL(cleaned);
+    if (!parsed.pathname || parsed.pathname === '/' || parsed.pathname === '') {
+      parsed.pathname = '/api';
+    }
+    return parsed.toString().replace(/\/+$/, '');
+  } catch (err) {
+    return '/api';
+  }
+};
+
+const API_BASE_URL = sanitizeApiBaseUrl(import.meta.env?.VITE_API_URL);
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json'
   },
-  timeout: 12000
+  timeout: 15000
 });
 
 // Request Interceptor: inject stored JWT token if present
