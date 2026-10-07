@@ -812,7 +812,7 @@ export const LoginPage = () => {
                 textDecoration: 'none'
               }}
             >
-              Create Account
+              Create New Account
             </Link>
           </div>
         </div>
