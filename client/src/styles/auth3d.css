@@ -1,0 +1,87 @@
+/* 3D Cinematic Authentication Styles & Animations */
+
+@keyframes gradientShimmer {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes floatOrb1 {
+  0% { transform: translate(0px, 0px) scale(1); }
+  50% { transform: translate(30px, -40px) scale(1.1); }
+  100% { transform: translate(-20px, 20px) scale(0.95); }
+}
+
+@keyframes floatOrb2 {
+  0% { transform: translate(0px, 0px) scale(1); }
+  50% { transform: translate(-40px, 30px) scale(1.15); }
+  100% { transform: translate(25px, -35px) scale(0.9); }
+}
+
+@keyframes subtleFloat {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes badgeGlow {
+  0%, 100% { box-shadow: 0 0 15px rgba(16, 185, 129, 0.35); }
+  50% { box-shadow: 0 0 25px rgba(52, 211, 153, 0.65); }
+}
+
+.perspective-stage {
+  perspective: 1600px;
+  perspective-origin: center center;
+}
+
+.card-3d {
+  transform-style: preserve-3d;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s ease;
+  will-change: transform;
+}
+
+.card-3d:hover {
+  box-shadow: 0 35px 70px -15px rgba(6, 78, 59, 0.28), 0 20px 40px -20px rgba(15, 23, 42, 0.18);
+}
+
+.welcome-shimmer-border {
+  background: linear-gradient(135deg, #059669, #10b981, #0284c7, #059669);
+  background-size: 300% 300%;
+  animation: gradientShimmer 7s ease infinite;
+}
+
+.floating-orb-1 {
+  animation: floatOrb1 10s ease-in-out infinite alternate;
+}
+
+.floating-orb-2 {
+  animation: floatOrb2 12s ease-in-out infinite alternate;
+}
+
+.floating-badge {
+  animation: subtleFloat 4s ease-in-out infinite;
+}
+
+.glowing-indicator {
+  animation: badgeGlow 3s ease-in-out infinite;
+}
+
+/* Glassmorphism high-end effects */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.glass-dark-panel {
+  background: rgba(6, 78, 59, 0.94);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(167, 243, 208, 0.2);
+}
+
+.otp-box-input:focus {
+  border-color: #059669 !important;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2) !important;
+  transform: translateY(-2px);
+}

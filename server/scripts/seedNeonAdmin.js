@@ -8,12 +8,22 @@ async function seed() {
 
   const accounts = [
     {
+      id: 'usr-admin-primary',
+      name: 'Mahesh Naidu (Super Admin)',
+      email: 'looop.support@gmail.com',
+      password: 'Mahesh@Naidu',
+      role: 'admin',
+      bio: 'Looop Head Administrator & Platform Lead',
+      city: 'Guntur',
+      state: 'Andhra Pradesh'
+    },
+    {
       id: 'usr-admin-01',
       name: 'Mahesh Naidu',
       email: 'maheshkuppala321@gmail.com',
       password: 'Mahesh@1',
       role: 'admin',
-      bio: 'Looop Super Administrator',
+      bio: 'Looop Administrator',
       city: 'Guntur',
       state: 'Andhra Pradesh'
     },

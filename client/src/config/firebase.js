@@ -1,7 +1,6 @@
-// Import the functions you need from the SDKs you need
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAnalytics, isSupported } from "firebase/analytics";
-import { getAuth } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect } from "firebase/auth";
 
 // Your web app's Firebase configuration
 export const firebaseConfig = {
@@ -19,6 +18,23 @@ export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getA
 
 // Firebase Authentication instance
 export const auth = getAuth(app);
+
+// Google Auth Provider setup
+export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
+
+export const signInWithGoogle = async () => {
+  try {
+    const result = await signInWithPopup(auth, googleProvider);
+    return result.user;
+  } catch (error) {
+    if (error.code === 'auth/popup-blocked') {
+      await signInWithRedirect(auth, googleProvider);
+      return null;
+    }
+    throw error;
+  }
+};
 
 // Safe Analytics initialization
 export let analytics = null;

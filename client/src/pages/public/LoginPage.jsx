@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Mail,
@@ -8,21 +8,23 @@ import {
   ArrowRight,
   ArrowLeft,
   ShieldCheck,
-  CheckCircle2,
   Sparkles,
   AlertCircle,
-  Laptop,
-  BookOpen,
-  Wrench,
-  Headphones,
+  KeyRound,
   RefreshCw,
-  Key
+  CheckCircle2,
+  Globe2,
+  Flame,
+  ShieldAlert,
+  Send
 } from 'lucide-react';
 import LooopLogo from '../../components/common/LooopLogo';
 import Button from '../../components/common/Button';
 import { authService } from '../../services/authService';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../hooks/useToast';
+import { signInWithGoogle } from '../../config/firebase';
+import '../../styles/auth3d.css';
 
 export const LoginPage = () => {
   const navigate = useNavigate();
@@ -33,28 +35,95 @@ export const LoginPage = () => {
   const searchParams = new URLSearchParams(location.search);
   const redirectUrl = searchParams.get('redirect');
 
-  // Form state
+  // Auth Modes: 'password' | 'google-otp'
+  const [authMode, setAuthMode] = useState('password');
+
+  // Password Login State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // OTP Login State
+  const [otpEmail, setOtpEmail] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
+  const [otpCountdown, setOtpCountdown] = useState(60);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [simulatedCodeHint, setSimulatedCodeHint] = useState('');
+  const otpInputRefs = useRef([]);
+
+  // Google Login State
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
   // Validation & Error states
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState('');
 
-  // Client-side field validation
+  // 3D Tilt State
+  const cardRef = useRef(null);
+  const [rotateX, setRotateX] = useState(0);
+  const [rotateY, setRotateY] = useState(0);
+
+  // OTP Countdown timer
+  useEffect(() => {
+    let timer;
+    if (otpSent && otpCountdown > 0) {
+      timer = setInterval(() => {
+        setOtpCountdown((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [otpSent, otpCountdown]);
+
+  // Handle 3D Mouse Parallax
+  const handleMouseMove = (e) => {
+    if (!cardRef.current || window.innerWidth < 768) return;
+    const rect = cardRef.current.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const mouseX = e.clientX - centerX;
+    const mouseY = e.clientY - centerY;
+
+    const rX = -(mouseY / (rect.height / 2)) * 7;
+    const rY = (mouseX / (rect.width / 2)) * 7;
+
+    setRotateX(rX);
+    setRotateY(rY);
+  };
+
+  const handleMouseLeave = () => {
+    setRotateX(0);
+    setRotateY(0);
+  };
+
+  const handleAuthSuccess = (userData, authToken, welcomeName) => {
+    login(userData, authToken);
+    addToast({
+      title: 'Welcome Back!',
+      message: `Signed in successfully as ${welcomeName || userData.name || userData.email}.`,
+      variant: 'success'
+    });
+
+    if (redirectUrl) {
+      navigate(redirectUrl);
+    } else if (userData.role === 'ADMIN' || userData.role === 'admin') {
+      navigate('/admin/dashboard');
+    } else {
+      navigate('/dashboard');
+    }
+  };
+
+  // 1. Password Form Validation
   const validateForm = () => {
     const newErrors = {};
-
-    // Email validation
     if (!email.trim()) {
       newErrors.email = 'Please enter your email address.';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       newErrors.email = 'Please enter a valid email address.';
     }
 
-    // Password validation
     if (!password) {
       newErrors.password = 'Please enter your password.';
     } else if (password.length < 6) {
@@ -65,63 +134,140 @@ export const LoginPage = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Submit Password Form
   const handleSubmit = async (e) => {
     e.preventDefault();
     setServerError('');
-
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
 
     setIsSubmitting(true);
-
     try {
-      // Call decoupled authService layer
       const response = await authService.login({
         email: email.trim(),
         password
       });
 
-      // If backend responds with token & user
       if (response && response.token && response.user) {
-        login(response.user, response.token);
-        addToast({
-          title: 'Welcome Back',
-          message: `Signed in successfully as ${response.user.name || response.user.email}.`,
-          variant: 'success'
-        });
-
-        // Redirect to requested protected path if available
-        if (redirectUrl) {
-          navigate(redirectUrl);
-        } else if (response.user.role === 'ADMIN' || response.user.role === 'admin') {
-          navigate('/admin/dashboard');
-        } else {
-          navigate('/dashboard');
-        }
+        handleAuthSuccess(response.user, response.token, response.user.name);
       } else {
-        throw new Error('Unexpected response from authentication server.');
+        throw new Error('Invalid response from login service.');
       }
     } catch (err) {
-      // Professional error presentation (no raw stack traces or fake successes)
       const errorMsg =
         err.response?.data?.message ||
         err.message ||
-        'Unable to connect to authentication server. Please ensure the backend is running.';
-
+        'Unable to connect to authentication server.';
       setServerError(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleForgotPassword = (e) => {
+  // 2. Google Login with Firebase
+  const handleGoogleSignIn = async () => {
+    setServerError('');
+    setIsGoogleLoading(true);
+    try {
+      const googleUser = await signInWithGoogle();
+      if (!googleUser) return; // redirect initiated
+
+      const result = await authService.googleLogin({
+        email: googleUser.email,
+        displayName: googleUser.displayName,
+        photoURL: googleUser.photoURL,
+        uid: googleUser.uid
+      });
+
+      if (result && result.token && result.user) {
+        handleAuthSuccess(result.user, result.token, googleUser.displayName);
+      }
+    } catch (err) {
+      console.error('Google sign-in error:', err);
+      setServerError(err.message || 'Google sign-in failed. Please try again.');
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
+
+  // 3. Send OTP (Brevo Integration Ready)
+  const handleSendOtp = async (e) => {
+    if (e) e.preventDefault();
+    setServerError('');
+    if (!otpEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(otpEmail.trim())) {
+      setServerError('Please enter a valid email address to receive OTP.');
+      return;
+    }
+
+    setIsSendingOtp(true);
+    try {
+      const res = await authService.sendOtp(otpEmail.trim());
+      setOtpSent(true);
+      setOtpCountdown(60);
+      if (res.demoCode) {
+        setSimulatedCodeHint(res.demoCode);
+      }
+      addToast({
+        title: 'Verification Code Sent',
+        message: 'Please check your email inbox for the 6-digit OTP.',
+        variant: 'info'
+      });
+      setTimeout(() => otpInputRefs.current[0]?.focus(), 150);
+    } catch (err) {
+      setServerError(err.message || 'Failed to dispatch verification code.');
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  // Handle OTP 6-box input changes
+  const handleOtpDigitChange = (index, value) => {
+    const val = value.slice(-1);
+    const newDigits = [...otpDigits];
+    newDigits[index] = val;
+    setOtpDigits(newDigits);
+
+    if (val && index < 5) {
+      otpInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index, e) => {
+    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
+      otpInputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleOtpPaste = (e) => {
     e.preventDefault();
-    addToast({
-      title: 'Password Reset',
-      message: 'Password recovery will be activated when the backend email service is connected.',
-      variant: 'info'
-    });
+    const pasted = e.clipboardData.getData('text').trim().slice(0, 6);
+    if (/^\d+$/.test(pasted)) {
+      const newDigits = pasted.split('').concat(Array(6).fill('')).slice(0, 6);
+      setOtpDigits(newDigits);
+      otpInputRefs.current[Math.min(pasted.length, 5)]?.focus();
+    }
+  };
+
+  // Submit OTP Verification
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    const code = otpDigits.join('');
+    if (code.length < 6) {
+      setServerError('Please enter the complete 6-digit verification code.');
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+    setServerError('');
+    try {
+      const res = await authService.verifyOtp(otpEmail.trim(), code);
+      if (res && res.token && res.user) {
+        handleAuthSuccess(res.user, res.token, res.user.name);
+      }
+    } catch (err) {
+      setServerError(err.message || 'Invalid or expired verification code.');
+    } finally {
+      setIsVerifyingOtp(false);
+    }
   };
 
   return (
@@ -130,19 +276,55 @@ export const LoginPage = () => {
         minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
-        backgroundColor: '#f8fafc',
+        backgroundColor: '#021e17',
+        backgroundImage: 'radial-gradient(circle at 50% 10%, #064e3b 0%, #021a14 70%, #01120e 100%)',
         position: 'relative',
-        overflowX: 'hidden'
+        overflowX: 'hidden',
+        color: '#f8fafc'
       }}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
     >
-      {/* Top Simple Brand & Back Navigation */}
+      {/* Background Animated Floating Ambient 3D Orbs */}
+      <div
+        className="floating-orb-1"
+        style={{
+          position: 'absolute',
+          top: '10%',
+          left: '5%',
+          width: '380px',
+          height: '380px',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(16, 185, 129, 0.18) 0%, rgba(16, 185, 129, 0) 70%)',
+          pointerEvents: 'none',
+          filter: 'blur(40px)',
+          zIndex: 1
+        }}
+      />
+      <div
+        className="floating-orb-2"
+        style={{
+          position: 'absolute',
+          bottom: '10%',
+          right: '5%',
+          width: '450px',
+          height: '450px',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(5, 150, 105, 0.22) 0%, rgba(5, 150, 105, 0) 70%)',
+          pointerEvents: 'none',
+          filter: 'blur(50px)',
+          zIndex: 1
+        }}
+      />
+
+      {/* Top Header */}
       <header
         style={{
           padding: '1.25rem 2rem',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          zIndex: 10
+          zIndex: 20
         }}
       >
         <LooopLogo size="md" showTagline={true} linkTo="/" />
@@ -152,53 +334,111 @@ export const LoginPage = () => {
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '6px',
+            gap: '8px',
             fontSize: '0.875rem',
-            color: 'var(--color-slate-600)',
+            color: '#a7f3d0',
             textDecoration: 'none',
             fontWeight: 600,
-            padding: '6px 12px',
-            borderRadius: 'var(--radius-full)',
-            backgroundColor: 'rgba(255, 255, 255, 0.8)',
-            border: '1px solid var(--color-slate-200)',
-            transition: 'all var(--transition-fast)'
+            padding: '8px 16px',
+            borderRadius: '9999px',
+            backgroundColor: 'rgba(6, 95, 70, 0.4)',
+            border: '1px solid rgba(52, 211, 153, 0.25)',
+            backdropFilter: 'blur(10px)',
+            transition: 'all 0.2s ease'
           }}
-          className="back-home-link"
         >
           <ArrowLeft size={16} />
           <span>Back to Home</span>
         </Link>
       </header>
 
-      {/* Main Authentication Split Container */}
+      {/* Main 3D Container Stage */}
       <main
+        className="perspective-stage"
         style={{
           flex: 1,
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '1rem 1.5rem 3rem 1.5rem',
-          position: 'relative'
+          padding: '1rem 1.5rem 3.5rem 1.5rem',
+          position: 'relative',
+          zIndex: 10
         }}
       >
+        {/* TOP GLOWING WELCOME BANNER */}
         <div
+          className="floating-badge welcome-shimmer-border"
           style={{
-            maxWidth: '1100px',
+            padding: '2px',
+            borderRadius: '9999px',
+            marginBottom: '1.75rem',
+            maxWidth: '680px',
+            width: '100%',
+            boxShadow: '0 10px 30px -10px rgba(16, 185, 129, 0.4)'
+          }}
+        >
+          <div
+            style={{
+              padding: '10px 20px',
+              borderRadius: '9999px',
+              backgroundColor: '#064e3b',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              flexWrap: 'wrap'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  backgroundColor: '#34d399'
+                }}
+                className="glowing-indicator"
+              />
+              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#ecfdf5', letterSpacing: '-0.01em' }}>
+                LOOOP 3.0 Platform
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '0.78rem', color: '#a7f3d0' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Sparkles size={13} color="#34d399" /> 100% Circular Goods
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <ShieldCheck size={13} color="#34d399" /> Verified Community
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* 3D INTERACTIVE CARD CONTAINER */}
+        <div
+          ref={cardRef}
+          className="card-3d"
+          style={{
+            maxWidth: '1050px',
             width: '100%',
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
             backgroundColor: '#ffffff',
-            borderRadius: 'var(--radius-xl)',
-            boxShadow: '0 20px 40px -15px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(226, 232, 240, 0.8)',
-            overflow: 'hidden'
+            borderRadius: '24px',
+            overflow: 'hidden',
+            boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(16, 185, 129, 0.15)',
+            transform: `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`,
+            transformStyle: 'preserve-3d'
           }}
-          className="auth-card-container"
         >
-          {/* LEFT SIDE: Brand & 3D Connected Items Composition */}
+          {/* LEFT SIDE: Brand Showcase & 3D Visual Depth */}
           <div
             style={{
               padding: '3.5rem 3rem',
-              background: 'linear-gradient(145deg, #064e3b 0%, #065f46 60%, #047857 100%)',
+              background: 'linear-gradient(150deg, #022c22 0%, #064e3b 50%, #065f46 100%)',
               color: '#ffffff',
               display: 'flex',
               flexDirection: 'column',
@@ -206,464 +446,130 @@ export const LoginPage = () => {
               position: 'relative',
               overflow: 'hidden'
             }}
-            className="auth-brand-pane"
           >
-            {/* Background Decorative Rings */}
+            {/* Geometric 3D Aesthetic Rings */}
             <div
               style={{
                 position: 'absolute',
-                top: '-60px',
-                right: '-60px',
-                width: '260px',
-                height: '260px',
+                top: '-80px',
+                right: '-80px',
+                width: '300px',
+                height: '300px',
                 borderRadius: '50%',
-                border: '40px solid rgba(255, 255, 255, 0.04)',
+                border: '45px solid rgba(52, 211, 153, 0.08)',
                 pointerEvents: 'none'
               }}
             />
             <div
               style={{
                 position: 'absolute',
-                bottom: '-80px',
-                left: '-80px',
-                width: '320px',
-                height: '320px',
+                bottom: '-100px',
+                left: '-100px',
+                width: '380px',
+                height: '380px',
                 borderRadius: '50%',
-                border: '60px solid rgba(255, 255, 255, 0.03)',
+                border: '60px solid rgba(52, 211, 153, 0.05)',
                 pointerEvents: 'none'
               }}
             />
 
-            {/* Top Brand Copy */}
+            {/* Top Brand Tag */}
             <div style={{ position: 'relative', zIndex: 2 }}>
               <div
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
-                  padding: '4px 12px',
-                  borderRadius: 'var(--radius-full)',
-                  backgroundColor: 'rgba(255, 255, 255, 0.12)',
-                  fontSize: '0.78rem',
+                  padding: '5px 14px',
+                  borderRadius: '9999px',
+                  backgroundColor: 'rgba(52, 211, 153, 0.15)',
+                  border: '1px solid rgba(52, 211, 153, 0.25)',
+                  fontSize: '0.8rem',
                   fontWeight: 700,
-                  color: '#a7f3d0',
-                  marginBottom: '1.25rem',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em'
+                  color: '#6ee7b7',
+                  marginBottom: '1.5rem'
                 }}
               >
-                <Sparkles size={14} />
-                <span>The Community Sharing Circle</span>
+                <Flame size={14} color="#34d399" />
+                <span>Next-Gen Sustainability</span>
               </div>
 
               <h2
                 style={{
-                  fontSize: 'clamp(1.85rem, 3vw, 2.35rem)',
+                  fontSize: '2.1rem',
                   fontWeight: 900,
-                  lineHeight: 1.2,
+                  lineHeight: 1.15,
+                  letterSpacing: '-0.03em',
                   marginBottom: '1rem',
-                  letterSpacing: '-0.025em',
                   color: '#ffffff'
                 }}
               >
-                Give unused things another purpose.
+                Share goods. <br />
+                <span style={{ color: '#34d399' }}>Save resources.</span> <br />
+                Connect local.
               </h2>
 
               <p
                 style={{
-                  fontSize: '0.975rem',
-                  color: '#d1fae5',
-                  lineHeight: 1.65,
-                  maxWidth: '420px',
-                  margin: 0
+                  fontSize: '0.92rem',
+                  lineHeight: 1.6,
+                  color: '#cbd5e1',
+                  maxWidth: '380px'
                 }}
               >
-                Connect with fellow students, neighbors, and sharers in your local community. Borrow textbooks, share tools, and keep items in the loop.
+                Join thousands of verified neighbours lending, borrowing, and giving pre-loved items a second life.
               </p>
             </div>
 
-            {/* Middle: 3D Floating Everyday Item Cards */}
-            <div
-              style={{
-                margin: '2.5rem 0',
-                position: 'relative',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '12px',
-                zIndex: 2
-              }}
-              className="auth-floating-cards"
-            >
-              {/* Card 1: Study Calculator */}
-              <div
-                style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.12)',
-                  backdropFilter: 'blur(12px)',
-                  border: '1px solid rgba(255, 255, 255, 0.18)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '12px 16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  boxShadow: '0 8px 20px rgba(0, 0, 0, 0.15)',
-                  transform: 'rotate(-1.5deg)',
-                  transition: 'transform 0.3s ease'
-                }}
-                className="floating-perspective-card"
-              >
-                <div
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: 'var(--radius-sm)',
-                    backgroundColor: 'rgba(16, 185, 129, 0.25)',
-                    color: '#6ee7b7',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}
-                >
-                  <Laptop size={18} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#ffffff', lineHeight: 1.2 }}>
-                    Casio FX-991ES Plus
-                  </div>
-                  <div style={{ fontSize: '0.725rem', color: '#a7f3d0' }}>
-                    Borrowed for finals · Indiranagar
-                  </div>
-                </div>
-                <span
-                  style={{
-                    fontSize: '0.7rem',
-                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                    padding: '2px 8px',
-                    borderRadius: 'var(--radius-xs)',
-                    fontWeight: 600
-                  }}
-                >
-                  Borrow
-                </span>
-              </div>
-
-              {/* Card 2: Books & Calculus Set */}
-              <div
-                style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.14)',
-                  backdropFilter: 'blur(12px)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '12px 16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  boxShadow: '0 8px 20px rgba(0, 0, 0, 0.15)',
-                  transform: 'rotate(1.5deg) translateX(12px)',
-                  transition: 'transform 0.3s ease'
-                }}
-                className="floating-perspective-card"
-              >
-                <div
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: 'var(--radius-sm)',
-                    backgroundColor: 'rgba(56, 189, 248, 0.25)',
-                    color: '#7dd3fc',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}
-                >
-                  <BookOpen size={18} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#ffffff', lineHeight: 1.2 }}>
-                    University Physics & Calculus
-                  </div>
-                  <div style={{ fontSize: '0.725rem', color: '#bae6fd' }}>
-                    Given away to junior · HSR Layout
-                  </div>
-                </div>
-                <span
-                  style={{
-                    fontSize: '0.7rem',
-                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                    padding: '2px 8px',
-                    borderRadius: 'var(--radius-xs)',
-                    fontWeight: 600
-                  }}
-                >
-                  Give Away
-                </span>
-              </div>
-
-              {/* Card 3: Cordless Tool */}
-              <div
-                style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.12)',
-                  backdropFilter: 'blur(12px)',
-                  border: '1px solid rgba(255, 255, 255, 0.18)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '12px 16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  boxShadow: '0 8px 20px rgba(0, 0, 0, 0.15)',
-                  transform: 'rotate(-0.8deg)',
-                  transition: 'transform 0.3s ease'
-                }}
-                className="floating-perspective-card"
-              >
-                <div
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: 'var(--radius-sm)',
-                    backgroundColor: 'rgba(245, 158, 11, 0.25)',
-                    color: '#fcd34d',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}
-                >
-                  <Wrench size={18} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#ffffff', lineHeight: 1.2 }}>
-                    Bosch Cordless Impact Drill
-                  </div>
-                  <div style={{ fontSize: '0.725rem', color: '#fde68a' }}>
-                    Lent for DIY project · JP Nagar
-                  </div>
-                </div>
-                <span
-                  style={{
-                    fontSize: '0.7rem',
-                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                    padding: '2px 8px',
-                    borderRadius: 'var(--radius-xs)',
-                    fontWeight: 600
-                  }}
-                >
-                  Borrow
-                </span>
-              </div>
-            </div>
-
-            {/* Bottom Trust Indicators */}
-            <div
-              style={{
-                position: 'relative',
-                zIndex: 2,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingTop: '1.25rem',
-                borderTop: '1px solid rgba(255, 255, 255, 0.15)',
-                fontSize: '0.78rem',
-                color: '#d1fae5'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <ShieldCheck size={16} color="#6ee7b7" />
-                <span>Verified Peer Trust</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Key size={15} color="#6ee7b7" />
-                <span>4-Digit Handover Codes</span>
-              </div>
-            </div>
-          </div>
-
-          {/* RIGHT SIDE: Login Form */}
-          <div
-            style={{
-              padding: '3.5rem 3rem',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center'
-            }}
-            className="auth-form-pane"
-          >
-            {/* Auth Mode Tab Switcher: Log In / Create Account */}
-            <div
-              style={{
-                display: 'flex',
-                backgroundColor: '#f1f5f9',
-                borderRadius: 'var(--radius-lg)',
-                padding: '4px',
-                marginBottom: '1.75rem',
-                border: '1px solid var(--color-slate-200)'
-              }}
-            >
-              <button
-                type="button"
-                style={{
-                  flex: 1,
-                  padding: '9px 16px',
-                  fontSize: '0.9rem',
-                  fontWeight: 700,
-                  borderRadius: 'var(--radius-md)',
-                  border: 'none',
-                  cursor: 'default',
-                  backgroundColor: '#ffffff',
-                  color: 'var(--color-primary-700)',
-                  boxShadow: '0 2px 6px rgba(15, 23, 42, 0.08)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px'
-                }}
-              >
-                <span>Log In</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate(redirectUrl ? `/register?redirect=${encodeURIComponent(redirectUrl)}` : '/register')}
-                style={{
-                  flex: 1,
-                  padding: '9px 16px',
-                  fontSize: '0.9rem',
-                  fontWeight: 600,
-                  borderRadius: 'var(--radius-md)',
-                  border: 'none',
-                  cursor: 'pointer',
-                  backgroundColor: 'transparent',
-                  color: 'var(--color-slate-600)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <span>Create Account</span>
-              </button>
-            </div>
-
-            {/* Redirect Notice Banner */}
-            {redirectUrl && (
-              <div
-                style={{
-                  padding: '10px 14px',
-                  borderRadius: 'var(--radius-md)',
-                  backgroundColor: '#ecfdf5',
-                  border: '1px solid #a7f3d0',
-                  color: '#065f46',
-                  fontSize: '0.85rem',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '1.25rem'
-                }}
-              >
-                <Sparkles size={16} color="#059669" style={{ flexShrink: 0 }} />
-                <span>
-                  {redirectUrl.includes('share')
-                    ? 'Account required to share an item. Sign in or create an account to start sharing!'
-                    : 'Sign in or create an account to continue.'}
-                </span>
-              </div>
-            )}
-
-            {/* Header */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <h1
-                style={{
-                  fontSize: '1.85rem',
-                  fontWeight: 900,
-                  color: 'var(--color-slate-900)',
-                  marginBottom: '0.4rem',
-                  letterSpacing: '-0.025em'
-                }}
-              >
-                Welcome back
-              </h1>
-              <p style={{ color: 'var(--color-slate-600)', fontSize: '0.95rem', margin: 0 }}>
-                Sign in to continue to LOOOP.
-              </p>
-            </div>
-
-            {/* Server Error Alert */}
-            {serverError && (
-              <div
-                style={{
-                  padding: '12px 16px',
-                  borderRadius: 'var(--radius-md)',
-                  backgroundColor: 'var(--color-danger-bg)',
-                  border: '1px solid var(--color-danger-border)',
-                  color: '#991b1b',
-                  fontSize: '0.875rem',
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '10px',
-                  marginBottom: '1.5rem'
-                }}
-                role="alert"
-                aria-live="polite"
-              >
-                <AlertCircle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
-                <span>{serverError}</span>
-              </div>
-            )}
-
-            {/* Quick Fill Admin & Demo Accounts */}
-            <div
-              style={{
-                padding: '12px 14px',
-                borderRadius: 'var(--radius-md)',
-                backgroundColor: '#f0fdf4',
-                border: '1px solid #bbf7d0',
-                marginBottom: '1.25rem'
-              }}
-            >
+            {/* Bottom 1-Tap Quick Sign-In Pills */}
+            <div style={{ position: 'relative', zIndex: 2, marginTop: '2.5rem' }}>
               <div
                 style={{
                   fontSize: '0.78rem',
                   fontWeight: 700,
-                  color: '#166534',
+                  color: '#6ee7b7',
                   textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  marginBottom: '8px',
+                  letterSpacing: '0.06em',
+                  marginBottom: '10px',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px'
                 }}
               >
-                <ShieldCheck size={14} />
-                <span>Quick Admin Sign-In (1-Tap)</span>
+                <ShieldCheck size={15} />
+                <span>One-Tap Admin Sign-In:</span>
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <button
                   type="button"
                   onClick={() => {
-                    setEmail('maheshkuppala321@gmail.com');
-                    setPassword('Mahesh@1');
+                    setEmail('looop.support@gmail.com');
+                    setPassword('Mahesh@Naidu');
                     setErrors({});
                     setServerError('');
+                    setAuthMode('password');
                   }}
                   style={{
-                    padding: '6px 12px',
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                    borderRadius: 'var(--radius-sm)',
-                    border: '1px solid #86efac',
-                    backgroundColor: '#ffffff',
-                    color: '#15803d',
+                    padding: '8px 14px',
+                    borderRadius: '12px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                    border: '1px solid rgba(52, 211, 153, 0.4)',
+                    color: '#ffffff',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    textAlign: 'left',
                     cursor: 'pointer',
-                    display: 'inline-flex',
+                    display: 'flex',
                     alignItems: 'center',
-                    gap: '5px',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                    justifyContent: 'space-between',
+                    transition: 'all 0.15s ease'
                   }}
                 >
-                  <span>👑 Mahesh (Admin)</span>
+                  <span>👑 Mahesh Naidu (Super Admin)</span>
+                  <span style={{ color: '#34d399', fontSize: '0.75rem' }}>Fill Credentials →</span>
                 </button>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -671,286 +577,565 @@ export const LoginPage = () => {
                     setPassword('AdminPassword123!');
                     setErrors({});
                     setServerError('');
+                    setAuthMode('password');
                   }}
                   style={{
-                    padding: '6px 12px',
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                    borderRadius: 'var(--radius-sm)',
-                    border: '1px solid #86efac',
-                    backgroundColor: '#ffffff',
-                    color: '#15803d',
+                    padding: '8px 14px',
+                    borderRadius: '12px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    color: '#e2e8f0',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    textAlign: 'left',
                     cursor: 'pointer',
-                    display: 'inline-flex',
+                    display: 'flex',
                     alignItems: 'center',
-                    gap: '5px',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                    justifyContent: 'space-between',
+                    transition: 'all 0.15s ease'
                   }}
                 >
-                  <span>🛡️ Looop Admin</span>
+                  <span>🛡️ Platform Governance Admin</span>
+                  <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Fill →</span>
                 </button>
               </div>
             </div>
+          </div>
 
-            {/* Login Form */}
-            <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              {/* Email Address Field */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label
-                  htmlFor="login-email"
-                  style={{
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: errors.email ? 'var(--color-danger)' : 'var(--color-slate-700)'
-                  }}
-                >
-                  Email Address
-                </label>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <span
-                    style={{
-                      position: 'absolute',
-                      left: '12px',
-                      color: errors.email ? 'var(--color-danger)' : 'var(--color-slate-400)',
-                      pointerEvents: 'none',
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}
-                  >
-                    <Mail size={18} />
-                  </span>
-                  <input
-                    id="login-email"
-                    type="email"
-                    autoComplete="email"
-                    placeholder="Enter your email"
-                    value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value);
-                      if (errors.email) setErrors({ ...errors, email: null });
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '11px 14px 11px 40px',
-                      fontSize: '0.925rem',
-                      borderRadius: 'var(--radius-md)',
-                      border: errors.email ? '1.5px solid var(--color-danger)' : '1px solid var(--color-slate-300)',
-                      backgroundColor: '#ffffff',
-                      color: 'var(--color-slate-900)',
-                      outline: 'none',
-                      transition: 'all var(--transition-fast)'
-                    }}
-                    className="auth-input"
-                    aria-invalid={errors.email ? 'true' : 'false'}
-                    aria-describedby={errors.email ? 'email-error' : undefined}
-                    disabled={isSubmitting}
-                  />
-                </div>
-                {errors.email && (
-                  <span id="email-error" style={{ fontSize: '0.78rem', color: 'var(--color-danger)', fontWeight: 500 }}>
-                    {errors.email}
-                  </span>
-                )}
-              </div>
-
-              {/* Password Field */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <label
-                    htmlFor="login-password"
-                    style={{
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: errors.password ? 'var(--color-danger)' : 'var(--color-slate-700)'
-                    }}
-                  >
-                    Password
-                  </label>
-                  <Link
-                    to="/forgot-password"
-                    style={{
-                      fontSize: '0.8rem',
-                      color: 'var(--color-primary-700)',
-                      fontWeight: 600,
-                      textDecoration: 'none',
-                      transition: 'color var(--transition-fast)'
-                    }}
-                    className="forgot-password-link"
-                  >
-                    Forgot password?
-                  </Link>
-                </div>
-
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <span
-                    style={{
-                      position: 'absolute',
-                      left: '12px',
-                      color: errors.password ? 'var(--color-danger)' : 'var(--color-slate-400)',
-                      pointerEvents: 'none',
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}
-                  >
-                    <Lock size={18} />
-                  </span>
-                  <input
-                    id="login-password"
-                    type={showPassword ? 'text' : 'password'}
-                    autoComplete="current-password"
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      if (errors.password) setErrors({ ...errors, password: null });
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '11px 44px 11px 40px',
-                      fontSize: '0.925rem',
-                      borderRadius: 'var(--radius-md)',
-                      border: errors.password ? '1.5px solid var(--color-danger)' : '1px solid var(--color-slate-300)',
-                      backgroundColor: '#ffffff',
-                      color: 'var(--color-slate-900)',
-                      outline: 'none',
-                      transition: 'all var(--transition-fast)'
-                    }}
-                    className="auth-input"
-                    aria-invalid={errors.password ? 'true' : 'false'}
-                    aria-describedby={errors.password ? 'password-error' : undefined}
-                    disabled={isSubmitting}
-                  />
-
-                  {/* Password Visibility Toggle */}
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    style={{
-                      position: 'absolute',
-                      right: '10px',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: 'var(--color-slate-400)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: '6px',
-                      borderRadius: 'var(--radius-xs)',
-                      transition: 'color var(--transition-fast)'
-                    }}
-                    className="password-toggle-btn"
-                  >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
-
-                {errors.password && (
-                  <span id="password-error" style={{ fontSize: '0.78rem', color: 'var(--color-danger)', fontWeight: 500 }}>
-                    {errors.password}
-                  </span>
-                )}
-              </div>
-
-              {/* Login Button */}
-              <div style={{ marginTop: '0.5rem' }}>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="lg"
-                  loading={isSubmitting}
-                  disabled={isSubmitting}
-                  style={{ width: '100%' }}
-                  iconRight={!isSubmitting ? ArrowRight : undefined}
-                >
-                  {isSubmitting ? 'Signing in...' : 'Login'}
-                </Button>
-              </div>
-            </form>
-
-            {/* Divider */}
+          {/* RIGHT SIDE: Interactive 3D Login & OTP Panel */}
+          <div
+            style={{
+              padding: '3rem 2.5rem',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              backgroundColor: '#ffffff'
+            }}
+          >
+            {/* Top Mode Switcher Tabs */}
             <div
               style={{
                 display: 'flex',
-                alignItems: 'center',
-                margin: '1.75rem 0',
-                color: 'var(--color-slate-400)',
-                fontSize: '0.825rem',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
+                padding: '4px',
+                borderRadius: '14px',
+                backgroundColor: '#f1f5f9',
+                marginBottom: '1.75rem',
+                border: '1px solid #e2e8f0'
               }}
             >
-              <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--color-slate-200)' }} />
-              <span style={{ padding: '0 12px' }}>or continue exploring</span>
-              <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--color-slate-200)' }} />
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode('password');
+                  setServerError('');
+                }}
+                style={{
+                  flex: 1,
+                  padding: '9px 12px',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  borderRadius: '10px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  backgroundColor: authMode === 'password' ? '#ffffff' : 'transparent',
+                  color: authMode === 'password' ? '#065f46' : '#64748b',
+                  boxShadow: authMode === 'password' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
+              >
+                <KeyRound size={15} />
+                <span>Password Login</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode('google-otp');
+                  setServerError('');
+                }}
+                style={{
+                  flex: 1,
+                  padding: '9px 12px',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  borderRadius: '10px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  backgroundColor: authMode === 'google-otp' ? '#ffffff' : 'transparent',
+                  color: authMode === 'google-otp' ? '#065f46' : '#64748b',
+                  boxShadow: authMode === 'google-otp' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Mail size={15} />
+                <span>Google & OTP Login</span>
+              </button>
             </div>
 
-            {/* Guest Browsing CTA */}
-            <Link to="/browse" style={{ textDecoration: 'none' }}>
-              <Button variant="secondary" size="md" style={{ width: '100%' }}>
-                Browse Community Items as Guest
-              </Button>
-            </Link>
+            {/* Error Banner */}
+            {serverError && (
+              <div
+                style={{
+                  padding: '12px 16px',
+                  borderRadius: '12px',
+                  backgroundColor: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  color: '#991b1b',
+                  fontSize: '0.85rem',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px',
+                  marginBottom: '1.25rem'
+                }}
+                role="alert"
+              >
+                <AlertCircle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
+                <span>{serverError}</span>
+              </div>
+            )}
 
-            {/* Create Account Link */}
+            {/* MODE 1: PASSWORD LOGIN */}
+            {authMode === 'password' && (
+              <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                {/* Email Input */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label
+                    htmlFor="login-email"
+                    style={{
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                      color: errors.email ? '#ef4444' : '#334155'
+                    }}
+                  >
+                    Email Address
+                  </label>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <span
+                      style={{
+                        position: 'absolute',
+                        left: '12px',
+                        color: errors.email ? '#ef4444' : '#94a3b8',
+                        pointerEvents: 'none',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <Mail size={18} />
+                    </span>
+                    <input
+                      id="login-email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        if (errors.email) setErrors({ ...errors, email: '' });
+                      }}
+                      placeholder="looop.support@gmail.com"
+                      autoComplete="email"
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px 12px 40px',
+                        fontSize: '0.95rem',
+                        borderRadius: '12px',
+                        border: errors.email ? '1.5px solid #ef4444' : '1.5px solid #cbd5e1',
+                        outline: 'none',
+                        backgroundColor: '#ffffff',
+                        color: '#0f172a',
+                        transition: 'all 0.15s ease'
+                      }}
+                    />
+                  </div>
+                  {errors.email && (
+                    <span style={{ fontSize: '0.78rem', color: '#ef4444' }}>{errors.email}</span>
+                  )}
+                </div>
+
+                {/* Password Input */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label
+                      htmlFor="login-password"
+                      style={{
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        color: errors.password ? '#ef4444' : '#334155'
+                      }}
+                    >
+                      Password
+                    </label>
+                    <Link
+                      to="/forgot-password"
+                      style={{
+                        fontSize: '0.8rem',
+                        color: '#059669',
+                        fontWeight: 600,
+                        textDecoration: 'none'
+                      }}
+                    >
+                      Forgot?
+                    </Link>
+                  </div>
+
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <span
+                      style={{
+                        position: 'absolute',
+                        left: '12px',
+                        color: errors.password ? '#ef4444' : '#94a3b8',
+                        pointerEvents: 'none',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <Lock size={18} />
+                    </span>
+                    <input
+                      id="login-password"
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        if (errors.password) setErrors({ ...errors, password: '' });
+                      }}
+                      placeholder="••••••••"
+                      autoComplete="current-password"
+                      style={{
+                        width: '100%',
+                        padding: '12px 42px 12px 40px',
+                        fontSize: '0.95rem',
+                        borderRadius: '12px',
+                        border: errors.password ? '1.5px solid #ef4444' : '1.5px solid #cbd5e1',
+                        outline: 'none',
+                        backgroundColor: '#ffffff',
+                        color: '#0f172a',
+                        transition: 'all 0.15s ease'
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      style={{
+                        position: 'absolute',
+                        right: '12px',
+                        background: 'none',
+                        border: 'none',
+                        color: '#94a3b8',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  {errors.password && (
+                    <span style={{ fontSize: '0.78rem', color: '#ef4444' }}>{errors.password}</span>
+                  )}
+                </div>
+
+                {/* Submit Button */}
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  style={{
+                    padding: '13px 24px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    backgroundColor: '#059669',
+                    color: '#ffffff',
+                    fontSize: '0.95rem',
+                    fontWeight: 700,
+                    cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 14px rgba(5, 150, 105, 0.35)',
+                    transition: 'all 0.15s ease',
+                    marginTop: '0.5rem'
+                  }}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <RefreshCw size={18} className="animate-spin" />
+                      <span>Signing in...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Sign In to Account</span>
+                      <ArrowRight size={18} />
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
+
+            {/* MODE 2: GOOGLE LOGIN & OTP VERIFICATION */}
+            {authMode === 'google-otp' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                {/* Google Sign In Button */}
+                <button
+                  type="button"
+                  onClick={handleGoogleSignIn}
+                  disabled={isGoogleLoading}
+                  style={{
+                    padding: '12px 18px',
+                    borderRadius: '12px',
+                    border: '1.5px solid #cbd5e1',
+                    backgroundColor: '#ffffff',
+                    color: '#0f172a',
+                    fontSize: '0.92rem',
+                    fontWeight: 700,
+                    cursor: isGoogleLoading ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '12px',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {/* Official Google G Logo */}
+                  <svg width="20" height="20" viewBox="0 0 24 24">
+                    <path
+                      fill="#4285F4"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                    />
+                  </svg>
+                  <span>{isGoogleLoading ? 'Connecting to Google...' : 'Continue with Google'}</span>
+                </button>
+
+                {/* Divider */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '0.25rem 0' }}>
+                  <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
+                  <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: 600 }}>OR EMAIL OTP (BREVO)</span>
+                  <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
+                </div>
+
+                {/* OTP Step 1: Send Code */}
+                {!otpSent ? (
+                  <form onSubmit={handleSendOtp} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>
+                        Your Email Address
+                      </label>
+                      <input
+                        type="email"
+                        value={otpEmail}
+                        onChange={(e) => setOtpEmail(e.target.value)}
+                        placeholder="your.email@example.com"
+                        style={{
+                          width: '100%',
+                          padding: '12px 14px',
+                          fontSize: '0.95rem',
+                          borderRadius: '12px',
+                          border: '1.5px solid #cbd5e1',
+                          outline: 'none'
+                        }}
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isSendingOtp}
+                      style={{
+                        padding: '12px 20px',
+                        borderRadius: '12px',
+                        border: 'none',
+                        backgroundColor: '#0f766e',
+                        color: '#ffffff',
+                        fontSize: '0.92rem',
+                        fontWeight: 700,
+                        cursor: isSendingOtp ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px'
+                      }}
+                    >
+                      {isSendingOtp ? (
+                        <>
+                          <RefreshCw size={16} className="animate-spin" />
+                          <span>Generating Code...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send size={16} />
+                          <span>Send 6-Digit Verification Code</span>
+                        </>
+                      )}
+                    </button>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'center' }}>
+                      ⚡ Dispatches via Brevo Transactional Email Service
+                    </span>
+                  </form>
+                ) : (
+                  /* OTP Step 2: Verify Code */
+                  <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <div style={{ textAlign: 'center' }}>
+                      <p style={{ margin: 0, fontSize: '0.88rem', color: '#334155', fontWeight: 600 }}>
+                        Code sent to: <span style={{ color: '#059669' }}>{otpEmail}</span>
+                      </p>
+                      {simulatedCodeHint && (
+                        <div
+                          style={{
+                            marginTop: '8px',
+                            padding: '6px 12px',
+                            borderRadius: '8px',
+                            backgroundColor: '#ecfdf5',
+                            border: '1px solid #a7f3d0',
+                            fontSize: '0.78rem',
+                            color: '#065f46',
+                            fontWeight: 700
+                          }}
+                        >
+                          🔑 Test Code: {simulatedCodeHint}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 6 Digit Input Boxes */}
+                    <div
+                      onPaste={handleOtpPaste}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'center',
+                        gap: '8px'
+                      }}
+                    >
+                      {otpDigits.map((digit, idx) => (
+                        <input
+                          key={idx}
+                          ref={(el) => (otpInputRefs.current[idx] = el)}
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={1}
+                          value={digit}
+                          onChange={(e) => handleOtpDigitChange(idx, e.target.value)}
+                          onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                          className="otp-box-input"
+                          style={{
+                            width: '44px',
+                            height: '52px',
+                            textAlign: 'center',
+                            fontSize: '1.4rem',
+                            fontWeight: 800,
+                            borderRadius: '10px',
+                            border: '2px solid #cbd5e1',
+                            outline: 'none',
+                            color: '#065f46',
+                            transition: 'all 0.15s ease'
+                          }}
+                        />
+                      ))}
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isVerifyingOtp}
+                      style={{
+                        padding: '12px 20px',
+                        borderRadius: '12px',
+                        border: 'none',
+                        backgroundColor: '#059669',
+                        color: '#ffffff',
+                        fontSize: '0.95rem',
+                        fontWeight: 700,
+                        cursor: isVerifyingOtp ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        marginTop: '4px'
+                      }}
+                    >
+                      {isVerifyingOtp ? (
+                        <>
+                          <RefreshCw size={16} className="animate-spin" />
+                          <span>Verifying OTP...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 size={18} />
+                          <span>Verify & Sign In</span>
+                        </>
+                      )}
+                    </button>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => setOtpSent(false)}
+                        style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', textDecoration: 'underline' }}
+                      >
+                        Change Email
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={otpCountdown > 0}
+                        onClick={handleSendOtp}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: otpCountdown > 0 ? '#94a3b8' : '#059669',
+                          fontWeight: 600,
+                          cursor: otpCountdown > 0 ? 'default' : 'pointer'
+                        }}
+                      >
+                        {otpCountdown > 0 ? `Resend code in ${otpCountdown}s` : 'Resend Code'}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
+
+            {/* Bottom Register Prompt */}
             <div
               style={{
                 marginTop: '2rem',
                 textAlign: 'center',
-                fontSize: '0.9rem',
-                color: 'var(--color-slate-600)'
+                fontSize: '0.88rem',
+                color: '#64748b'
               }}
             >
               <span>Don't have an account? </span>
               <Link
                 to={redirectUrl ? `/register?redirect=${encodeURIComponent(redirectUrl)}` : '/register'}
                 style={{
-                  color: 'var(--color-primary-600)',
+                  color: '#059669',
                   fontWeight: 700,
                   textDecoration: 'none'
                 }}
-                className="create-account-link"
               >
-                Create an account
+                Create Account
               </Link>
             </div>
           </div>
         </div>
       </main>
-
-      {/* Embedded Component Micro-Interactions */}
-      <style>{`
-        .auth-input:focus {
-          border-color: var(--color-primary-500) !important;
-          box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18) !important;
-        }
-        .password-toggle-btn:hover {
-          color: var(--color-slate-700) !important;
-        }
-        .forgot-password-link:hover {
-          color: var(--color-primary-600) !important;
-          text-decoration: underline !important;
-        }
-        .create-account-link:hover {
-          color: var(--color-primary-700) !important;
-          text-decoration: underline !important;
-        }
-        .back-home-link:hover {
-          border-color: var(--color-primary-300) !important;
-          color: var(--color-primary-700) !important;
-        }
-        .floating-perspective-card:hover {
-          transform: translateY(-2px) scale(1.02) !important;
-        }
-        @media (max-width: 768px) {
-          .auth-brand-pane {
-            display: none !important;
-          }
-          .auth-form-pane {
-            padding: 2.25rem 1.75rem !important;
-          }
-        }
-      `}</style>
     </div>
   );
 };

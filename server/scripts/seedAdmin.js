@@ -9,7 +9,7 @@ const seedAdmin = async () => {
     await mongoose.connect(mongoUri);
     console.log('MongoDB connected for admin seeding');
 
-    const adminEmail = (process.env.ADMIN_EMAIL || 'admin@looop.community').toLowerCase().trim();
+    const adminEmail = (process.env.ADMIN_EMAIL || 'looop.support@gmail.com').toLowerCase().trim();
     let admin = await User.findOne({ email: adminEmail });
 
     if (admin) {
@@ -20,7 +20,7 @@ const seedAdmin = async () => {
       await admin.save();
       console.log(`Admin account confirmed: ${admin.email} (Role: ${admin.role})`);
     } else {
-      const hashedPassword = await bcrypt.hash(process.env.ADMIN_PASSWORD || 'AdminPassword123!', 10);
+      const hashedPassword = await bcrypt.hash(process.env.ADMIN_PASSWORD || 'Mahesh@Naidu', 10);
       admin = await User.create({
         name: 'Looop Administrator',
         email: adminEmail,
