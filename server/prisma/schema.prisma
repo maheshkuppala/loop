@@ -1,0 +1,509 @@
+// LOOOP Platform - PostgreSQL Database Schema (Prisma ORM)
+// Migration from MongoDB to PostgreSQL
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                    String    @id @default(cuid())
+  name                  String
+  email                 String    @unique
+  password              String
+  role                  String    @default("customer") // customer, admin
+  avatar                String    @default("https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80")
+  bio                   String    @default("")
+  city                  String    @default("")
+  locality              String    @default("")
+  state                 String    @default("")
+  interests             String[]  @default([])
+  profileVisibility     String    @default("public")
+  accountStatus         String    @default("active") // active, suspended
+  trustScore            Int       @default(95)
+  rating                Float     @default(0)
+  reviewsCount          Int       @default(0)
+  responseRate          String    @default("Under 1 hour")
+  verified              Boolean   @default(true)
+  resetPasswordToken    String?
+  resetPasswordExpires  DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relationships
+  items                 Item[]
+  wantedItems           WantedItem[]
+  sentRequests          Request[]               @relation("RequestRequester")
+  receivedRequests      Request[]               @relation("RequestOwner")
+  ownerTransactions     Transaction[]           @relation("TransactionOwner")
+  recipientTransactions Transaction[]           @relation("TransactionRecipient")
+  ownerMatches          Match[]                 @relation("MatchItemOwner")
+  requesterMatches      Match[]                 @relation("MatchRequester")
+  sentMessages          Message[]
+  writtenReviews        Review[]                @relation("ReviewReviewer")
+  receivedReviews       Review[]                @relation("ReviewReviewee")
+  filedReports          Report[]                @relation("ReportReporter")
+  targetedReports       Report[]                @relation("ReportTargetUser")
+  resolvedReports       Report[]                @relation("ReportResolver")
+  savedItems            SavedItem[]
+  receivedNotifications Notification[]          @relation("NotificationRecipient")
+  triggeredNotifications Notification[]         @relation("NotificationActor")
+  notificationPreference NotificationPreference?
+  createdImpactFactors  ImpactFactor[]
+  ownerImpactEvents     ImpactEvent[]           @relation("ImpactEventOwner")
+  recipientImpactEvents ImpactEvent[]           @relation("ImpactEventRecipient")
+  adminAuditLogs        AdminAuditLog[]
+  updatedAdminSettings  AdminSetting[]
+
+  @@index([role, accountStatus])
+  @@index([createdAt(sort: Desc)])
+}
+
+model Category {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  slug          String   @unique
+  description   String   @default("")
+  icon          String   @default("FolderTree")
+  subcategories String[] @default([])
+  status        String   @default("ACTIVE") // ACTIVE, INACTIVE
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([slug])
+  @@index([status])
+}
+
+model Item {
+  id                    String    @id @default(cuid())
+  title                 String
+  description           String
+  category              String
+  subcategory           String    @default("General")
+  brand                 String    @default("")
+  model                 String    @default("")
+  images                Json      @default("[]") // [{ url, isPrimary, caption }]
+  sharingType           String    @default("give_away") // free, give_away, borrow, exchange
+  condition             String    @default("good") // new, like_new, good, fair, needs_repair
+  availability          String    @default("Available") // Available, Unavailable, Reserved
+  status                String    @default("active") // active, pending moderation, rejected, removed, suspended
+  
+  // Location
+  city                  String    @default("")
+  district              String    @default("")
+  state                 String    @default("")
+  locality              String    @default("")
+  approximateAddress    String    @default("")
+  latitude              Float?    @default(12.9716)
+  longitude             Float?    @default(77.5946)
+
+  // Borrow settings
+  borrowMaxDurationDays Int       @default(14)
+  borrowMaxDurationUnit String    @default("days")
+  borrowNotes           String    @default("")
+
+  // Exchange wishlist
+  exchangeWantedItems   String    @default("")
+
+  ownerId               String
+  owner                 User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  viewsCount            Int       @default(0)
+  savesCount            Int       @default(0)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relationships
+  requests              Request[]             @relation("RequestItem")
+  offeredInRequests     Request[]             @relation("RequestOfferedItem")
+  primaryTransactions   Transaction[]         @relation("TransactionItem")
+  offeredTransactions   Transaction[]         @relation("TransactionOfferedItem")
+  matches               Match[]
+  savedByUsers          SavedItem[]
+  reviews               Review[]
+  reports               Report[]              @relation("ReportTargetItem")
+  conversations         Conversation[]
+
+  @@index([category, status, availability])
+  @@index([category, subcategory, status])
+  @@index([sharingType, status])
+  @@index([condition])
+  @@index([ownerId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([city, status])
+}
+
+model WantedItem {
+  id                    String    @id @default(cuid())
+  title                 String
+  description           String
+  category              String
+  subcategory           String    @default("General")
+  quantity              Int       @default(1)
+  preferredSharingType  String    @default("any") // any, free, give_away, borrow, exchange
+  conditionPreference   String    @default("any")
+  
+  // Location
+  city                  String    @default("")
+  district              String    @default("")
+  state                 String    @default("")
+  locality              String    @default("")
+  approximateAddress    String    @default("")
+  latitude              Float?    @default(12.9716)
+  longitude             Float?    @default(77.5946)
+
+  urgency               String    @default("medium") // low, medium, high
+  requiredBy            DateTime?
+  expiresAt             DateTime?
+  images                Json      @default("[]")
+  status                String    @default("ACTIVE") // ACTIVE, FULFILLED, EXPIRED, CLOSED
+
+  requesterId           String
+  requester             User      @relation(fields: [requesterId], references: [id], onDelete: Cascade)
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relationships
+  requests              Request[]
+  matches               Match[]
+
+  @@index([status, category, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([requesterId, createdAt(sort: Desc)])
+  @@index([city, status])
+}
+
+model Request {
+  id                 String        @id @default(cuid())
+  itemId             String?
+  item               Item?         @relation("RequestItem", fields: [itemId], references: [id], onDelete: SetNull)
+  wantedItemId       String?
+  wantedItem         WantedItem?   @relation(fields: [wantedItemId], references: [id], onDelete: SetNull)
+  requesterId        String
+  requester          User          @relation("RequestRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  ownerId            String
+  owner              User          @relation("RequestOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  
+  type               String        @default("REQUEST_ITEM") // REQUEST_ITEM, BORROW, EXCHANGE, OFFER
+  message            String        @default("")
+  expectedReturnDate DateTime?
+  offeredItemId      String?
+  offeredItem        Item?         @relation("RequestOfferedItem", fields: [offeredItemId], references: [id], onDelete: SetNull)
+  
+  status             String        @default("PENDING") // PENDING, ACCEPTED, DECLINED, CANCELLED, COMPLETED
+  acceptedAt         DateTime?
+  declinedAt         DateTime?
+  cancelledAt        DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  // Relationships
+  transaction        Transaction?
+  conversation       Conversation?
+
+  @@index([requesterId, createdAt(sort: Desc)])
+  @@index([ownerId, status, createdAt(sort: Desc)])
+  @@index([itemId, requesterId, status])
+  @@index([wantedItemId, requesterId, status])
+  @@index([status, createdAt(sort: Desc)])
+}
+
+model Transaction {
+  id                           String        @id @default(cuid())
+  requestId                    String        @unique
+  request                      Request       @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  itemId                       String
+  item                         Item          @relation("TransactionItem", fields: [itemId], references: [id], onDelete: Cascade)
+  offeredItemId                String?
+  offeredItem                  Item?         @relation("TransactionOfferedItem", fields: [offeredItemId], references: [id], onDelete: SetNull)
+  ownerId                      String
+  owner                        User          @relation("TransactionOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  recipientId                  String
+  recipient                    User          @relation("TransactionRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  
+  type                         String        // FREE, GIVEAWAY, BORROW, EXCHANGE
+  status                       String        @default("PENDING_HANDOVER")
+  handoverMethod               String        @default("In Person")
+  handoverDate                 DateTime?
+  handoverTime                 String        @default("")
+  handoverCity                 String        @default("")
+  handoverLocality             String        @default("")
+  handoverMeetingArea          String        @default("")
+  handoverNotes                String        @default("")
+  handoverConfirmedByOwner     Boolean       @default(false)
+  handoverConfirmedByRecipient Boolean       @default(false)
+  handoverConfirmedAt          DateTime?
+
+  expectedReturnDate           DateTime?
+  returnDate                   DateTime?
+  returnNotes                  String        @default("")
+  returnConfirmedByBorrower    Boolean       @default(false)
+  returnConfirmedByOwner       Boolean       @default(false)
+  returnConfirmedAt            DateTime?
+  returnedAt                   DateTime?
+
+  completedAt                  DateTime?
+  cancelledAt                  DateTime?
+  notes                        String        @default("")
+  createdAt                    DateTime      @default(now())
+  updatedAt                    DateTime      @updatedAt
+
+  // Relationships
+  reviews                      Review[]
+  impactEvent                  ImpactEvent?
+  conversations                Conversation[]
+
+  @@index([ownerId, status, createdAt(sort: Desc)])
+  @@index([recipientId, status, createdAt(sort: Desc)])
+  @@index([itemId, status])
+  @@index([status, createdAt(sort: Desc)])
+}
+
+model Match {
+  id              String      @id @default(cuid())
+  itemId          String
+  item            Item        @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  wantedItemId    String
+  wantedItem      WantedItem  @relation(fields: [wantedItemId], references: [id], onDelete: Cascade)
+  itemOwnerId     String
+  itemOwner       User        @relation("MatchItemOwner", fields: [itemOwnerId], references: [id], onDelete: Cascade)
+  requesterId     String
+  requester       User        @relation("MatchRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  score           Float
+  matchReasons    String[]    @default([])
+  distanceKm      Float?
+  status          String      @default("ACTIVE") // ACTIVE, DISMISSED, EXPIRED, CONVERTED
+  notified        Boolean     @default(false)
+  lastEvaluatedAt DateTime    @default(now())
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([itemId, wantedItemId])
+  @@index([requesterId, status, score(sort: Desc)])
+  @@index([itemOwnerId, status, score(sort: Desc)])
+}
+
+model Conversation {
+  id              String      @id @default(cuid())
+  requestId       String      @unique
+  request         Request     @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  itemId          String?
+  item            Item?       @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  transactionId   String?
+  transaction     Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  participantIds  String[]    // Array of User IDs
+  lastMessageText String      @default("")
+  lastMessageAt   DateTime    @default(now())
+  status          String      @default("ACTIVE") // ACTIVE, CLOSED
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relationships
+  messages        Message[]
+
+  @@index([lastMessageAt(sort: Desc)])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  text           String
+  readByIds      String[]     @default([])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([conversationId, createdAt(sort: Asc)])
+  @@index([conversationId, createdAt(sort: Desc)])
+}
+
+model Review {
+  id            String      @id @default(cuid())
+  reviewerId    String
+  reviewer      User        @relation("ReviewReviewer", fields: [reviewerId], references: [id], onDelete: Cascade)
+  revieweeId    String
+  reviewee      User        @relation("ReviewReviewee", fields: [revieweeId], references: [id], onDelete: Cascade)
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  itemId        String
+  item          Item        @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  rating        Int
+  comment       String      @default("")
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([reviewerId, transactionId, revieweeId])
+  @@index([revieweeId, createdAt(sort: Desc)])
+  @@index([reviewerId, createdAt(sort: Desc)])
+}
+
+model Report {
+  id              String    @id @default(cuid())
+  reporterId      String
+  reporter        User      @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetType      String    // USER, ITEM
+  targetUserId    String?
+  targetUser      User?     @relation("ReportTargetUser", fields: [targetUserId], references: [id], onDelete: SetNull)
+  targetItemId    String?
+  targetItem      Item?     @relation("ReportTargetItem", fields: [targetItemId], references: [id], onDelete: SetNull)
+  reason          String
+  description     String    @default("")
+  status          String    @default("PENDING") // PENDING, REVIEWED, RESOLVED, DISMISSED
+  resolutionNotes String    @default("")
+  actionTaken     String    @default("")
+  resolvedById    String?
+  resolvedBy      User?     @relation("ReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  resolvedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([reporterId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+}
+
+model SavedItem {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemId    String
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, itemId])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model Notification {
+  id                    String    @id @default(cuid())
+  recipientId           String
+  recipient             User      @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  actorId               String?
+  actor                 User?     @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+  type                  String
+  category              String
+  title                 String
+  message               String
+  link                  String?
+  dedupeKey             String?
+  relatedEntityType     String?
+  relatedEntityId       String?
+  relatedItemId         String?
+  relatedWantedItemId   String?
+  relatedRequestId      String?
+  relatedTransactionId  String?
+  relatedConversationId String?
+  isRead                Boolean   @default(false)
+  readAt                DateTime?
+  deletedAt             DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([recipientId, deletedAt, createdAt(sort: Desc)])
+  @@index([recipientId, deletedAt, isRead, createdAt(sort: Desc)])
+  @@index([recipientId, deletedAt, category, createdAt(sort: Desc)])
+  @@index([recipientId, dedupeKey])
+}
+
+model NotificationPreference {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inApp      Boolean  @default(true)
+  browser    Boolean  @default(false)
+  categories Json     @default("{\"requests\":true,\"transactions\":true,\"messages\":true,\"matching\":true,\"items\":true,\"safety\":true,\"account\":true,\"impact\":true,\"system\":true}")
+  quietHours Json     @default("{\"enabled\":false,\"start\":\"22:00\",\"end\":\"07:00\",\"timezone\":\"Asia/Kolkata\"}")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model ImpactFactor {
+  id                 String   @id @default(cuid())
+  category           String
+  metricType         String   // CO2E_AVOIDED, WASTE_AVOIDED, WATER_SAVED, REUSE_COUNT
+  value              Float
+  unit               String
+  basis              String   @default("per item reused")
+  source             String
+  methodologyVersion String   @default("1.0")
+  factorVersion      Int      @default(1)
+  description        String   @default("")
+  active             Boolean  @default(true)
+  effectiveDate      DateTime @default(now())
+  createdById        String?
+  createdBy          User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([category, metricType, active])
+  @@index([createdAt(sort: Desc)])
+}
+
+model ImpactEvent {
+  id                   String      @id @default(cuid())
+  transactionId        String      @unique
+  transaction          Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  ownerUserId          String
+  ownerUser            User        @relation("ImpactEventOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  recipientUserId      String
+  recipientUser        User        @relation("ImpactEventRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
+  impactType           String      // FREE, GIVEAWAY, BORROW, EXCHANGE
+  category             String      @default("Other")
+  quantity             Int         @default(1)
+  items                Json        @default("[]")
+  reuseCount           Int         @default(1)
+  estimatedCo2eAvoided Float?
+  estimatedWasteAvoided Float?
+  estimatedWaterSaved  Float?
+  methodologyVersion   String      @default("1.0")
+  factorVersion        String      @default("1.0")
+  source               String      @default("Platform verified impact factors")
+  calculationNotes     String      @default("")
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+
+  @@index([ownerUserId, createdAt(sort: Desc)])
+  @@index([recipientUserId, createdAt(sort: Desc)])
+  @@index([category, createdAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
+}
+
+model AdminAuditLog {
+  id          String   @id @default(cuid())
+  adminId     String
+  admin       User     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  action      String
+  targetType  String   // USER, ITEM, WANTED_ITEM, REQUEST, TRANSACTION, REPORT, CATEGORY, SETTINGS, IMPACT_FACTOR, IMPACT_EVENT
+  targetId    String?
+  targetTitle String   @default("")
+  metadata    Json     @default("{}")
+  ipAddress   String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([targetType, targetId, createdAt(sort: Desc)])
+  @@index([adminId, createdAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
+}
+
+model AdminSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       Json
+  label       String   @default("")
+  description String   @default("")
+  category    String   @default("GENERAL")
+  updatedById String?
+  updatedBy   User?    @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

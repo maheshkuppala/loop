@@ -1,0 +1,52 @@
+{
+  "name": "looop-frontend",
+  "version": "1.0.0",
+  "description": "Looop Frontend Application - Share. Reuse. Connect.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "start": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "looop",
+    "mern",
+    "react",
+    "circular-economy",
+    "sharing"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.20.0",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-leaflet": "^4.2.1",
+    "react-router-dom": "^6.28.0",
+    "socket.io-client": "^4.8.3",
+    "three": "^0.186.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.26.0",
+    "@babel/preset-env": "^7.26.0",
+    "@babel/preset-react": "^7.26.3",
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-react": "^6.1.1",
+    "autoprefixer": "^10.5.6",
+    "babel-loader": "^9.2.1",
+    "css-loader": "^7.1.2",
+    "dotenv-webpack": "^8.1.0",
+    "html-webpack-plugin": "^5.6.3",
+    "postcss": "^8.5.28",
+    "style-loader": "^4.0.0",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.0",
+    "webpack": "^5.97.1",
+    "webpack-cli": "^6.0.1",
+    "webpack-dev-server": "^5.2.0"
+  }
+}

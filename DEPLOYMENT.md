@@ -1,0 +1,172 @@
+# LOOOP — Production Deployment Guide
+
+This guide provides instructions for deploying the **LOOOP** community unused items sharing platform to production using **MongoDB Atlas**, **Render**, and **Vercel**.
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                    LOOOP ARCHITECTURE                       │
+│                                                             │
+│   Frontend (React + Vite)  ────────► Vercel (Global Edge)   │
+│              │                                              │
+│              ▼ HTTPS / WSS                                  │
+│                                                             │
+│   Backend (Express + Sockets) ─────► Render (Web Service)   │
+│              │                                              │
+│              ▼ TCP / TLS Mongoose                           │
+│                                                             │
+│   Database (MongoDB Mongoose) ─────► MongoDB Atlas (Cloud)  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 1. Step 1: MongoDB Atlas Setup (Database)
+
+### 1.1 Create Cluster
+1. Log in to [MongoDB Atlas](https://www.mongodb.com/cloud/atlas).
+2. Create a new cluster (Shared M0 free tier or dedicated M10+ for production).
+3. Select your preferred cloud provider (AWS/GCP) and region (e.g. `ap-south-1` Mumbai or region closest to your users).
+
+### 1.2 Create Database User
+1. Go to **Security > Database Access**.
+2. Click **Add New Database User**.
+3. **Authentication Method:** Password.
+4. **Username:** `looop_app_user`.
+5. **Password:** Generate a secure high-entropy password (avoid special characters that require URL-encoding, or encode them).
+6. **Database User Privileges:** Select `Read and write to any database` or restrict to `looop` database.
+
+### 1.3 Configure Network Access
+1. Go to **Security > Network Access**.
+2. Click **Add IP Address**.
+3. For Render deployments without static outbound IPs:
+   * Select **Allow Access from Anywhere** (`0.0.0.0/0`).
+   * *Security Note:* Atlas requires username + password authentication with TLS encryption regardless of IP allowlist.
+4. Click **Confirm**.
+
+### 1.4 Get Connection String
+1. Go to **Deployments > Database**.
+2. Click **Connect** next to your cluster.
+3. Choose **Drivers** (Node.js).
+4. Copy the connection URI:
+   ```text
+   mongodb+srv://looop_app_user:<password>@cluster0.xxxxx.mongodb.net/looop?retryWrites=true&w=majority
+   ```
+5. Replace `<password>` with your actual database user password and ensure the database name is `/looop`.
+
+---
+
+## 2. Step 2: Render Backend Deployment (API & WebSockets)
+
+### 2.1 Create Web Service
+1. Sign in to [Render](https://render.com).
+2. Click **New + > Web Service**.
+3. Connect your GitHub repository.
+4. Configure the service settings:
+   * **Name:** `looop-backend`
+   * **Region:** Same or close to your MongoDB Atlas region.
+   * **Branch:** `main`
+   * **Root Directory:** `server`
+   * **Runtime:** `Node`
+   * **Build Command:** `npm install`
+   * **Start Command:** `npm start`
+   * **Plan Type:** Starter (WebSockets require a persistent service; free tier supports WebSockets but sleeps after inactivity).
+
+### 2.2 Configure Health Check
+* In **Advanced Settings**, set **Health Check Path** to:
+  ```text
+  /api/health
+  ```
+* Render will verify this endpoint returns `HTTP 200` before routing live traffic.
+
+### 2.3 Configure Backend Environment Variables
+In the **Environment** tab on Render, add the following variables:
+
+| Variable | Value / Notes |
+| :--- | :--- |
+| `NODE_ENV` | `production` |
+| `PORT` | `10000` (Render provides and overrides this automatically) |
+| `MONGODB_URI` | `mongodb+srv://looop_app_user:<password>@cluster0.xxxxx.mongodb.net/looop?retryWrites=true&w=majority` |
+| `JWT_SECRET` | Generate a 64-character random string (e.g. `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`) |
+| `CLIENT_URL` | `https://<your-vercel-frontend-domain>.vercel.app` |
+
+Click **Save Changes** and allow Render to build and deploy.
+
+Copy your Render service URL (e.g. `https://looop-backend.onrender.com`).
+
+---
+
+## 3. Step 3: Vercel Frontend Deployment (SPA Client)
+
+### 3.1 Import Project into Vercel
+1. Sign in to [Vercel](https://vercel.com).
+2. Click **Add New... > Project**.
+3. Import your GitHub repository.
+4. In **Project Settings**:
+   * **Framework Preset:** Vite
+   * **Root Directory:** Click **Edit** and select `client` (or leave as root; the included root `vercel.json` will automatically build `client`).
+   * **Build Command:** `npm run build`
+   * **Output Directory:** `dist`
+
+### 3.2 Configure Frontend Environment Variables
+In the **Environment Variables** section, add:
+
+| Variable | Production Value |
+| :--- | :--- |
+| `VITE_API_URL` | `https://<your-backend-app>.onrender.com/api` |
+| `VITE_SOCKET_URL` | `https://<your-backend-app>.onrender.com` |
+
+*Ensure there are NO trailing slashes on `VITE_SOCKET_URL` and that `VITE_API_URL` ends with `/api`.*
+
+### 3.3 Deploy
+Click **Deploy**. Vercel will build the frontend, optimize assets, and deploy globally across edge locations.
+
+Copy your assigned Vercel URL (e.g. `https://looop-community.vercel.app`).
+
+### 3.4 Update Backend CORS
+Return to your **Render Dashboard > Environment Variables** and update `CLIENT_URL` with your final Vercel domain:
+```text
+CLIENT_URL=https://looop-community.vercel.app
+```
+Render will automatically redeploy the backend with the authorized origin.
+
+---
+
+## 4. Step 4: Post-Deployment Smoke Test
+
+Perform the following validation sequence against your live deployment:
+
+### 4.1 Backend Health & Security
+1. In your browser or terminal:
+   ```bash
+   curl -i https://<your-backend-app>.onrender.com/api/health
+   ```
+2. Verify:
+   * Response status is `HTTP 200 OK`.
+   * Body contains `"status": "healthy"`.
+   * Database host is safely sanitized (`"host": "Atlas Cluster"`).
+   * No raw passwords or MongoDB internal URLs appear in response.
+
+### 4.2 Frontend SPA Routing
+1. Open the homepage: `https://<your-vercel-frontend>.vercel.app`.
+2. Directly navigate to `/browse`, `/login`, `/register`, `/how-it-works`.
+3. Refresh the page on `/browse`. Verify no 404 appears (handled by `vercel.json`).
+
+### 4.3 Authentication & Real-Time Socket Connection
+1. Register a new customer user.
+2. Verify token is issued and stored in browser `localStorage`.
+3. Open browser developer tools > **Network > WS (WebSocket)**.
+4. Verify Socket.IO handshake completes successfully (`101 Switching Protocols` / `transport: websocket`).
+5. Open an item and submit a request. Verify the request is persisted in MongoDB Atlas.
+
+---
+
+## 5. Troubleshooting & Common Issues
+
+| Issue | Root Cause | Solution |
+| :--- | :--- | :--- |
+| **CORS error in browser console** | `CLIENT_URL` on Render doesn't match Vercel URL | Update `CLIENT_URL` in Render environment to match your Vercel URL exactly (no trailing slash). |
+| **Direct URL refresh returns 404** | SPA routing rewrite missing | Ensure `vercel.json` contains rewrites from `/(.*)` to `/index.html`. |
+| **Socket.IO disconnects immediately** | Invalid or missing JWT token | Verify user is logged in. Check Render `JWT_SECRET` matches across restarts. |
+| **Database connection timeout on Render** | Atlas IP Access List not configured | In Atlas > Network Access, ensure `0.0.0.0/0` is allowed or Render's IP range is whitelisted. |
+| **Render server crashes on start** | Missing `JWT_SECRET` in production | Set `JWT_SECRET` in Render Environment variables; the app prevents startup in production without it. |
+| **Double notification triggers** | Duplicate listeners on client unmount | All components use `socketService.subscribe` with automatic cleanup in `useEffect` return handlers. |

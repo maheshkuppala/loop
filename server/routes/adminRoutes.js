@@ -1,0 +1,64 @@
+const express = require('express');
+const router = express.Router();
+const adminMiddleware = require('../middleware/adminMiddleware');
+const adminController = require('../controllers/adminController');
+const impactController = require('../controllers/impactController');
+
+// All administrative routes require strict verified administrative privileges
+router.use(adminMiddleware);
+
+// 1. Dashboard & Platform Overview
+router.get('/dashboard', adminController.getDashboard);
+
+// 2. Real Aggregated Analytics
+router.get('/analytics', adminController.getAnalytics);
+
+// 3. User Governance
+router.get('/users', adminController.getUsers);
+router.get('/users/:id', adminController.getUserDetails);
+router.patch('/users/:id/status', adminController.updateUserStatus);
+
+// 4. Listing Moderation
+router.get('/items', adminController.getItems);
+router.get('/items/:id', adminController.getItemDetails);
+router.patch('/items/:id/moderation', adminController.moderateItem);
+
+// 5. Wanted Items Oversight
+router.get('/wanted', adminController.getWantedItems);
+
+// 6. Requests Monitoring
+router.get('/requests', adminController.getRequests);
+router.get('/requests/:id', adminController.getRequestDetails);
+
+// 7. Transactions Oversight
+router.get('/transactions', adminController.getTransactions);
+router.get('/transactions/:id', adminController.getTransactionDetails);
+
+// 8. Reports & Dispute Moderation
+router.get('/reports', adminController.getReports);
+router.get('/reports/:id', adminController.getReportDetails);
+router.patch('/reports/:id/resolve', adminController.resolveReport);
+
+// 9. Categories Management
+router.get('/categories', adminController.getCategories);
+router.post('/categories', adminController.createCategory);
+router.patch('/categories/:id', adminController.updateCategory);
+router.patch('/categories/:id/status', adminController.toggleCategoryStatus);
+
+// 10. Platform Settings
+router.get('/settings', adminController.getSettings);
+router.put('/settings', adminController.updateSettings);
+
+// 11. Security Audit Logs
+router.get('/audit-logs', adminController.getAuditLogs);
+
+// 12. Environmental Impact & Factors Governance
+router.get('/impact/summary', impactController.getAdminImpactSummary);
+router.get('/impact/trends', impactController.getAdminImpactTrends);
+router.get('/impact/factors', impactController.getImpactFactors);
+router.post('/impact/factors', impactController.createImpactFactor);
+router.patch('/impact/factors/:id', impactController.updateImpactFactor);
+router.delete('/impact/factors/:id', impactController.deleteImpactFactor);
+router.post('/impact/recalculate/:transactionId', impactController.recalculateTransactionImpact);
+
+module.exports = router;
