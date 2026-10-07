@@ -14,7 +14,8 @@ import {
   Check,
   Circle,
   Send,
-  Globe
+  Globe,
+  Home
 } from 'lucide-react';
 import LooopLogo from '../../components/common/LooopLogo';
 import Button from '../../components/common/Button';
@@ -449,23 +450,23 @@ export const RegisterPage = () => {
 
         <Link
           to="/"
+          title="Return to Home"
+          aria-label="Home"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '6px',
-            fontSize: '0.85rem',
+            justifyContent: 'center',
+            width: '40px',
+            height: '40px',
+            borderRadius: '50%',
             color: '#a7f3d0',
-            textDecoration: 'none',
-            fontWeight: 600,
-            padding: '7px 14px',
-            borderRadius: '9999px',
-            backgroundColor: 'rgba(255, 255, 255, 0.08)',
-            border: '1px solid rgba(52, 211, 153, 0.25)',
-            backdropFilter: 'blur(10px)'
+            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+            border: '1.5px solid rgba(52, 211, 153, 0.3)',
+            backdropFilter: 'blur(10px)',
+            transition: 'all 0.2s ease'
           }}
         >
-          <ArrowLeft size={16} />
-          <span>Home</span>
+          <Home size={20} />
         </Link>
       </header>
 
