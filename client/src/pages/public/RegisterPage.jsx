@@ -1331,7 +1331,7 @@ export const RegisterPage = () => {
             </h3>
 
             <p style={{ fontSize: '0.875rem', color: '#475569', lineHeight: 1.55, marginBottom: '1.5rem' }}>
-              This email address (<strong style={{ color: '#0f172a', fontWeight: 700 }}>{email}</strong>) is already registered in our database. Please login through this email. Welcome back Chief!
+              An account with <strong style={{ color: '#0f172a', fontWeight: 700 }}>{email}</strong> is already registered in our database. Please sign in to your existing account or use a different email address to create a new account.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
