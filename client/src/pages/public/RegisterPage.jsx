@@ -47,6 +47,16 @@ export const RegisterPage = () => {
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const otpInputRefs = useRef([]);
 
+  // Inline Email Verification State
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
+  const [isCheckingEmailDb, setIsCheckingEmailDb] = useState(false);
+  const [inlineOtpSent, setInlineOtpSent] = useState(false);
+  const [inlineOtpDigits, setInlineOtpDigits] = useState(['', '', '', '', '', '']);
+  const [inlineOtpCountdown, setInlineOtpCountdown] = useState(60);
+  const [isVerifyingInlineOtp, setIsVerifyingInlineOtp] = useState(false);
+  const [inlineOtpError, setInlineOtpError] = useState('');
+  const inlineOtpRefs = useRef([]);
+
   // Visibility toggles
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -67,6 +77,17 @@ export const RegisterPage = () => {
     }
     return () => clearInterval(timer);
   }, [regStep, otpCountdown]);
+
+  // Inline OTP Countdown timer
+  useEffect(() => {
+    let timer;
+    if (inlineOtpSent && inlineOtpCountdown > 0) {
+      timer = setInterval(() => {
+        setInlineOtpCountdown((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [inlineOtpSent, inlineOtpCountdown]);
 
   // Password Requirement Checks
   const hasMinLength = password.length >= 8;
@@ -134,12 +155,93 @@ export const RegisterPage = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Inline Email Verification Trigger (Checks DB first, then dispatches Brevo OTP)
+  const handleVerifyEmailClick = async (e) => {
+    if (e) e.preventDefault();
+    setServerError('');
+    setInlineOtpError('');
+    setIsDuplicateEmail(false);
+
+    const cleanEmail = email.trim();
+    if (!cleanEmail) {
+      setErrors((prev) => ({ ...prev, email: 'Please enter your email address first.' }));
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setErrors((prev) => ({ ...prev, email: 'Invalid email address format (e.g. name@domain.com).' }));
+      return;
+    }
+
+    setIsCheckingEmailDb(true);
+
+    try {
+      // 1. Check direct Neon PostgreSQL Cloud DB, Mongo, and LocalStorage for duplicate email
+      const check = await authService.checkEmailExists(cleanEmail);
+      if (check.exists) {
+        setIsDuplicateEmail(true);
+        setIsCheckingEmailDb(false);
+        return;
+      }
+
+      // 2. Email is new! Dispatch 6-digit Brevo OTP code
+      await authService.sendOtp(cleanEmail);
+      setInlineOtpSent(true);
+      setInlineOtpDigits(['', '', '', '', '', '']);
+      setInlineOtpCountdown(60);
+      addToast({
+        title: 'Verification Code Sent',
+        message: `A 6-digit OTP code has been dispatched to ${cleanEmail} via Brevo Email.`,
+        variant: 'info'
+      });
+      setTimeout(() => inlineOtpRefs.current[0]?.focus(), 150);
+    } catch (err) {
+      setInlineOtpError(err.message || 'Failed to dispatch verification code via Brevo Email. Please try again.');
+    } finally {
+      setIsCheckingEmailDb(false);
+    }
+  };
+
+  // Confirm Inline OTP code
+  const handleConfirmInlineOtp = async (e) => {
+    if (e) e.preventDefault();
+    const code = inlineOtpDigits.join('');
+    if (code.length < 6) {
+      setInlineOtpError('Please enter the full 6-digit verification code.');
+      return;
+    }
+
+    setIsVerifyingInlineOtp(true);
+    setInlineOtpError('');
+
+    try {
+      await authService.verifyOtp(email.trim(), code);
+      setIsEmailVerified(true);
+      setInlineOtpSent(false);
+      addToast({
+        title: 'Email Verified!',
+        message: 'Your email address has been verified successfully.',
+        variant: 'success'
+      });
+    } catch (err) {
+      setInlineOtpError(err.message || 'Invalid or expired verification code. Please check and try again.');
+    } finally {
+      setIsVerifyingInlineOtp(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setServerError('');
     setIsDuplicateEmail(false);
 
     if (!validateForm()) {
+      return;
+    }
+
+    // If email is not verified yet, trigger inline verification / DB check
+    if (!isEmailVerified) {
+      await handleVerifyEmailClick();
       return;
     }
 
@@ -154,42 +256,30 @@ export const RegisterPage = () => {
         return;
       }
 
-      // 2. Dispatch Brevo Email OTP
-      const res = await authService.sendRegisterOtp({
+      // 2. Perform account registration & save directly to Neon PostgreSQL Cloud DB
+      const res = await authService.register({
         name: name.trim(),
         email: email.trim(),
         password
       });
 
-      if (!res.success && res.isDuplicate) {
-        setIsDuplicateEmail(true);
-        return;
+      if (res && res.token && res.user) {
+        register(res.user, res.token);
+        addToast({
+          title: 'Account Created & Verified!',
+          message: `Welcome to LOOOP, ${res.user.name || 'Member'}! Your account details have been securely saved to the database.`,
+          variant: 'success'
+        });
+        if (redirectUrl) {
+          navigate(redirectUrl);
+        } else if (res.user.role === 'admin' || res.user.role === 'ADMIN') {
+          navigate('/admin/dashboard');
+        } else {
+          navigate('/dashboard');
+        }
       }
-
-      setRegStep('otp');
-      setOtpCountdown(60);
-      addToast({
-        title: 'Verification Code Dispatched',
-        message: 'A 6-digit OTP code has been sent to your email address via Brevo.',
-        variant: 'info'
-      });
-      setTimeout(() => otpInputRefs.current[0]?.focus(), 150);
     } catch (err) {
-      let errorMsg = "We couldn't dispatch your verification code right now. Please try again.";
-      const status = err.response?.status;
-      const respMsg = err.response?.data?.message || err.message || '';
-
-      if (
-        status === 409 ||
-        respMsg.toLowerCase().includes('already exists') ||
-        respMsg.toLowerCase().includes('already registered')
-      ) {
-        setIsDuplicateEmail(true);
-        return;
-      } else if (respMsg) {
-        errorMsg = respMsg;
-      }
-      setServerError(errorMsg);
+      setServerError(err.message || 'Account creation failed. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -631,24 +721,59 @@ export const RegisterPage = () => {
                   )}
                 </div>
 
-                {/* Email Address Field */}
+                {/* Email Address Field with Real-Time Validation & Inline OTP Verification */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', boxSizing: 'border-box' }}>
-                  <label
-                    htmlFor="register-email"
-                    style={{
-                      fontSize: '0.825rem',
-                      fontWeight: 600,
-                      color: errors.email ? '#ef4444' : '#334155'
-                    }}
-                  >
-                    Email Address
-                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <label
+                      htmlFor="register-email"
+                      style={{
+                        fontSize: '0.825rem',
+                        fontWeight: 600,
+                        color: errors.email ? '#ef4444' : '#334155'
+                      }}
+                    >
+                      Email Address
+                    </label>
+
+                    {/* Verification Status Badge or Action Button */}
+                    {isEmailVerified ? (
+                      <span style={{ fontSize: '0.78rem', color: '#059669', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: '#ecfdf5', padding: '2px 8px', borderRadius: '12px', border: '1px solid #a7f3d0' }}>
+                        <CheckCircle2 size={13} />
+                        <span>Verified</span>
+                      </span>
+                    ) : (
+                      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) && !inlineOtpSent && (
+                        <button
+                          type="button"
+                          onClick={handleVerifyEmailClick}
+                          disabled={isCheckingEmailDb}
+                          style={{
+                            background: '#ecfdf5',
+                            border: '1.5px solid #047857',
+                            color: '#047857',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            padding: '3px 12px',
+                            borderRadius: '12px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          {isCheckingEmailDb ? 'Checking DB...' : 'Verify Email'}
+                        </button>
+                      )
+                    )}
+                  </div>
+
                   <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: '100%', boxSizing: 'border-box' }}>
                     <span
                       style={{
                         position: 'absolute',
                         left: '12px',
-                        color: errors.email ? '#ef4444' : '#94a3b8',
+                        color: isEmailVerified ? '#059669' : (errors.email ? '#ef4444' : '#94a3b8'),
                         pointerEvents: 'none',
                         display: 'flex',
                         alignItems: 'center'
@@ -660,11 +785,21 @@ export const RegisterPage = () => {
                       id="register-email"
                       type="email"
                       autoComplete="email"
-                      placeholder="Enter your email"
+                      placeholder="Enter your email address"
                       value={email}
                       onChange={(e) => {
-                        setEmail(e.target.value);
-                        if (errors.email) setErrors({ ...errors, email: '' });
+                        const val = e.target.value;
+                        setEmail(val);
+                        if (isEmailVerified) setIsEmailVerified(false);
+                        if (inlineOtpSent) setInlineOtpSent(false);
+
+                        if (!val.trim()) {
+                          if (errors.email) setErrors({ ...errors, email: '' });
+                        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim())) {
+                          setErrors({ ...errors, email: 'Invalid email address format (e.g. name@domain.com)' });
+                        } else {
+                          setErrors({ ...errors, email: '' });
+                        }
                       }}
                       style={{
                         width: '100%',
@@ -672,18 +807,112 @@ export const RegisterPage = () => {
                         padding: '10px 12px 10px 38px',
                         fontSize: '0.9rem',
                         borderRadius: '12px',
-                        border: errors.email ? '1.5px solid #ef4444' : '1.5px solid #cbd5e1',
-                        backgroundColor: '#ffffff',
+                        border: isEmailVerified
+                          ? '2px solid #10b981'
+                          : (errors.email ? '1.5px solid #ef4444' : '1.5px solid #cbd5e1'),
+                        backgroundColor: isEmailVerified ? '#f0fdf4' : '#ffffff',
                         color: '#0f172a',
                         outline: 'none'
                       }}
-                      disabled={isSubmitting}
+                      disabled={isSubmitting || isEmailVerified}
                     />
                   </div>
+
+                  {/* Real-Time Format Error */}
                   {errors.email && (
                     <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 500 }}>
                       {errors.email}
                     </span>
+                  )}
+
+                  {/* Inline 6-Digit OTP Verification Box */}
+                  {inlineOtpSent && !isEmailVerified && (
+                    <div
+                      style={{
+                        marginTop: '8px',
+                        padding: '12px',
+                        backgroundColor: '#f8fafc',
+                        borderRadius: '14px',
+                        border: '1.5px solid #cbd5e1',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <div style={{ fontSize: '0.8rem', color: '#334155', fontWeight: 600 }}>
+                        Enter 6-digit OTP code sent via Brevo to <strong>{email.trim()}</strong>:
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                        {inlineOtpDigits.map((digit, idx) => (
+                          <input
+                            key={idx}
+                            ref={(el) => (inlineOtpRefs.current[idx] = el)}
+                            type="text"
+                            maxLength={1}
+                            value={digit}
+                            onChange={(e) => {
+                              const val = e.target.value.slice(-1);
+                              const copy = [...inlineOtpDigits];
+                              copy[idx] = val;
+                              setInlineOtpDigits(copy);
+                              if (val && idx < 5) inlineOtpRefs.current[idx + 1]?.focus();
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Backspace' && !inlineOtpDigits[idx] && idx > 0) {
+                                inlineOtpRefs.current[idx - 1]?.focus();
+                              }
+                            }}
+                            style={{
+                              width: '36px',
+                              height: '42px',
+                              textAlign: 'center',
+                              fontSize: '1.2rem',
+                              fontWeight: 800,
+                              borderRadius: '8px',
+                              border: '1.5px solid #cbd5e1',
+                              backgroundColor: '#ffffff',
+                              color: '#047857',
+                              outline: 'none',
+                              boxSizing: 'border-box'
+                            }}
+                          />
+                        ))}
+                      </div>
+
+                      {inlineOtpError && (
+                        <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 500, textAlign: 'center' }}>
+                          {inlineOtpError}
+                        </span>
+                      )}
+
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
+                        <Button
+                          type="button"
+                          variant="primary"
+                          size="sm"
+                          loading={isVerifyingInlineOtp}
+                          disabled={isVerifyingInlineOtp || inlineOtpDigits.join('').length < 6}
+                          onClick={handleConfirmInlineOtp}
+                          style={{ flex: 1, borderRadius: '8px' }}
+                        >
+                          Confirm & Verify Email
+                        </Button>
+
+                        {inlineOtpCountdown > 0 ? (
+                          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Resend {inlineOtpCountdown}s</span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={handleVerifyEmailClick}
+                            style={{ background: 'none', border: 'none', color: '#047857', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
+                          >
+                            Resend OTP
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
 
@@ -1069,11 +1298,11 @@ export const RegisterPage = () => {
             </div>
 
             <h3 style={{ fontSize: '1.3rem', fontWeight: 900, color: '#0f172a', marginBottom: '0.5rem' }}>
-              Email Already Owned
+              Email Already Registered!
             </h3>
 
             <p style={{ fontSize: '0.875rem', color: '#475569', lineHeight: 1.55, marginBottom: '1.5rem' }}>
-              The email address <strong style={{ color: '#0f172a', fontWeight: 700 }}>{email}</strong> is already registered to an account in our database. Please log in with your credentials or try registering with a different email.
+              This email address (<strong style={{ color: '#0f172a', fontWeight: 700 }}>{email}</strong>) is already registered in our database. Please login through this email. Welcome back Chief!
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
