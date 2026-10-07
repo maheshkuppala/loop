@@ -108,7 +108,27 @@ export const neonDb = {
     const sql = 'SELECT id, name, email, role, avatar, bio, city, locality, state, account_status, trust_score, rating, reviews_count, verified, created_at FROM users WHERE LOWER(email) = $1 LIMIT 1;';
     const res = await neonDb.query(sql, [cleanEmail]);
     return res.rows && res.rows.length > 0 ? res.rows[0] : null;
+  },
+
+  /**
+   * Direct password update in Neon PostgreSQL for Forgot Password recovery
+   */
+  updatePassword: async (email, newPassword) => {
+    if (!email || !newPassword) return false;
+    const cleanEmail = email.toLowerCase().trim();
+    const sql = 'UPDATE users SET password = $1, updated_at = CURRENT_TIMESTAMP WHERE LOWER(email) = $2 RETURNING id, email;';
+    try {
+      const res = await neonDb.query(sql, [newPassword, cleanEmail]);
+      if (res.rows && res.rows.length > 0) {
+        console.log(`[Neon DB Password Reset] Updated password in PostgreSQL for ${cleanEmail}`);
+        return true;
+      }
+    } catch (err) {
+      console.warn('[Neon DB Password Reset Error]', err.message);
+    }
+    return false;
   }
 };
 
 export default neonDb;
+

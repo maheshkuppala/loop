@@ -175,6 +175,9 @@ export const LoginPage = () => {
         user: { email: targetEmail, name: targetEmail.split('@')[0], role: 'customer' },
         token: `looop_token_${Date.now()}`
       };
+      
+      // Dispatch pleasant welcome email notification via Brevo
+      authService.sendLoginWelcomeEmail(session.user);
       handleAuthSuccess(session.user, session.token, session.user.name);
     } catch (err) {
       setServerError(err.message || 'Invalid or expired verification code. Please check and try again.');
@@ -199,6 +202,7 @@ export const LoginPage = () => {
       });
 
       if (result && result.token && result.user) {
+        authService.sendLoginWelcomeEmail(result.user);
         handleAuthSuccess(result.user, result.token, googleUser.displayName);
       }
     } catch (err) {
@@ -380,79 +384,6 @@ export const LoginPage = () => {
             </p>
           </div>
 
-          {/* Mode Selector Tabs: Password vs OTP */}
-          {loginStep === 'form' && (
-            <div
-              style={{
-                display: 'flex',
-                padding: '4px',
-                borderRadius: '12px',
-                backgroundColor: '#f1f5f9',
-                marginBottom: '1.25rem',
-                border: '1px solid #e2e8f0',
-                width: '100%',
-                boxSizing: 'border-box'
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => {
-                  setAuthMode('password');
-                  setServerError('');
-                }}
-                style={{
-                  flex: 1,
-                  padding: '9px 12px',
-                  fontSize: '0.85rem',
-                  fontWeight: 700,
-                  borderRadius: '9px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  backgroundColor: authMode === 'password' ? '#ffffff' : 'transparent',
-                  color: authMode === 'password' ? '#047857' : '#64748b',
-                  boxShadow: authMode === 'password' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
-                  transition: 'all 0.2s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px'
-                }}
-              >
-                <KeyRound size={15} />
-                <span>Password Sign-In</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setAuthMode('otp');
-                  setServerError('');
-                  if (email) setOtpEmail(email);
-                }}
-                style={{
-                  flex: 1,
-                  padding: '9px 12px',
-                  fontSize: '0.85rem',
-                  fontWeight: 700,
-                  borderRadius: '9px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  backgroundColor: authMode === 'otp' ? '#ffffff' : 'transparent',
-                  color: authMode === 'otp' ? '#047857' : '#64748b',
-                  boxShadow: authMode === 'otp' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
-                  transition: 'all 0.2s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px'
-                }}
-              >
-                <Mail size={15} />
-                <span>Email OTP Code</span>
-              </button>
-            </div>
-          )}
-
           {/* Server Error Alert */}
           {serverError && (
             <div
@@ -476,546 +407,384 @@ export const LoginPage = () => {
             </div>
           )}
 
-          {/* MODE 1: PASSWORD LOGIN */}
-          {authMode === 'password' && (
-            loginStep === 'otp' ? (
-              /* Step 2 of Password Login: OTP Verification */
-              <div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLoginStep('form');
-                    setServerError('');
-                  }}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    background: 'none',
-                    border: 'none',
-                    color: '#047857',
-                    fontSize: '0.85rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    marginBottom: '1rem',
-                    padding: 0
-                  }}
-                >
-                  <ArrowLeft size={16} /> Back to password sign-in
-                </button>
+          {/* PASSWORD SIGN-IN & OTP VERIFICATION */}
+          {loginStep === 'otp' ? (
+            /* Step 2 of Password Login: OTP Verification */
+            <div>
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginStep('form');
+                  setServerError('');
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'none',
+                  border: 'none',
+                  color: '#047857',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  marginBottom: '1rem',
+                  padding: 0
+                }}
+              >
+                <ArrowLeft size={16} /> Back to password sign-in
+              </button>
 
-                <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-                  <div style={{
-                    width: '56px',
-                    height: '56px',
-                    borderRadius: '50%',
-                    backgroundColor: '#ecfdf5',
-                    color: '#047857',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: '0 auto 1rem auto',
-                    border: '1px solid #a7f3d0'
-                  }}>
-                    <ShieldCheck size={30} />
-                  </div>
-                  <h2 style={{ fontSize: '1.3rem', fontWeight: 900, color: '#0f172a' }}>
-                    Enter 6-Digit OTP Code
-                  </h2>
-                  <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '6px', lineHeight: 1.5 }}>
-                    For account security, enter the 6-digit login verification code sent via <strong>Brevo Email</strong> to:
-                  </p>
-                  <div style={{
-                    display: 'inline-block',
-                    marginTop: '8px',
-                    padding: '4px 14px',
-                    backgroundColor: '#f1f5f9',
-                    borderRadius: '20px',
-                    fontSize: '0.85rem',
-                    fontWeight: 700,
-                    color: '#0f172a',
-                    border: '1px solid #cbd5e1',
-                    wordBreak: 'break-all'
-                  }}>
-                    {email}
-                  </div>
+              <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+                <div style={{
+                  width: '56px',
+                  height: '56px',
+                  borderRadius: '50%',
+                  backgroundColor: '#ecfdf5',
+                  color: '#047857',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 1rem auto',
+                  border: '1px solid #a7f3d0'
+                }}>
+                  <ShieldCheck size={30} />
                 </div>
-
-                <form onSubmit={handleVerifyLoginOtp} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: '6px' }}>
-                    {otpDigits.map((digit, idx) => (
-                      <input
-                        key={idx}
-                        ref={(el) => (otpInputRefs.current[idx] = el)}
-                        type="text"
-                        maxLength={1}
-                        value={digit}
-                        onChange={(e) => handleOtpDigitChange(idx, e.target.value)}
-                        onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                        onPaste={idx === 0 ? handleOtpPaste : undefined}
-                        style={{
-                          width: '42px',
-                          height: '50px',
-                          textAlign: 'center',
-                          fontSize: '1.35rem',
-                          fontWeight: 800,
-                          borderRadius: '10px',
-                          border: '2px solid #cbd5e1',
-                          backgroundColor: '#ffffff',
-                          color: '#047857',
-                          outline: 'none',
-                          boxSizing: 'border-box'
-                        }}
-                      />
-                    ))}
-                  </div>
-
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    size="lg"
-                    loading={isVerifyingOtp}
-                    disabled={isVerifyingOtp || otpDigits.join('').length < 6}
-                    style={{ width: '100%', borderRadius: '12px' }}
-                    iconRight={ArrowRight}
-                  >
-                    {isVerifyingOtp ? 'Verifying Code...' : 'Verify Code & Sign In'}
-                  </Button>
-                </form>
-
-                <div style={{ marginTop: '1.25rem', textAlign: 'center', fontSize: '0.85rem', color: '#64748b' }}>
-                  <span>Didn't receive the email code? </span>
-                  {otpCountdown > 0 ? (
-                    <span style={{ fontWeight: 600, color: '#047857' }}>Resend in {otpCountdown}s</span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => handleSendOtp()}
-                      disabled={isSendingOtp}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#047857',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        textDecoration: 'underline'
-                      }}
-                    >
-                      {isSendingOtp ? 'Sending...' : 'Resend Code via Brevo'}
-                    </button>
-                  )}
+                <h2 style={{ fontSize: '1.3rem', fontWeight: 900, color: '#0f172a' }}>
+                  Enter 6-Digit OTP Code
+                </h2>
+                <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '6px', lineHeight: 1.5 }}>
+                  For account security, enter the 6-digit login verification code sent via <strong>Brevo Email</strong> to:
+                </p>
+                <div style={{
+                  display: 'inline-block',
+                  marginTop: '8px',
+                  padding: '4px 14px',
+                  backgroundColor: '#f1f5f9',
+                  borderRadius: '20px',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  color: '#0f172a',
+                  border: '1px solid #cbd5e1',
+                  wordBreak: 'break-all'
+                }}>
+                  {email}
                 </div>
               </div>
-            ) : (
-              /* Step 1 of Password Login: Form */
-              <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%', boxSizing: 'border-box' }}>
-                {/* Email Address Input */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', boxSizing: 'border-box' }}>
+
+              <form onSubmit={handleVerifyLoginOtp} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '6px' }}>
+                  {otpDigits.map((digit, idx) => (
+                    <input
+                      key={idx}
+                      ref={(el) => (otpInputRefs.current[idx] = el)}
+                      type="text"
+                      maxLength={1}
+                      value={digit}
+                      onChange={(e) => handleOtpDigitChange(idx, e.target.value)}
+                      onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                      onPaste={idx === 0 ? handleOtpPaste : undefined}
+                      style={{
+                        width: '42px',
+                        height: '50px',
+                        textAlign: 'center',
+                        fontSize: '1.35rem',
+                        fontWeight: 800,
+                        borderRadius: '10px',
+                        border: '2px solid #cbd5e1',
+                        backgroundColor: '#ffffff',
+                        color: '#047857',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  ))}
+                </div>
+
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="lg"
+                  loading={isVerifyingOtp}
+                  disabled={isVerifyingOtp || otpDigits.join('').length < 6}
+                  style={{ width: '100%', borderRadius: '12px' }}
+                  iconRight={ArrowRight}
+                >
+                  {isVerifyingOtp ? 'Verifying Code...' : 'Verify Code & Sign In'}
+                </Button>
+              </form>
+
+              <div style={{ marginTop: '1.25rem', textAlign: 'center', fontSize: '0.85rem', color: '#64748b' }}>
+                <span>Didn't receive the email code? </span>
+                {otpCountdown > 0 ? (
+                  <span style={{ fontWeight: 600, color: '#047857' }}>Resend in {otpCountdown}s</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleSendOtp()}
+                    disabled={isSendingOtp}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#047857',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      textDecoration: 'underline'
+                    }}
+                  >
+                    {isSendingOtp ? 'Sending...' : 'Resend Code via Brevo'}
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            /* Step 1 of Password Login: Form */
+            <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%', boxSizing: 'border-box' }}>
+              {/* Email Address Input */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', boxSizing: 'border-box' }}>
+                <label
+                  htmlFor="login-email"
+                  style={{
+                    fontSize: '0.825rem',
+                    fontWeight: 600,
+                    color: errors.email ? '#ef4444' : '#334155'
+                  }}
+                >
+                  Email Address
+                </label>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: '100%', boxSizing: 'border-box' }}>
+                  <span
+                    style={{
+                      position: 'absolute',
+                      left: '12px',
+                      color: errors.email ? '#ef4444' : '#94a3b8',
+                      pointerEvents: 'none',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <Mail size={17} />
+                  </span>
+                  <input
+                    id="login-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (errors.email) setErrors({ ...errors, email: '' });
+                    }}
+                    placeholder="Enter your email"
+                    autoComplete="email"
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      padding: '10px 12px 10px 38px',
+                      fontSize: '0.9rem',
+                      borderRadius: '12px',
+                      border: errors.email ? '1.5px solid #ef4444' : '1.5px solid #cbd5e1',
+                      outline: 'none',
+                      backgroundColor: '#ffffff',
+                      color: '#0f172a'
+                    }}
+                    disabled={isSubmitting}
+                  />
+                </div>
+                {errors.email && (
+                  <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 500 }}>
+                    {errors.email}
+                  </span>
+                )}
+              </div>
+
+              {/* Password Input */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', boxSizing: 'border-box' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <label
-                    htmlFor="login-email"
+                    htmlFor="login-password"
                     style={{
                       fontSize: '0.825rem',
                       fontWeight: 600,
-                      color: errors.email ? '#ef4444' : '#334155'
+                      color: errors.password ? '#ef4444' : '#334155'
                     }}
                   >
-                    Email Address
+                    Password
                   </label>
-                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: '100%', boxSizing: 'border-box' }}>
-                    <span
-                      style={{
-                        position: 'absolute',
-                        left: '12px',
-                        color: errors.email ? '#ef4444' : '#94a3b8',
-                        pointerEvents: 'none',
-                        display: 'flex',
-                        alignItems: 'center'
-                      }}
-                    >
-                      <Mail size={17} />
-                    </span>
-                    <input
-                      id="login-email"
-                      type="email"
-                      value={email}
-                      onChange={(e) => {
-                        setEmail(e.target.value);
-                        if (errors.email) setErrors({ ...errors, email: '' });
-                      }}
-                      placeholder="Enter your email"
-                      autoComplete="email"
-                      style={{
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        padding: '10px 12px 10px 38px',
-                        fontSize: '0.9rem',
-                        borderRadius: '12px',
-                        border: errors.email ? '1.5px solid #ef4444' : '1.5px solid #cbd5e1',
-                        outline: 'none',
-                        backgroundColor: '#ffffff',
-                        color: '#0f172a'
-                      }}
-                      disabled={isSubmitting}
-                    />
-                  </div>
-                  {errors.email && (
-                    <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 500 }}>
-                      {errors.email}
-                    </span>
-                  )}
-                </div>
-
-                {/* Password Input */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', boxSizing: 'border-box' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <label
-                      htmlFor="login-password"
-                      style={{
-                        fontSize: '0.825rem',
-                        fontWeight: 600,
-                        color: errors.password ? '#ef4444' : '#334155'
-                      }}
-                    >
-                      Password
-                    </label>
-                    <Link
-                      to="/forgot-password"
-                      style={{
-                        fontSize: '0.78rem',
-                        color: '#047857',
-                        fontWeight: 700,
-                        textDecoration: 'none'
-                      }}
-                    >
-                      Forgot password?
-                    </Link>
-                  </div>
-                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: '100%', boxSizing: 'border-box' }}>
-                    <span
-                      style={{
-                        position: 'absolute',
-                        left: '12px',
-                        color: errors.password ? '#ef4444' : '#94a3b8',
-                        pointerEvents: 'none',
-                        display: 'flex',
-                        alignItems: 'center'
-                      }}
-                    >
-                      <Lock size={17} />
-                    </span>
-                    <input
-                      id="login-password"
-                      type={showPassword ? 'text' : 'password'}
-                      value={password}
-                      onChange={(e) => {
-                        setPassword(e.target.value);
-                        if (errors.password) setErrors({ ...errors, password: '' });
-                      }}
-                      placeholder="Enter your password"
-                      autoComplete="current-password"
-                      style={{
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        padding: '10px 40px 10px 38px',
-                        fontSize: '0.9rem',
-                        borderRadius: '12px',
-                        border: errors.password ? '1.5px solid #ef4444' : '1.5px solid #cbd5e1',
-                        outline: 'none',
-                        backgroundColor: '#ffffff',
-                        color: '#0f172a'
-                      }}
-                      disabled={isSubmitting}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                      style={{
-                        position: 'absolute',
-                        right: '10px',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: '#94a3b8',
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '4px'
-                      }}
-                    >
-                      {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
-                    </button>
-                  </div>
-                  {errors.password && (
-                    <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 500 }}>
-                      {errors.password}
-                    </span>
-                  )}
-                </div>
-
-                {/* Submit Button */}
-                <div style={{ marginTop: '0.4rem', width: '100%', boxSizing: 'border-box' }}>
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    size="lg"
-                    loading={isSubmitting}
-                    disabled={isSubmitting}
-                    style={{ width: '100%', borderRadius: '12px' }}
-                    iconRight={!isSubmitting ? ArrowRight : undefined}
-                  >
-                    {isSubmitting ? 'Verifying credentials...' : 'Sign In'}
-                  </Button>
-                </div>
-              </form>
-            )
-          )}
-
-          {/* MODE 2: EMAIL OTP LOGIN */}
-          {authMode === 'otp' && (
-            <div>
-              {!otpSent ? (
-                <form onSubmit={handleSendOtp} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%', boxSizing: 'border-box' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', boxSizing: 'border-box' }}>
-                    <label htmlFor="otp-email" style={{ fontSize: '0.825rem', fontWeight: 600, color: '#334155' }}>
-                      Email Address for OTP
-                    </label>
-                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: '100%', boxSizing: 'border-box' }}>
-                      <span
-                        style={{
-                          position: 'absolute',
-                          left: '12px',
-                          color: '#94a3b8',
-                          pointerEvents: 'none',
-                          display: 'flex',
-                          alignItems: 'center'
-                        }}
-                      >
-                        <Mail size={17} />
-                      </span>
-                      <input
-                        id="otp-email"
-                        type="email"
-                        value={otpEmail}
-                        onChange={(e) => setOtpEmail(e.target.value)}
-                        placeholder="your.email@example.com"
-                        style={{
-                          width: '100%',
-                          boxSizing: 'border-box',
-                          padding: '10px 12px 10px 38px',
-                          fontSize: '0.9rem',
-                          borderRadius: '12px',
-                          border: '1.5px solid #cbd5e1',
-                          outline: 'none',
-                          color: '#0f172a'
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    size="lg"
-                    loading={isSendingOtp}
-                    disabled={isSendingOtp}
-                    style={{ width: '100%', borderRadius: '12px' }}
-                    iconRight={!isSendingOtp ? Send : undefined}
-                  >
-                    {isSendingOtp ? 'Dispatching OTP code...' : 'Send OTP Code via Brevo'}
-                  </Button>
-                </form>
-              ) : (
-                <form onSubmit={handleVerifyLoginOtp} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                  <div style={{ textAlign: 'center', marginBottom: '0.25rem' }}>
-                    <p style={{ margin: 0, fontSize: '0.875rem', color: '#475569', fontWeight: 600 }}>
-                      Enter 6-digit code sent via Brevo Email to:
-                    </p>
-                    <div
-                      style={{
-                        display: 'inline-block',
-                        marginTop: '4px',
-                        padding: '3px 12px',
-                        backgroundColor: '#f1f5f9',
-                        borderRadius: '20px',
-                        fontSize: '0.85rem',
-                        fontWeight: 700,
-                        color: '#0f172a',
-                        wordBreak: 'break-all'
-                      }}
-                    >
-                      {otpEmail}
-                    </div>
-                  </div>
-
-                  {/* 6 Digit OTP Box Inputs */}
-                  <div
+                  <Link
+                    to="/forgot-password"
                     style={{
-                      display: 'flex',
-                      justifyContent: 'center',
-                      gap: '6px'
+                      fontSize: '0.78rem',
+                      color: '#047857',
+                      fontWeight: 700,
+                      textDecoration: 'none'
                     }}
                   >
-                    {otpDigits.map((digit, idx) => (
-                      <input
-                        key={idx}
-                        ref={(el) => (otpInputRefs.current[idx] = el)}
-                        type="text"
-                        maxLength={1}
-                        value={digit}
-                        onChange={(e) => handleOtpDigitChange(idx, e.target.value)}
-                        onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                        onPaste={idx === 0 ? handleOtpPaste : undefined}
-                        style={{
-                          width: '42px',
-                          height: '50px',
-                          textAlign: 'center',
-                          fontSize: '1.35rem',
-                          fontWeight: 800,
-                          borderRadius: '10px',
-                          border: '2px solid #cbd5e1',
-                          outline: 'none',
-                          color: '#047857',
-                          backgroundColor: '#ffffff',
-                          boxSizing: 'border-box'
-                        }}
-                      />
-                    ))}
-                  </div>
-
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    size="lg"
-                    loading={isVerifyingOtp}
-                    disabled={isVerifyingOtp || otpDigits.join('').length < 6}
-                    style={{ width: '100%', borderRadius: '12px' }}
-                    iconRight={ArrowRight}
+                    Forgot password?
+                  </Link>
+                </div>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: '100%', boxSizing: 'border-box' }}>
+                  <span
+                    style={{
+                      position: 'absolute',
+                      left: '12px',
+                      color: errors.password ? '#ef4444' : '#94a3b8',
+                      pointerEvents: 'none',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
                   >
-                    {isVerifyingOtp ? 'Verifying Code...' : 'Verify Code & Sign In'}
-                  </Button>
+                    <Lock size={17} />
+                  </span>
+                  <input
+                    id="login-password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (errors.password) setErrors({ ...errors, password: '' });
+                    }}
+                    placeholder="Enter your password"
+                    autoComplete="current-password"
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      padding: '10px 40px 10px 38px',
+                      fontSize: '0.9rem',
+                      borderRadius: '12px',
+                      border: errors.password ? '1.5px solid #ef4444' : '1.5px solid #cbd5e1',
+                      outline: 'none',
+                      backgroundColor: '#ffffff',
+                      color: '#0f172a'
+                    }}
+                    disabled={isSubmitting}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    style={{
+                      position: 'absolute',
+                      right: '10px',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#94a3b8',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '4px'
+                    }}
+                  >
+                    {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                  </button>
+                </div>
+                {errors.password && (
+                  <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 500 }}>
+                    {errors.password}
+                  </span>
+                )}
+              </div>
 
-                  <div style={{ textAlign: 'center', fontSize: '0.825rem', color: '#64748b' }}>
-                    <span>Didn't receive code? </span>
-                    {otpCountdown > 0 ? (
-                      <span style={{ fontWeight: 600, color: '#047857' }}>Resend in {otpCountdown}s</span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleSendOtp}
-                        disabled={isSendingOtp}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#047857',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          textDecoration: 'underline'
-                        }}
-                      >
-                        {isSendingOtp ? 'Sending...' : 'Resend Code'}
-                      </button>
-                    )}
-                  </div>
-                </form>
-              )}
-            </div>
+              {/* Submit Button */}
+              <div style={{ marginTop: '0.4rem', width: '100%', boxSizing: 'border-box' }}>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="lg"
+                  loading={isSubmitting}
+                  disabled={isSubmitting}
+                  style={{ width: '100%', borderRadius: '12px' }}
+                  iconRight={!isSubmitting ? ArrowRight : undefined}
+                >
+                  {isSubmitting ? 'Verifying credentials...' : 'Sign In'}
+                </Button>
+              </div>
+            </form>
           )}
 
-          {/* BOTTOM SOCIAL AUTH OPTIONS (Google, Facebook, GitHub) */}
+          {/* BOTTOM SUBTLE SOCIAL AUTH OPTIONS (Google, Facebook, GitHub) */}
           {loginStep === 'form' && (
-            <div style={{ marginTop: '1.5rem', textAlign: 'center', width: '100%', boxSizing: 'border-box' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.25rem' }}>
+            <div style={{ marginTop: '1.25rem', textAlign: 'center', width: '100%', boxSizing: 'border-box' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1rem' }}>
                 <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
-                <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <span style={{ fontSize: '0.725rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Or connect with
                 </span>
                 <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', alignItems: 'center' }}>
                 {/* Google */}
                 <button
                   type="button"
                   onClick={() => handleSocialAuth('Google')}
                   disabled={isGoogleLoading}
+                  title="Connect with Google"
                   style={{
-                    flex: 1,
-                    padding: '10px 12px',
-                    borderRadius: '12px',
-                    border: '1.5px solid #cbd5e1',
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '50%',
+                    border: '1.5px solid #e2e8f0',
                     backgroundColor: '#ffffff',
-                    color: '#0f172a',
-                    fontSize: '0.85rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '8px',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                    transition: 'all 0.2s ease'
                   }}
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24">
+                  <svg width="20" height="20" viewBox="0 0 24 24">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                     <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
                     <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
                     <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
                   </svg>
-                  <span>Google</span>
                 </button>
 
                 {/* Facebook */}
                 <button
                   type="button"
                   onClick={() => handleSocialAuth('Facebook')}
+                  title="Connect with Facebook"
                   style={{
-                    flex: 1,
-                    padding: '10px 12px',
-                    borderRadius: '12px',
-                    border: '1.5px solid #cbd5e1',
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '50%',
+                    border: '1.5px solid #e2e8f0',
                     backgroundColor: '#ffffff',
-                    color: '#1877F2',
-                    fontSize: '0.85rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '8px',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                    transition: 'all 0.2s ease'
                   }}
                 >
-                  <svg width="18" height="18" fill="#1877F2" viewBox="0 0 24 24">
+                  <svg width="20" height="20" fill="#1877F2" viewBox="0 0 24 24">
                     <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
                   </svg>
-                  <span>Facebook</span>
                 </button>
 
                 {/* GitHub */}
                 <button
                   type="button"
                   onClick={() => handleSocialAuth('GitHub')}
+                  title="Connect with GitHub"
                   style={{
-                    flex: 1,
-                    padding: '10px 12px',
-                    borderRadius: '12px',
-                    border: '1.5px solid #cbd5e1',
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '50%',
+                    border: '1.5px solid #e2e8f0',
                     backgroundColor: '#ffffff',
-                    color: '#24292f',
-                    fontSize: '0.85rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '8px',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                    transition: 'all 0.2s ease'
                   }}
                 >
-                  <svg width="18" height="18" fill="#24292f" viewBox="0 0 24 24">
+                  <svg width="20" height="20" fill="#24292f" viewBox="0 0 24 24">
                     <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
                   </svg>
-                  <span>GitHub</span>
                 </button>
               </div>
             </div>
@@ -1024,13 +793,17 @@ export const LoginPage = () => {
           {/* Footer Navigation Link: Register */}
           <div
             style={{
-              marginTop: '1.5rem',
-              textAlign: 'center',
+              marginTop: '1.25rem',
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px',
               fontSize: '0.875rem',
               color: '#64748b'
             }}
           >
-            <span>Don't have an account? </span>
+            <span>Don't have an account?</span>
             <Link
               to={redirectUrl ? `/register?redirect=${encodeURIComponent(redirectUrl)}` : '/register'}
               style={{
@@ -1039,7 +812,7 @@ export const LoginPage = () => {
                 textDecoration: 'none'
               }}
             >
-              Create New Account
+              Create Account
             </Link>
           </div>
         </div>
@@ -1049,4 +822,5 @@ export const LoginPage = () => {
 };
 
 export default LoginPage;
+
 
