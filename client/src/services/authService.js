@@ -281,7 +281,7 @@ export const authService = {
   },
 
   /**
-   * Verify 6-digit OTP verification code with direct Neon PostgreSQL persistence
+   * Verify 6-digit OTP verification code
    * @param {string} email
    * @param {string} otp
    */
@@ -289,49 +289,44 @@ export const authService = {
     const cleanEmail = (email || '').trim().toLowerCase();
     const cleanOtp = (otp || '').trim();
 
-    const isAdmin =
-      cleanEmail === 'looop.support@gmail.com' ||
-      cleanEmail === 'maheshkuppala321@gmail.com' ||
-      cleanEmail === 'admin@looop.community' ||
-      cleanEmail.includes('admin');
-
-    const userObj = {
-      id: `usr_${Date.now()}`,
-      _id: `usr_${Date.now()}`,
-      name: cleanEmail.split('@')[0],
-      email: cleanEmail,
-      role: isAdmin ? 'admin' : 'customer',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
-      trustScore: 100,
-      rating: 5.0,
-      city: 'Guntur',
-      state: 'Andhra Pradesh'
-    };
-
-    // Save directly into Neon PostgreSQL
-    let pgUser = null;
-    try {
-      pgUser = await neonDb.saveUser(userObj, 'OtpVerifiedUser123!');
-    } catch (pgErr) {
-      console.warn('[Neon Sync] OTP user persistence warning:', pgErr.message);
-    }
-
-    const finalUser = pgUser ? { ...userObj, ...pgUser } : userObj;
-    saveLocalUser(finalUser);
-
     try {
       const response = await api.post('/auth/otp/verify', { email: cleanEmail, otp: cleanOtp });
       return response.data;
     } catch {
       const saved = sessionStorage.getItem(`looop_otp_${cleanEmail}`);
-      if (cleanOtp === saved || cleanOtp === '123456' || cleanOtp.length === 6) {
+      const isValid = cleanOtp === saved || cleanOtp === '123456' || cleanOtp.length === 6;
+
+      if (!isValid) {
+        throw new Error('Invalid verification code. Please check and try again.');
+      }
+
+      // Check if user already exists in Neon DB or LocalStorage (for login OTP case)
+      let existingUser = null;
+      try {
+        existingUser = await neonDb.getUserByEmail(cleanEmail);
+      } catch (dbErr) {
+        // Ignore
+      }
+
+      if (!existingUser) {
+        const localUsers = getLocalUsers();
+        existingUser = localUsers.find((u) => u.email.toLowerCase() === cleanEmail);
+      }
+
+      if (existingUser) {
         return {
           success: true,
           token: `looop_token_otp_${Date.now()}`,
-          user: finalUser
+          user: existingUser
         };
       }
-      throw new Error('Invalid verification code. Please check and try again.');
+
+      // Pure email verification for registration: DO NOT pre-create user in database!
+      return {
+        success: true,
+        verified: true,
+        message: 'Email address verified successfully.'
+      };
     }
   },
 

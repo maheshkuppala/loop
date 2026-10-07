@@ -481,22 +481,22 @@ exports.verifyOtp = async (req, res) => {
       }
     } catch {}
 
-    if (!user) {
-      const newId = `usr_${Date.now()}`;
-      const defaultName = cleanEmail.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
-      const tempHash = await bcrypt.hash('TempPassword123!', 10);
+    if (!user && mongoose.connection && mongoose.connection.readyState === 1) {
       try {
-        await pgQuery(
-          `INSERT INTO users (id, name, email, password, role, account_status, verified, trust_score)
-           VALUES ($1, $2, $3, $4, $5, 'active', true, 100)
-           ON CONFLICT (email) DO NOTHING`,
-          [newId, defaultName, cleanEmail, tempHash, role]
-        );
+        user = await User.findOne({ email: cleanEmail });
       } catch {}
-      user = { id: newId, _id: newId, name: defaultName, email: cleanEmail, role };
     }
 
-    const token = generateToken(user.id || user._id, role);
+    if (!user) {
+      // Pure email verification for registration: DO NOT pre-create user in database!
+      return res.status(200).json({
+        success: true,
+        verified: true,
+        message: 'Email address verified successfully.'
+      });
+    }
+
+    const token = generateToken(user.id || user._id, user.role || role);
 
     return res.status(200).json({
       success: true,
@@ -507,7 +507,7 @@ exports.verifyOtp = async (req, res) => {
         _id: user.id || user._id,
         name: user.name || cleanEmail,
         email: cleanEmail,
-        role,
+        role: user.role || role,
         avatar: user.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
         trustScore: 100
       }
