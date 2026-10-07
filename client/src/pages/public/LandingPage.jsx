@@ -205,7 +205,12 @@ export const LandingPage = () => {
                 }}
               >
                 <Link to="/browse" style={{ textDecoration: 'none' }}>
-                  <Button variant="primary" size="lg" iconRight={ArrowRight}>
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    iconRight={ArrowRight}
+                    className="browse-hover-highlight-btn"
+                  >
                     Browse Items
                   </Button>
                 </Link>
@@ -1129,6 +1134,21 @@ export const LandingPage = () => {
           border-color: var(--color-primary-600) !important;
           transform: translateY(-2px);
           box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4) !important;
+        }
+        .browse-hover-highlight-btn {
+          background-color: #ffffff !important;
+          color: var(--color-slate-700) !important;
+          border: 1.5px solid var(--color-slate-300) !important;
+          font-weight: 600 !important;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+        .browse-hover-highlight-btn:hover {
+          background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600)) !important;
+          color: #ffffff !important;
+          border-color: var(--color-primary-600) !important;
+          box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35) !important;
+          transform: translateY(-2px);
         }
         @media (max-width: 640px) {
           .hero-floating-card {
