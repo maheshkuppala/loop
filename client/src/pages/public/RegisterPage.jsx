@@ -724,50 +724,16 @@ export const RegisterPage = () => {
 
                 {/* Email Address Field with Real-Time Validation & Inline OTP Verification */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', boxSizing: 'border-box' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <label
-                      htmlFor="register-email"
-                      style={{
-                        fontSize: '0.825rem',
-                        fontWeight: 600,
-                        color: errors.email ? '#ef4444' : '#334155'
-                      }}
-                    >
-                      Email Address
-                    </label>
-
-                    {/* Verification Status Badge or Action Button */}
-                    {isEmailVerified ? (
-                      <span style={{ fontSize: '0.78rem', color: '#059669', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: '#ecfdf5', padding: '2px 8px', borderRadius: '12px', border: '1px solid #a7f3d0' }}>
-                        <CheckCircle2 size={13} />
-                        <span>Verified</span>
-                      </span>
-                    ) : (
-                      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) && !inlineOtpSent && (
-                        <button
-                          type="button"
-                          onClick={handleVerifyEmailClick}
-                          disabled={isCheckingEmailDb}
-                          style={{
-                            background: '#ecfdf5',
-                            border: '1.5px solid #047857',
-                            color: '#047857',
-                            fontSize: '0.78rem',
-                            fontWeight: 700,
-                            padding: '3px 12px',
-                            borderRadius: '12px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            transition: 'all 0.2s ease'
-                          }}
-                        >
-                          {isCheckingEmailDb ? 'Checking DB...' : 'Verify Email'}
-                        </button>
-                      )
-                    )}
-                  </div>
+                  <label
+                    htmlFor="register-email"
+                    style={{
+                      fontSize: '0.825rem',
+                      fontWeight: 600,
+                      color: errors.email ? '#ef4444' : '#334155'
+                    }}
+                  >
+                    Email Address
+                  </label>
 
                   <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: '100%', boxSizing: 'border-box' }}>
                     <span
@@ -777,7 +743,8 @@ export const RegisterPage = () => {
                         color: isEmailVerified ? '#059669' : (errors.email ? '#ef4444' : '#94a3b8'),
                         pointerEvents: 'none',
                         display: 'flex',
-                        alignItems: 'center'
+                        alignItems: 'center',
+                        zIndex: 1
                       }}
                     >
                       <Mail size={17} />
@@ -805,7 +772,11 @@ export const RegisterPage = () => {
                       style={{
                         width: '100%',
                         boxSizing: 'border-box',
-                        padding: '10px 12px 10px 38px',
+                        padding: isEmailVerified
+                          ? '10px 90px 10px 38px'
+                          : (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) && !inlineOtpSent
+                            ? '10px 85px 10px 38px'
+                            : '10px 12px 10px 38px'),
                         fontSize: '0.9rem',
                         borderRadius: '12px',
                         border: isEmailVerified
@@ -817,6 +788,63 @@ export const RegisterPage = () => {
                       }}
                       disabled={isSubmitting || isEmailVerified}
                     />
+
+                    {/* Small Inline Action Button or Status Badge inside Email Input on the Right */}
+                    {isEmailVerified ? (
+                      <span
+                        style={{
+                          position: 'absolute',
+                          right: '8px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          fontSize: '0.75rem',
+                          color: '#059669',
+                          fontWeight: 800,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          backgroundColor: '#ecfdf5',
+                          padding: '3px 8px',
+                          borderRadius: '8px',
+                          border: '1px solid #a7f3d0',
+                          zIndex: 2,
+                          pointerEvents: 'none'
+                        }}
+                      >
+                        <CheckCircle2 size={13} />
+                        <span>Verified</span>
+                      </span>
+                    ) : (
+                      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) && !inlineOtpSent && (
+                        <button
+                          type="button"
+                          onClick={handleVerifyEmailClick}
+                          disabled={isCheckingEmailDb}
+                          style={{
+                            position: 'absolute',
+                            right: '6px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: '#047857',
+                            border: 'none',
+                            color: '#ffffff',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            padding: '4px 10px',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            boxShadow: '0 2px 4px rgba(4, 120, 87, 0.25)',
+                            transition: 'all 0.2s ease',
+                            zIndex: 2
+                          }}
+                        >
+                          {isCheckingEmailDb ? '...' : 'Verify'}
+                        </button>
+                      )
+                    )}
                   </div>
 
                   {/* Real-Time Format Error */}
