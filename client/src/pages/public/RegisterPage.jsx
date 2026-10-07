@@ -446,7 +446,7 @@ export const RegisterPage = () => {
           boxSizing: 'border-box'
         }}
       >
-        <LooopLogo size="md" showTagline={false} linkTo="/" />
+        <LooopLogo size="md" showTagline={false} light={true} linkTo="/" />
 
         <Link
           to="/"
