@@ -192,7 +192,17 @@ export const Navbar = () => {
         {/* Right Section: Auth Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
           <Link to="/login" style={{ textDecoration: 'none' }}>
-            <Button variant="ghost" size="sm">
+            <Button
+              variant="primary"
+              size="sm"
+              style={{
+                padding: '0.45rem 1.4rem',
+                fontWeight: 700,
+                borderRadius: 'var(--radius-full)',
+                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)',
+                fontSize: '0.925rem'
+              }}
+            >
               Login
             </Button>
           </Link>
@@ -294,7 +304,11 @@ export const Navbar = () => {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
             <Link to="/login" onClick={() => setMobileMenuOpen(false)} style={{ textDecoration: 'none' }}>
-              <Button variant="secondary" size="sm" style={{ width: '100%' }}>
+              <Button
+                variant="primary"
+                size="sm"
+                style={{ width: '100%', fontWeight: 700, borderRadius: 'var(--radius-full)' }}
+              >
                 Login
               </Button>
             </Link>

@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import AuthPromptModal from '../../components/common/AuthPromptModal';
+import impactService from '../../services/impactService';
+import { getLiveImpactMetrics, saveLiveImpactMetrics } from '../../utils/communityImpactTracker';
 import {
   Sparkles,
   ArrowRight,
@@ -40,8 +42,59 @@ import { mockItems, mockCommunityImpact, mockCategories } from '../../data/mockD
 export const LandingPage = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [liveImpact, setLiveImpact] = useState(getLiveImpactMetrics());
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Initial load from tracker (defaults to 0)
+    setLiveImpact(getLiveImpactMetrics());
+
+    // Sync from platform API if available
+    impactService.getImpactSummary().then((res) => {
+      if (res?.success && res?.summary) {
+        const s = res.summary;
+        const current = getLiveImpactMetrics();
+        if (s.totalItemsReused || s.totalCompletedTransactions) {
+          const updated = {
+            itemsReused: Math.max(current.itemsReused, s.totalItemsReused || 0),
+            peopleHelped: Math.max(current.peopleHelped, s.totalCompletedTransactions || 0),
+            booksShared: Math.max(
+              current.booksShared,
+              s.categoryBreakdown?.find((c) => (c.category || '').toLowerCase().includes('book'))?.itemsReused || 0
+            ),
+            electronicsShared: Math.max(
+              current.electronicsShared,
+              s.categoryBreakdown?.find((c) => (c.category || '').toLowerCase().includes('electronic'))?.itemsReused || 0
+            ),
+            wasteAvoidedKg: Math.max(
+              current.wasteAvoidedKg,
+              Math.round(s.environmentalMetrics?.wasteAvoided || 0)
+            )
+          };
+          saveLiveImpactMetrics(updated);
+          setLiveImpact(updated);
+        }
+      }
+    }).catch(() => {});
+
+    // Listen to live community actions (shares, handovers, reuse)
+    const handleImpactUpdate = (e) => {
+      if (e?.detail) {
+        setLiveImpact(e.detail);
+      } else {
+        setLiveImpact(getLiveImpactMetrics());
+      }
+    };
+
+    window.addEventListener('looop:impact_updated', handleImpactUpdate);
+    window.addEventListener('storage', handleImpactUpdate);
+
+    return () => {
+      window.removeEventListener('looop:impact_updated', handleImpactUpdate);
+      window.removeEventListener('storage', handleImpactUpdate);
+    };
+  }, []);
 
   const isLoggedIn = !!(user && (isAuthenticated || user.id || user.email));
 
@@ -157,7 +210,22 @@ export const LandingPage = () => {
                   </Button>
                 </Link>
 
-                <Button variant="secondary" size="lg" iconLeft={Gift} onClick={handleShareClick}>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  iconLeft={Gift}
+                  onClick={handleShareClick}
+                  style={{
+                    backgroundColor: '#ecfdf5',
+                    borderColor: 'var(--color-primary-500)',
+                    borderWidth: '2px',
+                    color: 'var(--color-primary-700)',
+                    fontWeight: 700,
+                    boxShadow: '0 4px 14px rgba(16, 185, 129, 0.22)',
+                    transition: 'all 0.25s ease'
+                  }}
+                  className="highlighted-share-btn"
+                >
                   Share an Item
                 </Button>
               </div>
@@ -729,117 +797,7 @@ export const LandingPage = () => {
       </section>
 
       {/* =========================================================================
-          6. ENVIRONMENTAL & COMMUNITY IMPACT SECTION
-          ========================================================================= */}
-      <section
-        style={{
-          padding: '5.5rem 0',
-          background: 'linear-gradient(135deg, #064e3b 0%, #0f172a 100%)',
-          color: '#ffffff'
-        }}
-        aria-label="Environmental and Community Impact"
-      >
-        <div className="container">
-          <div style={{ textAlign: 'center', maxWidth: '680px', margin: '0 auto 3.5rem auto' }}>
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '5px 14px',
-                backgroundColor: 'rgba(16, 185, 129, 0.22)',
-                borderRadius: 'var(--radius-full)',
-                color: '#a7f3d0',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                marginBottom: '1rem',
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase'
-              }}
-            >
-              <Sparkles size={14} />
-              <span>Simulated Impact Metrics (API Ready)</span>
-            </span>
-            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.6rem)', fontWeight: 800, color: '#ffffff', marginBottom: '1rem', letterSpacing: '-0.025em' }}>
-              Reducing Waste Through Circular Reuse
-            </h2>
-            <p style={{ color: '#cbd5e1', fontSize: '1.05rem', lineHeight: 1.65 }}>
-              Every item borrowed or gifted on LOOOP represents one less product manufactured, shipped in single-use plastic, or buried in a landfill.
-            </p>
-          </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: '1.75rem',
-              textAlign: 'center'
-            }}
-          >
-            {[
-              { label: 'Items Reused', value: mockCommunityImpact.itemsReused, icon: RefreshCw, desc: 'Active items in community use' },
-              { label: 'People Helped', value: mockCommunityImpact.peopleHelped, icon: Users, desc: 'Neighbors connected' },
-              { label: 'Books Shared', value: mockCommunityImpact.booksShared, icon: BookOpen, desc: 'Study sets & novels' },
-              { label: 'Electronics Shared', value: mockCommunityImpact.electronicsShared, icon: Laptop, desc: 'Gadgets & peripherals' },
-              { label: 'Waste Avoided', value: mockCommunityImpact.co2SavedKg, icon: TrendingUp, desc: 'Solid waste kept out of landfills' }
-            ].map((stat, i) => {
-              const Icon = stat.icon;
-              return (
-                <div
-                  key={i}
-                  style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.07)',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                    borderRadius: 'var(--radius-lg)',
-                    padding: '2rem 1.25rem',
-                    backdropFilter: 'blur(10px)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center'
-                  }}
-                >
-                  <div
-                    style={{
-                      width: '44px',
-                      height: '44px',
-                      borderRadius: '50%',
-                      backgroundColor: 'rgba(16, 185, 129, 0.25)',
-                      color: '#a7f3d0',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginBottom: '1rem'
-                    }}
-                  >
-                    <Icon size={22} />
-                  </div>
-                  <div
-                    style={{
-                      fontSize: '2.5rem',
-                      fontWeight: 900,
-                      fontFamily: 'var(--font-brand)',
-                      color: '#ffffff',
-                      marginBottom: '0.35rem',
-                      lineHeight: 1.1
-                    }}
-                  >
-                    {stat.value}
-                  </div>
-                  <div style={{ fontSize: '0.95rem', color: '#f8fafc', fontWeight: 700, marginBottom: '0.25rem' }}>
-                    {stat.label}
-                  </div>
-                  <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
-                    {stat.desc}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* =========================================================================
-          7. FEATURED ITEMS SECTION
+          6. FEATURED ITEMS SECTION
           ========================================================================= */}
       <section style={{ padding: '5.5rem 0', backgroundColor: '#ffffff' }}>
         <div className="container">
@@ -1022,9 +980,134 @@ export const LandingPage = () => {
               </Button>
             </Link>
 
-            <Button variant="secondary" size="lg" iconLeft={Gift} onClick={handleShareClick}>
+            <Button
+              variant="outline"
+              size="lg"
+              iconLeft={Gift}
+              onClick={handleShareClick}
+              style={{
+                backgroundColor: 'rgba(16, 185, 129, 0.22)',
+                borderColor: '#34d399',
+                borderWidth: '2px',
+                color: '#ffffff',
+                fontWeight: 700,
+                boxShadow: '0 4px 16px rgba(16, 185, 129, 0.35)',
+                transition: 'all 0.25s ease'
+              }}
+              className="highlighted-share-btn"
+            >
               Share an Item
             </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* =========================================================================
+          8. LIVE ENVIRONMENTAL & COMMUNITY IMPACT SLIDE (ABOVE FOOTER BAR)
+          ========================================================================= */}
+      <section
+        style={{
+          padding: '5.5rem 0',
+          background: 'linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%)',
+          color: '#ffffff'
+        }}
+        aria-label="Environmental and Community Impact"
+      >
+        <div className="container">
+          <div style={{ textAlign: 'center', maxWidth: '680px', margin: '0 auto 3.5rem auto' }}>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '5px 14px',
+                backgroundColor: 'rgba(16, 185, 129, 0.22)',
+                borderRadius: 'var(--radius-full)',
+                color: '#a7f3d0',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                marginBottom: '1rem',
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase'
+              }}
+            >
+              <Sparkles size={14} />
+              <span>Verified Community Impact</span>
+            </span>
+            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.6rem)', fontWeight: 800, color: '#ffffff', marginBottom: '1rem', letterSpacing: '-0.025em' }}>
+              Reducing Waste Through Circular Reuse
+            </h2>
+            <p style={{ color: '#cbd5e1', fontSize: '1.05rem', lineHeight: 1.65 }}>
+              Every item borrowed or gifted on LOOOP represents one less product manufactured, shipped in single-use plastic, or buried in a landfill.
+            </p>
+          </div>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '1.75rem',
+              textAlign: 'center'
+            }}
+          >
+            {[
+              { label: 'Items Reused', value: liveImpact.itemsReused, icon: RefreshCw, desc: 'Active items in community use' },
+              { label: 'People Helped', value: liveImpact.peopleHelped, icon: Users, desc: 'Neighbors connected' },
+              { label: 'Books Shared', value: liveImpact.booksShared, icon: BookOpen, desc: 'Study sets & novels' },
+              { label: 'Electronics Shared', value: liveImpact.electronicsShared, icon: Laptop, desc: 'Gadgets & peripherals' },
+              { label: 'Waste Avoided', value: `${liveImpact.wasteAvoidedKg} kg`, icon: TrendingUp, desc: 'Solid waste kept out of landfills' }
+            ].map((stat, i) => {
+              const Icon = stat.icon;
+              return (
+                <div
+                  key={i}
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    borderRadius: 'var(--radius-lg)',
+                    padding: '2rem 1.25rem',
+                    backdropFilter: 'blur(10px)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center'
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '44px',
+                      height: '44px',
+                      borderRadius: '50%',
+                      backgroundColor: 'rgba(16, 185, 129, 0.25)',
+                      color: '#a7f3d0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: '1rem'
+                    }}
+                  >
+                    <Icon size={22} />
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '2.5rem',
+                      fontWeight: 900,
+                      fontFamily: 'var(--font-brand)',
+                      color: '#ffffff',
+                      marginBottom: '0.35rem',
+                      lineHeight: 1.1
+                    }}
+                  >
+                    {stat.value}
+                  </div>
+                  <div style={{ fontSize: '0.95rem', color: '#f8fafc', fontWeight: 700, marginBottom: '0.25rem' }}>
+                    {stat.label}
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                    {stat.desc}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -1039,6 +1122,13 @@ export const LandingPage = () => {
           border-color: var(--color-primary-300) !important;
           box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.1) !important;
           transform: translateY(-2px);
+        }
+        .highlighted-share-btn:hover {
+          background-color: var(--color-primary-600) !important;
+          color: #ffffff !important;
+          border-color: var(--color-primary-600) !important;
+          transform: translateY(-2px);
+          box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4) !important;
         }
         @media (max-width: 640px) {
           .hero-floating-card {
