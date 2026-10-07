@@ -10,7 +10,8 @@ import {
   ShieldCheck,
   AlertCircle,
   KeyRound,
-  Send
+  Send,
+  UserPlus
 } from 'lucide-react';
 import LooopLogo from '../../components/common/LooopLogo';
 import Button from '../../components/common/Button';
@@ -790,29 +791,44 @@ export const LoginPage = () => {
             </div>
           )}
 
-          {/* Footer Navigation Link: Register */}
+          {/* Highlighted Footer Navigation Link: Create New Account */}
           <div
             style={{
-              marginTop: '1.25rem',
-              display: 'flex',
-              flexWrap: 'wrap',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '4px',
-              fontSize: '0.875rem',
-              color: '#64748b'
+              marginTop: '1.5rem',
+              paddingTop: '1.25rem',
+              borderTop: '1px solid #f1f5f9',
+              textAlign: 'center',
+              width: '100%',
+              boxSizing: 'border-box'
             }}
           >
-            <span>Don't have an account?</span>
+            <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0 0 10px 0', fontWeight: 600 }}>
+              Don't have an account yet?
+            </p>
             <Link
               to={redirectUrl ? `/register?redirect=${encodeURIComponent(redirectUrl)}` : '/register'}
               style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                width: '100%',
+                padding: '12px 20px',
+                borderRadius: '14px',
+                backgroundColor: '#ecfdf5',
+                border: '2px solid #047857',
                 color: '#047857',
-                fontWeight: 700,
-                textDecoration: 'none'
+                fontWeight: 800,
+                fontSize: '0.95rem',
+                textDecoration: 'none',
+                boxSizing: 'border-box',
+                boxShadow: '0 4px 12px rgba(4, 120, 87, 0.12)',
+                transition: 'all 0.2s ease'
               }}
             >
-              Create New Account
+              <UserPlus size={18} />
+              <span>Create New Account</span>
+              <ArrowRight size={16} />
             </Link>
           </div>
         </div>
