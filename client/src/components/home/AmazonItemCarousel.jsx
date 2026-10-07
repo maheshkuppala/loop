@@ -66,9 +66,9 @@ export const AmazonItemCarousel = ({ items = [] }) => {
     <section
       style={{
         padding: '5rem 0',
-        backgroundColor: '#ffffff',
-        borderTop: '1px solid var(--color-slate-100)',
-        borderBottom: '1px solid var(--color-slate-100)'
+        background: 'linear-gradient(180deg, #f0fdf9 0%, #f8fffe 60%, #ffffff 100%)',
+        borderTop: '1px solid rgba(16, 185, 129, 0.12)',
+        borderBottom: '1px solid rgba(16, 185, 129, 0.1)'
       }}
       aria-label="Available Items Carousel"
       onMouseEnter={() => setIsPaused(true)}

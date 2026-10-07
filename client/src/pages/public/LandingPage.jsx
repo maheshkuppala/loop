@@ -122,7 +122,12 @@ export const LandingPage = () => {
           paddingTop: '3.5rem',
           paddingBottom: '5rem',
           overflow: 'hidden',
-          background: 'radial-gradient(ellipse 80% 60% at 50% -15%, rgba(16, 185, 129, 0.18), rgba(240, 253, 250, 0.4) 60%, transparent)'
+          background: `
+            radial-gradient(ellipse 70% 55% at 65% 5%, rgba(52, 211, 153, 0.13) 0%, transparent 65%),
+            radial-gradient(ellipse 55% 45% at 10% 90%, rgba(16, 185, 129, 0.09) 0%, transparent 60%),
+            radial-gradient(ellipse 80% 60% at 50% 0%, rgba(209, 250, 229, 0.35) 0%, transparent 55%),
+            linear-gradient(160deg, #f0fdf9 0%, #ffffff 45%, #f8fafc 100%)
+          `
         }}
         aria-label="Hero Section"
       >
@@ -428,7 +433,7 @@ export const LandingPage = () => {
       {/* =========================================================================
           3. CUSTOMER FEEDBACKS & COMMUNITY REVIEWS SECTION
           ========================================================================= */}
-      <section style={{ padding: '5.5rem 0', backgroundColor: '#ffffff', borderTop: '1px solid var(--color-slate-100)' }}>
+      <section style={{ padding: '5.5rem 0', background: 'linear-gradient(180deg, #ffffff 0%, #fafdf9 50%, #f4fdf8 100%)', borderTop: '1px solid var(--color-slate-100)' }}>
         <div className="container">
           <div style={{ textAlign: 'center', maxWidth: '720px', margin: '0 auto 3.5rem auto' }}>
             <Badge variant="success" style={{ marginBottom: '0.75rem' }}>Customer Feedbacks</Badge>
@@ -539,7 +544,11 @@ export const LandingPage = () => {
       <section
         style={{
           padding: '5.5rem 0',
-          background: 'linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%)',
+          background: `
+            radial-gradient(ellipse 60% 50% at 80% 20%, rgba(52, 211, 153, 0.18) 0%, transparent 55%),
+            radial-gradient(ellipse 40% 40% at 15% 75%, rgba(6, 78, 59, 0.7) 0%, transparent 60%),
+            linear-gradient(135deg, #052e16 0%, #064e3b 40%, #065f46 75%, #047857 100%)
+          `,
           color: '#ffffff'
         }}
         aria-label="Environmental and Community Impact"
