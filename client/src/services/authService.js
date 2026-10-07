@@ -1,6 +1,7 @@
 import api from './api';
 import { mockUsers } from '../data/mockData';
 import neonDb from './neonDbService';
+import looopEmailTemplates from './emailTemplateService';
 
 // Storage key for locally registered accounts
 const LOCAL_USERS_KEY = 'looop_registered_accounts';
@@ -233,20 +234,12 @@ export const authService = {
       sessionStorage.setItem(`looop_otp_${cleanEmail}`, generatedOtp);
 
       try {
+        const emailData = looopEmailTemplates.otpEmail({ name: cleanEmail.split('@')[0], otpCode: generatedOtp, expiry: '10 minutes' });
         const brevoPayload = {
           sender: { name: 'LOOOP Community', email: 'looop.support@gmail.com' },
           to: [{ email: cleanEmail }],
-          subject: `Your LOOOP Verification Code: ${generatedOtp}`,
-          htmlContent: `
-            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 14px;">
-              <h2 style="color: #065f46; text-align: center; margin-top: 0;">LOOOP Verification</h2>
-              <p style="color: #475569; font-size: 15px;">Your one-time login verification code is:</p>
-              <div style="text-align: center; font-size: 36px; font-weight: 800; letter-spacing: 6px; color: #047857; padding: 18px; background: #ecfdf5; border-radius: 10px; margin: 20px 0;">
-                ${generatedOtp}
-              </div>
-              <p style="color: #64748b; font-size: 13px;">This code expires in 5 minutes. If you did not request this, please ignore this email.</p>
-            </div>
-          `
+          subject: emailData.subject,
+          htmlContent: emailData.html
         };
 
         const clientBrevoKey = import.meta.env?.VITE_BREVO_API_KEY;
@@ -570,33 +563,12 @@ export const authService = {
     const cleanName = (user.name || user.displayName || cleanEmail.split('@')[0]).trim();
 
     try {
+      const emailData = looopEmailTemplates.welcomeAccountCreated({ name: cleanName });
       const brevoPayload = {
         sender: { name: 'LOOOP Community', email: 'looop.support@gmail.com' },
         to: [{ email: cleanEmail, name: cleanName }],
-        subject: `Welcome to LOOOP, ${cleanName}!`,
-        htmlContent: `
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
-            <div style="text-align: center; margin-bottom: 20px;">
-              <h1 style="color: #065f46; font-size: 24px; font-weight: 900; margin: 0;">LOOOP Community</h1>
-              <p style="color: #047857; font-size: 14px; font-weight: 600; margin-top: 4px;">Share, Reuse & Connect</p>
-            </div>
-            <h2 style="color: #0f172a; font-size: 18px; margin-bottom: 12px;">Hello ${cleanName},</h2>
-            <p style="color: #475569; font-size: 15px; line-height: 1.6; margin-bottom: 16px;">
-              You have successfully signed in to your <strong>LOOOP</strong> account.
-            </p>
-            <div style="padding: 16px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px; margin-bottom: 20px;">
-              <p style="color: #047857; font-size: 14px; margin: 0; font-weight: 700;">
-                ✓ Account Status: Active & Secured
-              </p>
-              <p style="color: #065f46; font-size: 13px; margin: 6px 0 0 0;">
-                Enjoy sharing, requesting, and connecting with your local neighborhood!
-              </p>
-            </div>
-            <p style="color: #94a3b8; font-size: 12px; text-align: center; margin: 0;">
-              If you did not sign in, please reset your password immediately or contact looop.support@gmail.com.
-            </p>
-          </div>
-        `
+        subject: emailData.subject,
+        htmlContent: emailData.html
       };
 
       const clientBrevoKey = import.meta.env?.VITE_BREVO_API_KEY;
