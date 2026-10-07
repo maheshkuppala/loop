@@ -148,7 +148,7 @@ export const Footer = () => {
               </li>
               <li>
                 <Link to="/admin/dashboard" style={{ color: 'var(--color-slate-600)', textDecoration: 'none' }} className="footer-link">
-                  Admin Governance Desk
+                  Admin Portal
                 </Link>
               </li>
             </ul>
