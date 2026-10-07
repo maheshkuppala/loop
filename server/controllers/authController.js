@@ -98,6 +98,18 @@ exports.login = async (req, res) => {
 
     const token = generateToken(user._id || user.id, user.role);
 
+    // Dispatch Login Alert Email asynchronously
+    sendLooopEmail({
+      toEmail: user.email,
+      recipientName: user.name || 'LOOOP Member',
+      templateType: 'loginAlert',
+      templateParams: {
+        device: req.headers['user-agent']?.includes('Mobile') ? 'Mobile Browser' : 'Chrome on Windows',
+        date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+      }
+    }).catch((err) => console.warn('Login alert email dispatch notice:', err.message));
+
     return res.status(200).json({
       success: true,
       message: 'Signed in successfully.',
@@ -258,6 +270,13 @@ exports.register = async (req, res) => {
     const assignedId = mongoUser?._id ? String(mongoUser._id) : userId;
     const token = generateToken(assignedId, roleToAssign);
 
+    // Dispatch Welcome Email asynchronously
+    sendLooopEmail({
+      toEmail: cleanEmail,
+      recipientName: cleanName,
+      templateType: 'welcomeAccountCreated'
+    }).catch((err) => console.warn('Welcome email dispatch notice:', err.message));
+
     return res.status(201).json({
       success: true,
       message: 'Account created successfully.',
@@ -316,6 +335,16 @@ exports.forgotPassword = async (req, res) => {
       user.resetPasswordToken = hashedToken;
       user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour validity
       await user.save();
+
+      // Dispatch Forgot Password Email asynchronously
+      sendLooopEmail({
+        toEmail: cleanEmail,
+        recipientName: user.name || 'LOOOP Member',
+        templateType: 'forgotPassword',
+        templateParams: {
+          resetUrl: `https://loop-five-azure.vercel.app/reset-password?token=${rawToken}`
+        }
+      }).catch((err) => console.warn('Forgot password email dispatch notice:', err.message));
     }
 
     // Anti-enumeration: Return generic success regardless of account existence
@@ -378,6 +407,13 @@ exports.resetPassword = async (req, res) => {
     user.resetPasswordExpires = undefined;
     await user.save();
 
+    // Dispatch Password Changed Security Email asynchronously
+    sendLooopEmail({
+      toEmail: user.email,
+      recipientName: user.name || 'LOOOP Member',
+      templateType: 'securityPasswordChanged'
+    }).catch((err) => console.warn('Security password changed email dispatch notice:', err.message));
+
     return res.status(200).json({
       success: true,
       message: 'Password has been reset successfully. You can now sign in with your new password.'
@@ -418,7 +454,7 @@ exports.getMe = async (req, res) => {
   }
 };
 
-const { sendOtpEmail } = require('../services/brevoService');
+const { sendOtpEmail, sendLooopEmail } = require('../services/brevoService');
 const otpMemoryCache = new Map();
 
 exports.sendOtp = async (req, res) => {
