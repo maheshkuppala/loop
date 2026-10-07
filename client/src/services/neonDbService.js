@@ -41,11 +41,19 @@ export const neonDb = {
   /**
    * Save or update user account in Neon PostgreSQL users table with ALL details
    */
-  saveUser: async (user, passwordInput = 'DefaultSecret123!') => {
+  saveUser: async (user, passwordInput = 'DefaultSecret123!', failOnDuplicate = false) => {
     if (!user || !user.email) return null;
 
     const cleanEmail = user.email.toLowerCase().trim();
     const cleanName = (user.name || cleanEmail.split('@')[0]).trim();
+
+    if (failOnDuplicate) {
+      const existing = await neonDb.getUserByEmail(cleanEmail);
+      if (existing) {
+        throw new Error(`An account with email ${cleanEmail} is already registered in the database.`);
+      }
+    }
+
     const isAdmin =
       cleanEmail === 'looop.support@gmail.com' ||
       cleanEmail === 'maheshkuppala321@gmail.com' ||
