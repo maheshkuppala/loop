@@ -39,7 +39,6 @@ import Badge from '../../components/common/Badge';
 import Avatar from '../../components/common/Avatar';
 import { mockItems, mockCommunityImpact, mockCategories } from '../../data/mockData';
 import AmazonItemCarousel from '../../components/home/AmazonItemCarousel';
-import WasteSavingsCalculator from '../../components/home/WasteSavingsCalculator';
 
 export const LandingPage = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -632,9 +631,6 @@ export const LandingPage = () => {
               );
             })}
           </div>
-
-          {/* Embedded Interactive Waste Calculator */}
-          <WasteSavingsCalculator />
         </div>
       </section>
 

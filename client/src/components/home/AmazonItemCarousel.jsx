@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Pause, Play, ArrowRight, Sparkles, MapPin, Tag } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ArrowRight, Sparkles, MapPin } from 'lucide-react';
 import Button from '../common/Button';
 import Badge from '../common/Badge';
 
@@ -95,15 +95,10 @@ export const AmazonItemCarousel = ({ items = [] }) => {
           }}
         >
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.5rem' }}>
-              <Badge variant="success">
-                <Sparkles size={13} style={{ marginRight: '4px' }} />
-                Amazon-Style Live Catalog
-              </Badge>
-              <span style={{ fontSize: '0.78rem', color: 'var(--color-slate-500)', fontWeight: 600 }}>
-                {isPaused ? '⏸️ Auto-scroll paused' : '▶️ Auto-moving every 3.5s'}
-              </span>
-            </div>
+            <Badge variant="success" style={{ marginBottom: '0.5rem' }}>
+              <Sparkles size={13} style={{ marginRight: '4px' }} />
+              Trending Items
+            </Badge>
             <h2
               style={{
                 fontSize: 'clamp(1.8rem, 3.5vw, 2.5rem)',
@@ -123,42 +118,22 @@ export const AmazonItemCarousel = ({ items = [] }) => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button
               type="button"
-              onClick={() => setIsPaused(!isPaused)}
-              style={{
-                background: 'var(--color-slate-100)',
-                border: '1px solid var(--color-slate-200)',
-                borderRadius: '50%',
-                width: '40px',
-                height: '40px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                color: 'var(--color-slate-700)',
-                transition: 'all 0.2s'
-              }}
-              title={isPaused ? 'Resume auto-scroll' : 'Pause auto-scroll'}
-              aria-label={isPaused ? 'Resume auto-scroll' : 'Pause auto-scroll'}
-            >
-              {isPaused ? <Play size={18} /> : <Pause size={18} />}
-            </button>
-
-            <button
-              type="button"
               onClick={handlePrev}
               style={{
-                background: 'var(--color-slate-100)',
+                background: '#ffffff',
                 border: '1px solid var(--color-slate-200)',
                 borderRadius: '50%',
-                width: '40px',
-                height: '40px',
+                width: '42px',
+                height: '42px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
                 color: 'var(--color-slate-700)',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
                 transition: 'all 0.2s'
               }}
+              className="carousel-arrow-btn"
               aria-label="Previous items"
             >
               <ChevronLeft size={22} />
@@ -168,11 +143,11 @@ export const AmazonItemCarousel = ({ items = [] }) => {
               type="button"
               onClick={handleNext}
               style={{
-                background: 'var(--color-primary-500)',
+                background: 'var(--color-primary-600)',
                 border: 'none',
                 borderRadius: '50%',
-                width: '40px',
-                height: '40px',
+                width: '42px',
+                height: '42px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -181,13 +156,14 @@ export const AmazonItemCarousel = ({ items = [] }) => {
                 boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
                 transition: 'all 0.2s'
               }}
+              className="carousel-arrow-btn-primary"
               aria-label="Next items"
             >
               <ChevronRight size={22} />
             </button>
 
             <Link to="/browse" style={{ textDecoration: 'none', marginLeft: '0.5rem' }}>
-              <Button variant="outline" size="sm" iconRight={ArrowRight}>
+              <Button variant="outline" size="sm" iconRight={ArrowRight} className="browse-hover-highlight-btn">
                 View All Catalog
               </Button>
             </Link>
@@ -300,7 +276,7 @@ export const AmazonItemCarousel = ({ items = [] }) => {
                 width: currentIndex === idx ? '24px' : '8px',
                 height: '8px',
                 borderRadius: '4px',
-                backgroundColor: currentIndex === idx ? 'var(--color-primary-500)' : 'var(--color-slate-300)',
+                backgroundColor: currentIndex === idx ? 'var(--color-primary-600)' : 'var(--color-slate-300)',
                 border: 'none',
                 cursor: 'pointer',
                 transition: 'all 0.3s ease'
@@ -319,6 +295,14 @@ export const AmazonItemCarousel = ({ items = [] }) => {
         }
         .amazon-item-card:hover .amazon-card-img {
           transform: scale(1.05);
+        }
+        .carousel-arrow-btn:hover {
+          background-color: var(--color-slate-100) !important;
+          transform: translateY(-1px);
+        }
+        .carousel-arrow-btn-primary:hover {
+          background-color: var(--color-primary-700) !important;
+          transform: translateY(-1px);
         }
       `}</style>
     </section>
