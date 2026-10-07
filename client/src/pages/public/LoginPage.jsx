@@ -792,28 +792,44 @@ export const LoginPage = () => {
             </div>
           )}
 
-          {/* Footer Navigation Link: Register */}
+          {/* Footer Navigation Link: Register (HIGHLY HIGHLIGHTED) */}
           <div
             style={{
               marginTop: '1.5rem',
+              paddingTop: '1.25rem',
+              borderTop: '1px solid #f1f5f9',
               textAlign: 'center',
               width: '100%',
               boxSizing: 'border-box'
             }}
           >
-            <p style={{ fontSize: '0.875rem', color: '#64748b', margin: '0 0 6px 0' }}>
-              Don't have an account?
-            </p>
+            <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600, marginBottom: '8px' }}>
+              Don't have a LOOOP account yet?
+            </div>
             <Link
               to={redirectUrl ? `/register?redirect=${encodeURIComponent(redirectUrl)}` : '/register'}
               style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                width: '100%',
+                padding: '12px 16px',
+                borderRadius: '12px',
+                backgroundColor: '#ecfdf5',
+                border: '2px solid #059669',
                 color: '#047857',
-                fontWeight: 700,
+                fontWeight: 800,
                 fontSize: '0.95rem',
-                textDecoration: 'none'
+                textDecoration: 'none',
+                boxShadow: '0 4px 14px rgba(5, 150, 105, 0.18)',
+                transition: 'all 0.2s ease',
+                boxSizing: 'border-box'
               }}
             >
-              Create New Account
+              <UserPlus size={18} />
+              <span>Create New Account</span>
+              <ArrowRight size={16} />
             </Link>
           </div>
         </div>
