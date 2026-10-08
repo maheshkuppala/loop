@@ -13,6 +13,8 @@ const adminDashboardService = require('../services/adminDashboardService');
 const adminAnalyticsService = require('../services/adminAnalyticsService');
 const { logAction } = require('../services/adminAuditService');
 const notificationService = require('../services/notificationService');
+const uploadRulesService = require('../services/uploadRulesService');
+const locationRulesService = require('../services/locationRulesService');
 const { query: pgQuery } = require('../config/postgres');
 
 // Default platform configuration values
@@ -654,6 +656,38 @@ exports.updateUploadRules = async (req, res) => {
   } catch (error) {
     console.error('Error updating upload rules:', error);
     return res.status(500).json({ success: false, message: 'Failed to update upload rules.' });
+  }
+};
+
+exports.getLocationRules = async (req, res) => {
+  try {
+    const rules = await locationRulesService.getLocationRules();
+    return res.status(200).json({ success: true, rules });
+  } catch (error) {
+    console.error('Error getting location rules:', error);
+    return res.status(500).json({ success: false, message: 'Failed to get location rules.' });
+  }
+};
+
+exports.updateLocationRules = async (req, res) => {
+  try {
+    const adminId = req.admin?._id || req.user?._id;
+    const rules = await locationRulesService.updateLocationRules(req.body, adminId);
+    await logAction({
+      adminId,
+      action: 'LOCATION_RULES_UPDATED',
+      targetType: 'SETTINGS',
+      metadata: rules,
+      ipAddress: req.ip
+    });
+    return res.status(200).json({
+      success: true,
+      message: 'Location governance rules updated successfully.',
+      rules
+    });
+  } catch (error) {
+    console.error('Error updating location rules:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update location rules.' });
   }
 };
 

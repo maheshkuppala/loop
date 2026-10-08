@@ -53,6 +53,8 @@ router.get('/settings', adminController.getSettings);
 router.put('/settings', adminController.updateSettings);
 router.get('/upload-rules', adminController.getUploadRules);
 router.put('/upload-rules', adminController.updateUploadRules);
+router.get('/location-rules', adminController.getLocationRules);
+router.put('/location-rules', adminController.updateLocationRules);
 router.get('/points-settings', adminController.getPointsSettings);
 router.put('/points-settings', adminController.updatePointsSettings);
 

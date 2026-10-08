@@ -1,7 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapPin, Crosshair, X, Check, Sliders } from 'lucide-react';
 import { useLocationContext } from '../../context/LocationContext';
 import Button from '../common/Button';
+
+const CITY_COORDINATES = {
+  'Guntur': { latitude: 16.3067, longitude: 80.4365 },
+  'Vijayawada': { latitude: 16.5062, longitude: 80.6480 },
+  'Visakhapatnam': { latitude: 17.6868, longitude: 83.2185 },
+  'Tirupati': { latitude: 13.6288, longitude: 79.4192 },
+  'Bengaluru': { latitude: 12.9716, longitude: 77.5946 },
+  'Mysuru': { latitude: 12.2958, longitude: 76.6394 },
+  'Hyderabad': { latitude: 17.3850, longitude: 78.4867 },
+  'Chennai': { latitude: 13.0827, longitude: 80.2707 },
+  'Coimbatore': { latitude: 11.0168, longitude: 76.9558 },
+  'Mumbai': { latitude: 19.0760, longitude: 72.8777 },
+  'Pune': { latitude: 18.5204, longitude: 73.8567 },
+  'Delhi': { latitude: 28.6139, longitude: 77.2090 }
+};
 
 const INDIA_LOCATIONS = [
   {
@@ -46,16 +61,24 @@ export const LocationSelectorModal = ({ isOpen, onClose }) => {
   const {
     location,
     setManualLocation,
-    requestBrowserLocation,
+    requestFreshGPS,
     isGeoLoading,
     searchRadiusKm,
     setSearchRadius
   } = useLocationContext();
 
-  const [selectedState, setSelectedState] = useState(location.state || 'Karnataka');
-  const [selectedCity, setSelectedCity] = useState(location.city || 'Bengaluru');
-  const [selectedLocality, setSelectedLocality] = useState(location.locality || 'Indiranagar');
+  const [selectedState, setSelectedState] = useState(location?.state || 'Karnataka');
+  const [selectedCity, setSelectedCity] = useState(location?.city || 'Bengaluru');
+  const [selectedLocality, setSelectedLocality] = useState(location?.locality || 'Indiranagar');
   const [selectedRadius, setSelectedRadius] = useState(searchRadiusKm || 10);
+
+  useEffect(() => {
+    if (location) {
+      if (location.state) setSelectedState(location.state);
+      if (location.city) setSelectedCity(location.city);
+      if (location.locality) setSelectedLocality(location.locality);
+    }
+  }, [location]);
 
   if (!isOpen) return null;
 
@@ -84,21 +107,22 @@ export const LocationSelectorModal = ({ isOpen, onClose }) => {
   };
 
   const handleSave = () => {
+    const coords = CITY_COORDINATES[selectedCity] || { latitude: 12.9716, longitude: 77.5946 };
     setManualLocation({
       country: 'India',
       state: selectedState,
       city: selectedCity,
       locality: selectedLocality,
-      latitude: selectedCity === 'Guntur' ? 16.3067 : 12.9716,
-      longitude: selectedCity === 'Guntur' ? 80.4365 : 77.5946
+      latitude: coords.latitude,
+      longitude: coords.longitude
     });
     setSearchRadius(selectedRadius);
     if (onClose) onClose();
   };
 
   const handleGpsClick = () => {
-    requestBrowserLocation();
     if (onClose) onClose();
+    requestFreshGPS();
   };
 
   return (
@@ -209,7 +233,7 @@ export const LocationSelectorModal = ({ isOpen, onClose }) => {
             }}
           >
             <Crosshair size={18} />
-            <span>{isGeoLoading ? 'Detecting location...' : 'Use My Current GPS Location'}</span>
+            <span>{isGeoLoading ? 'Detecting GPS location...' : 'Use My Current GPS Location'}</span>
           </button>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
