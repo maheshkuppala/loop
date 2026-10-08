@@ -22,6 +22,9 @@ router.get('/:id/save-status', auth, savedItemController.getSavedStatus);
 // Public item discovery endpoints
 router.get('/discover', itemController.discoverItems);
 router.get('/nearby', itemController.getNearbyItems);
+router.get('/similar', itemController.getSimilarItems);
+router.get('/:id/similar', itemController.getSimilarItems);
+router.get('/:id/related', itemController.getSimilarItems);
 router.get('/:id/matches', itemController.getItemMatches);
 router.get('/', itemController.getItems);
 router.get('/:id', itemController.getItemById);

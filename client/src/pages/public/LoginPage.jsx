@@ -79,6 +79,15 @@ export const LoginPage = () => {
     return () => clearInterval(timer);
   }, [otpSent, loginStep, otpCountdown]);
 
+  // Store intended redirect URL in sessionStorage if present
+  useEffect(() => {
+    if (redirectUrl) {
+      try {
+        sessionStorage.setItem('looop_auth_redirect', redirectUrl);
+      } catch {}
+    }
+  }, [redirectUrl]);
+
   const handleAuthSuccess = (userData, authToken, welcomeName) => {
     login(userData, authToken);
     addToast({
@@ -87,12 +96,22 @@ export const LoginPage = () => {
       variant: 'success'
     });
 
-    if (redirectUrl) {
-      navigate(redirectUrl);
+    let targetRedirect = redirectUrl;
+    if (!targetRedirect) {
+      try {
+        targetRedirect = sessionStorage.getItem('looop_auth_redirect');
+      } catch {}
+    }
+    try {
+      sessionStorage.removeItem('looop_auth_redirect');
+    } catch {}
+
+    if (targetRedirect && targetRedirect !== '/login' && targetRedirect !== '/register') {
+      navigate(targetRedirect);
     } else if (userData.role === 'ADMIN' || userData.role === 'admin') {
       navigate('/admin/dashboard');
     } else {
-      navigate('/dashboard');
+      navigate('/');
     }
   };
 

@@ -141,23 +141,27 @@ function buildLooopEmailHtml({
 }
 
 const looopEmailTemplates = {
-  welcomeAccountCreated: ({ name = 'Mahesh' }) => ({
-    subject: 'Welcome to LOOOP 👋',
+  welcomeAccountCreated: ({ name = 'Member', appUrl = 'https://loop-five-azure.vercel.app' }) => ({
+    subject: 'Welcome to LOOOP! Give Unused Things a New Life',
     html: buildLooopEmailHtml({
-      headline: 'Welcome to LOOOP',
+      headline: 'Welcome to LOOOP!',
       recipientName: name,
       bodyParagraphs: [
-        'Welcome to LOOOP!',
-        "You're now ready to discover unused products, share what you no longer need, and connect with people in your community."
+        'Your account has been successfully created and your email has been verified.',
+        'You are now part of LOOOP — the circular reuse platform where communities keep things out of landfills and give unused products a second life.',
+        'Here is how you can get started:',
+        '• <strong>Share an unused product:</strong> Have books, tools, electronics, or gear sitting around? Post them in minutes so neighbors can reuse them.<br>' +
+        '• <strong>Borrow or request what you need:</strong> Why buy something you will only use once? Discover items shared by people nearby.<br>' +
+        '• <strong>Explore products in your area:</strong> Find high-quality items available for reuse, borrowing, or exchange right in your community.'
       ],
-      cardTitle: 'ACCOUNT STATUS',
+      cardTitle: 'YOUR LOOOP ACCOUNT',
       cardRows: [
-        { label: 'Status', value: 'Active & Ready' },
-        { label: 'Community', value: 'LOOOP Network' }
+        { label: 'Status', value: '✅ Verified & Active' },
+        { label: 'Platform Mission', value: 'Circular Community Reuse' }
       ],
-      buttonText: 'Explore LOOOP',
-      buttonUrl: 'https://loop-five-azure.vercel.app/explore',
-      extraNote: "We're happy to have you with us.",
+      buttonText: 'Start Browsing Products',
+      buttonUrl: `${appUrl}/browse`,
+      extraNote: 'Every item reused or shared prevents landfill waste and strengthens your neighborhood community.',
       signoffTeam: '— The LOOOP Team'
     })
   }),
@@ -178,18 +182,18 @@ const looopEmailTemplates = {
     })
   }),
 
-  otpEmail: ({ name = 'Mahesh', otpCode = '482731', expiry = '10 minutes' }) => ({
-    subject: 'Your LOOOP verification code',
+  otpEmail: ({ name = 'Member', otpCode = '482731', expiry = '5 minutes' }) => ({
+    subject: 'Verify your LOOOP account',
     html: buildLooopEmailHtml({
-      headline: 'Verify your account',
+      headline: 'Verify your LOOOP account',
       recipientName: name,
       bodyParagraphs: [
-        'Use the verification code below to continue with your LOOOP account.'
+        'Your LOOOP verification code is:'
       ],
       isOtp: true,
       otpCode,
-      otpExpiry: expiry,
-      extraNote: 'For your security, never share this code with anyone, including LOOOP support.<br><br>If you didn\'t request this code, you can safely ignore this email.',
+      otpExpiry: expiry || '5 minutes',
+      extraNote: 'This code expires soon.<br><br>For your security, never share this code with anyone, including LOOOP support.<br><br>If you did not request this verification code, you can safely ignore this email.',
       signoffTeam: '— The LOOOP Team'
     })
   }),

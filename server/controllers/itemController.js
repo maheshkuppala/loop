@@ -225,8 +225,23 @@ exports.getItemById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    if (mongoose.connection.readyState === 1 && mongoose.Types.ObjectId.isValid(id)) {
-      const item = await Item.findById(id).populate('owner', 'name avatar trustScore rating responseRate');
+    if (mongoose.connection.readyState === 1) {
+      let item = null;
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        item = await Item.findById(id).populate('owner', 'name avatar trustScore rating responseRate');
+      }
+      if (!item) {
+        const cleanSlug = String(id).trim();
+        const titleRegexPattern = cleanSlug.replace(/-/g, '[ -]');
+        item = await Item.findOne({
+          $or: [
+            { slug: cleanSlug },
+            { id: cleanSlug },
+            { title: new RegExp(`^${titleRegexPattern}$`, 'i') }
+          ]
+        }).populate('owner', 'name avatar trustScore rating responseRate');
+      }
+
       if (!item) {
         return res.status(404).json({
           success: false,
@@ -863,6 +878,104 @@ exports.getItemMatches = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to retrieve item matches.'
+    });
+  }
+};
+
+/**
+ * GET /api/items/:id/similar or GET /api/items/similar
+ * Returns similar available items based on category, subcategory, brand, sharing type, and condition
+ * Prioritizes AVAILABLE items over reserved/reused ones.
+ */
+exports.getSimilarItems = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { category, subcategory, brand, sharingType, condition, limit = 8 } = req.query;
+    const parsedLimit = Math.min(24, Math.max(1, parseInt(limit, 10) || 8));
+
+    let sourceCategory = category || '';
+    let sourceSubcategory = subcategory || '';
+    let sourceBrand = brand || '';
+    let sourceSharingType = sharingType || '';
+    let sourceCondition = condition || '';
+    let excludeId = null;
+
+    if (id && mongoose.Types.ObjectId.isValid(id)) {
+      excludeId = id;
+      if (mongoose.connection.readyState === 1) {
+        const sourceItem = await Item.findById(id);
+        if (sourceItem) {
+          sourceCategory = sourceCategory || sourceItem.category || '';
+          sourceSubcategory = sourceSubcategory || sourceItem.subcategory || '';
+          sourceBrand = sourceBrand || sourceItem.brand || '';
+          sourceSharingType = sourceSharingType || sourceItem.sharingType || '';
+          sourceCondition = sourceCondition || sourceItem.condition || '';
+        }
+      }
+    }
+
+    const filter = {
+      status: { $ne: 'removed' }
+    };
+    if (excludeId) {
+      filter._id = { $ne: excludeId };
+    }
+    if (sourceCategory && sourceCategory !== 'all') {
+      filter.category = sourceCategory.toLowerCase().trim();
+    }
+
+    let rawItems = [];
+    if (mongoose.connection.readyState === 1) {
+      rawItems = await Item.find(filter)
+        .sort({ createdAt: -1 })
+        .limit(40)
+        .populate('owner', 'name avatar trustScore verified rating reviewsCount');
+    }
+
+    // Score and rank candidates
+    const scoredItems = rawItems.map((item) => {
+      let score = 0;
+      const isAvailable = item.availability === 'Available' || item.status === 'active';
+
+      // Priority 1: AVAILABLE items prioritized FIRST over reserved/reused ones
+      if (isAvailable) score += 1000;
+
+      if (sourceSubcategory && item.subcategory && item.subcategory.toLowerCase() === sourceSubcategory.toLowerCase()) {
+        score += 50;
+      }
+      if (sourceBrand && item.brand && item.brand.toLowerCase() === sourceBrand.toLowerCase()) {
+        score += 40;
+      }
+      if (sourceSharingType && item.sharingType === sourceSharingType) {
+        score += 20;
+      }
+      if (sourceCondition && item.condition === sourceCondition) {
+        score += 10;
+      }
+
+      return { item, score };
+    });
+
+    scoredItems.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return new Date(b.item.createdAt || 0) - new Date(a.item.createdAt || 0);
+    });
+
+    const items = scoredItems.slice(0, parsedLimit).map((s) => ({
+      ...s.item.toObject(),
+      id: s.item._id
+    }));
+
+    return res.status(200).json({
+      success: true,
+      items,
+      total: items.length
+    });
+  } catch (error) {
+    console.error('Error in getSimilarItems:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve similar items.'
     });
   }
 };

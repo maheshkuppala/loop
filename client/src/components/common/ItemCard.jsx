@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Heart, ShieldCheck, Loader2 } from 'lucide-react';
+import { Heart, ShieldCheck, CheckCircle2, Loader2, ArrowRight } from 'lucide-react';
 import Badge from './Badge';
 import Rating from './Rating';
 import Avatar from './Avatar';
@@ -36,7 +36,18 @@ export const ItemCard = ({ item, onSaveToggle, isSaved: propIsSaved, isSaving = 
         ? item.images[0]
         : item.images[0]?.url || null
       : null;
-  const isItemUnavailable = item.isUnavailable || item.availability === 'Unavailable' || item.status === 'removed';
+  const isItemUnavailable = item.isUnavailable || item.availability === 'Unavailable' || item.status === 'removed' || item.status === 'RESERVED';
+
+  // Action Button Text derived strictly from sharingType
+  const getActionButtonLabel = () => {
+    if (isItemUnavailable) return item.status === 'RESERVED' ? 'RESERVED' : 'UNAVAILABLE';
+    const type = (item.sharingType || '').toLowerCase();
+    if (type === 'give_away' || type === 'free') return 'REQUEST TO REUSE';
+    if (type === 'borrow') return 'BORROW THIS ITEM';
+    if (type === 'exchange') return 'REQUEST EXCHANGE';
+    if (type === 'low_cost') return 'REQUEST ITEM';
+    return 'REQUEST ITEM';
+  };
 
   const handleSaveClick = (e) => {
     e.preventDefault();
@@ -61,9 +72,11 @@ export const ItemCard = ({ item, onSaveToggle, isSaved: propIsSaved, isSaving = 
     }
   };
 
+  const isOwnerVerified = item.owner?.verified || (item.owner?.trustScore && item.owner.trustScore >= 80);
+
   return (
     <div
-      className="item-card card card-interactive"
+      className="item-card item-card-3d card card-interactive"
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -72,7 +85,11 @@ export const ItemCard = ({ item, onSaveToggle, isSaved: propIsSaved, isSaving = 
         position: 'relative',
         height: '100%',
         backgroundColor: '#ffffff',
-        opacity: isItemUnavailable ? 0.88 : 1
+        borderRadius: 'var(--radius-xl)',
+        border: '1.5px solid var(--color-slate-200)',
+        boxShadow: '0 4px 12px rgba(15, 23, 42, 0.04)',
+        transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+        opacity: isItemUnavailable ? 0.9 : 1
       }}
     >
       <Link
@@ -85,12 +102,12 @@ export const ItemCard = ({ item, onSaveToggle, isSaved: propIsSaved, isSaving = 
           color: 'inherit'
         }}
       >
-        {/* Card Media Header */}
+        {/* Card Media Header with Subtle Hover Zoom */}
         <div
           style={{
             position: 'relative',
             width: '100%',
-            height: '200px',
+            height: '210px',
             backgroundColor: 'var(--color-slate-100)',
             overflow: 'hidden'
           }}
@@ -104,8 +121,8 @@ export const ItemCard = ({ item, onSaveToggle, isSaved: propIsSaved, isSaving = 
                 width: '100%',
                 height: '100%',
                 objectFit: 'cover',
-                filter: isItemUnavailable ? 'grayscale(40%)' : 'none',
-                transition: 'transform var(--transition-normal)'
+                filter: isItemUnavailable ? 'grayscale(35%)' : 'none',
+                transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
               }}
               className="item-card-image"
               onError={(e) => {
@@ -121,7 +138,8 @@ export const ItemCard = ({ item, onSaveToggle, isSaved: propIsSaved, isSaving = 
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: 'var(--color-slate-400)',
-                fontSize: '0.9rem'
+                fontSize: '0.9rem',
+                fontWeight: 600
               }}
             >
               No Photo Provided
@@ -135,12 +153,12 @@ export const ItemCard = ({ item, onSaveToggle, isSaved: propIsSaved, isSaving = 
             </Badge>
             {isItemUnavailable && (
               <Badge variant="warning">
-                Unavailable
+                {item.status === 'RESERVED' ? 'Reserved' : 'Unavailable'}
               </Badge>
             )}
           </div>
 
-          {/* Top-Right Save Item Button */}
+          {/* Top-Right Save / Wishlist Button */}
           <button
             type="button"
             onClick={handleSaveClick}
@@ -162,8 +180,8 @@ export const ItemCard = ({ item, onSaveToggle, isSaved: propIsSaved, isSaving = 
               alignItems: 'center',
               justifyContent: 'center',
               cursor: isSaving ? 'not-allowed' : 'pointer',
-              boxShadow: 'var(--shadow-md)',
-              transition: 'transform var(--transition-fast)'
+              boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+              transition: 'all var(--transition-fast)'
             }}
             className="save-btn"
           >
@@ -172,8 +190,8 @@ export const ItemCard = ({ item, onSaveToggle, isSaved: propIsSaved, isSaving = 
             ) : (
               <Heart
                 size={18}
-                color={isSaved ? 'var(--color-danger)' : 'var(--color-slate-600)'}
-                fill={isSaved ? 'var(--color-danger)' : 'none'}
+                color={isSaved ? '#ef4444' : 'var(--color-slate-600)'}
+                fill={isSaved ? '#ef4444' : 'none'}
               />
             )}
           </button>
@@ -185,13 +203,14 @@ export const ItemCard = ({ item, onSaveToggle, isSaved: propIsSaved, isSaving = 
               bottom: '10px',
               left: '12px',
               zIndex: 2,
-              backgroundColor: 'rgba(15, 23, 42, 0.75)',
+              backgroundColor: 'rgba(15, 23, 42, 0.78)',
               backdropFilter: 'blur(4px)',
               color: '#ffffff',
-              padding: '2px 8px',
+              padding: '3px 9px',
               borderRadius: 'var(--radius-xs)',
               fontSize: '0.725rem',
-              fontWeight: 600
+              fontWeight: 700,
+              letterSpacing: '0.02em'
             }}
           >
             {conditionInfo.label}
@@ -199,14 +218,15 @@ export const ItemCard = ({ item, onSaveToggle, isSaved: propIsSaved, isSaving = 
         </div>
 
         {/* Card Content Body */}
-        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', flex: 1 }}>
+        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', flex: 1, gap: '8px' }}>
+          {/* Title */}
           <h3
             style={{
               fontSize: '1.05rem',
-              fontWeight: 700,
+              fontWeight: 800,
               color: 'var(--color-slate-900)',
               lineHeight: 1.35,
-              marginBottom: '6px',
+              margin: 0,
               display: '-webkit-box',
               WebkitLineClamp: 2,
               WebkitBoxOrient: 'vertical',
@@ -216,12 +236,13 @@ export const ItemCard = ({ item, onSaveToggle, isSaved: propIsSaved, isSaving = 
             {item.title}
           </h3>
 
-          <div style={{ marginBottom: '12px' }}>
+          {/* Location Badge */}
+          <div>
             <LocationBadge location={item.location} distanceKm={item.distanceKm} />
           </div>
 
-          <div style={{ marginTop: 'auto', paddingTop: '12px', borderTop: '1px solid var(--color-slate-100)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            {/* Owner info */}
+          {/* Owner Info with Verified Badge */}
+          <div style={{ marginTop: 'auto', paddingTop: '10px', borderTop: '1px solid var(--color-slate-100)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Avatar
                 src={item.owner?.avatar}
@@ -229,11 +250,14 @@ export const ItemCard = ({ item, onSaveToggle, isSaved: propIsSaved, isSaving = 
                 size="sm"
               />
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-slate-800)', lineHeight: 1.2 }}>
-                  {item.owner?.name}
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-slate-800)', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                  {item.owner?.name || 'Community Member'}
+                  {isOwnerVerified && (
+                    <CheckCircle2 size={13} color="#059669" title="Verified Community Member" />
+                  )}
                 </span>
                 {item.owner?.trustScore && (
-                  <span style={{ fontSize: '0.72rem', color: 'var(--color-primary-700)', display: 'flex', alignItems: 'center', gap: '2px', fontWeight: 600 }}>
+                  <span style={{ fontSize: '0.72rem', color: '#047857', display: 'flex', alignItems: 'center', gap: '2px', fontWeight: 700 }}>
                     <ShieldCheck size={11} />
                     <span>{item.owner.trustScore}% Trust</span>
                   </span>
@@ -245,6 +269,33 @@ export const ItemCard = ({ item, onSaveToggle, isSaved: propIsSaved, isSaving = 
             {item.owner?.rating && (
               <Rating score={item.owner.rating} count={item.owner.reviewsCount} size={13} />
             )}
+          </div>
+
+          {/* Main Action Button Matching Sharing Type */}
+          <div style={{ paddingTop: '8px' }}>
+            <div
+              style={{
+                width: '100%',
+                padding: '9px 12px',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: isItemUnavailable ? '#f1f5f9' : '#059669',
+                color: isItemUnavailable ? '#64748b' : '#ffffff',
+                fontSize: '0.825rem',
+                fontWeight: 800,
+                textAlign: 'center',
+                letterSpacing: '0.04em',
+                boxShadow: isItemUnavailable ? 'none' : '0 2px 6px rgba(16, 185, 129, 0.25)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                transition: 'all var(--transition-fast)'
+              }}
+              className="card-action-btn"
+            >
+              <span>{getActionButtonLabel()}</span>
+              {!isItemUnavailable && <ArrowRight size={14} />}
+            </div>
           </div>
         </div>
       </Link>
@@ -258,6 +309,20 @@ export const ItemCard = ({ item, onSaveToggle, isSaved: propIsSaved, isSaving = 
         actionDescription={`To save "${item.title || 'this item'}" to your collection, please sign in or create a free account.`}
         redirectPath={window.location.pathname + window.location.search}
       />
+
+      <style>{`
+        .item-card-3d:hover {
+          transform: translateY(-6px) rotateX(1.5deg) rotateY(-1deg);
+          box-shadow: 0 16px 32px -6px rgba(16, 185, 129, 0.22), 0 4px 12px rgba(15, 23, 42, 0.08) !important;
+          border-color: #10b981 !important;
+        }
+        .item-card-3d:hover .item-card-image {
+          transform: scale(1.04) !important;
+        }
+        .item-card-3d:hover .card-action-btn {
+          background-color: #047857 !important;
+        }
+      `}</style>
     </div>
   );
 };

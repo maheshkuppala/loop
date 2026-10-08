@@ -86,6 +86,22 @@ export const AppRoutes = () => {
         }
       />
       <Route
+        path="/product/:id"
+        element={
+          <PublicLayout>
+            <ItemDetailPage />
+          </PublicLayout>
+        }
+      />
+      <Route
+        path="/products/:id"
+        element={
+          <PublicLayout>
+            <ItemDetailPage />
+          </PublicLayout>
+        }
+      />
+      <Route
         path="/users/:id"
         element={
           <PublicLayout>

@@ -1,18 +1,14 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import Spinner from '../components/common/Spinner';
+import LooopRouteLoader from '../components/common/LooopRouteLoader';
 
 export const ProtectedRoute = ({ children, requiredRole }) => {
   const { user, isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
-    return (
-      <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Spinner size="lg" />
-      </div>
-    );
+    return <LooopRouteLoader message="Verifying your session..." />;
   }
 
   if (!isAuthenticated && !user) {

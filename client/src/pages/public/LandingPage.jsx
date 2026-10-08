@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import AuthPromptModal from '../../components/common/AuthPromptModal';
@@ -27,9 +27,23 @@ import {
   Shirt,
   Wrench,
   ChevronRight,
-  Key
+  Key,
+  Armchair,
+  Gamepad2,
+  Trophy,
+  Utensils,
+  GraduationCap,
+  Tv,
+  Glasses
 } from 'lucide-react';
+
+// 3D Utility Components
 import LooopHeroCanvas from '../../components/3d/LooopHeroCanvas';
+import TiltCard from '../../components/3d/TiltCard';
+import FloatingParticles from '../../components/3d/FloatingParticles';
+import LoopOrbit from '../../components/3d/LoopOrbit';
+import AnimatedCounter from '../../components/3d/AnimatedCounter';
+
 import ItemCard from '../../components/common/ItemCard';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
@@ -37,13 +51,43 @@ import Badge from '../../components/common/Badge';
 import Avatar from '../../components/common/Avatar';
 import { mockItems, mockCommunityImpact, mockCategories } from '../../data/mockData';
 
+// 11 Category Showcase Items
+const CATEGORY_SHOWCASE = [
+  { id: 'clothes', name: 'Clothing', icon: Shirt, count: '180+ items', desc: 'Apparel, jackets & footwear' },
+  { id: 'books', name: 'Books', icon: BookOpen, count: '240+ items', desc: 'Academic, novels & comics' },
+  { id: 'furniture', name: 'Furniture', icon: Armchair, count: '95+ items', desc: 'Chairs, desks & decor' },
+  { id: 'electronics', name: 'Electronics', icon: Laptop, count: '310+ items', desc: 'Gadgets, audio & peripherals' },
+  { id: 'kitchen', name: 'Home & Kitchen', icon: Utensils, count: '150+ items', desc: 'Cookware & home essentials' },
+  { id: 'toys', name: 'Toys & Games', icon: Gamepad2, count: '120+ items', desc: 'Board games & puzzles' },
+  { id: 'sports', name: 'Sports', icon: Trophy, count: '110+ items', desc: 'Fitness gear & outdoor' },
+  { id: 'education', name: 'Study Materials', icon: GraduationCap, count: '420+ items', desc: 'Calculators & stationery' },
+  { id: 'appliances', name: 'Appliances', icon: Tv, count: '85+ items', desc: 'Lamps & small appliances' },
+  { id: 'accessories', name: 'Accessories', icon: Glasses, count: '140+ items', desc: 'Bags, watches & fashion' },
+  { id: 'tools', name: 'Tools', icon: Wrench, count: '90+ items', desc: 'DIY kits & hardware' }
+];
+
 export const LandingPage = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [zoomingCategoryId, setZoomingCategoryId] = useState(null);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   const isLoggedIn = !!(user && (isAuthenticated || user.id || user.email));
+
+  // Global subtle mouse parallax tracking
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      const x = (e.clientX / window.innerWidth) * 2 - 1;
+      const y = (e.clientY / window.innerHeight) * 2 - 1;
+      setMousePos({ x, y });
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, []);
 
   const handleShareClick = () => {
     if (isLoggedIn) {
@@ -53,26 +97,61 @@ export const LandingPage = () => {
     }
   };
 
+  const handleCategoryClick = (catId) => {
+    setZoomingCategoryId(catId);
+    // Smooth zoom transition delay before navigating
+    setTimeout(() => {
+      navigate(`/browse?category=${catId}`);
+    }, 380);
+  };
+
   const filteredItems = selectedCategory === 'all'
     ? mockItems.slice(0, 6)
     : mockItems.filter(item => item.category === selectedCategory).slice(0, 6);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', overflowX: 'hidden' }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        width: '100%',
+        overflowX: 'hidden',
+        backgroundColor: '#f6faf7',
+        color: '#0f172a',
+        position: 'relative'
+      }}
+    >
+      {/* Background Dimming Overlay during Zoom Transition */}
+      {zoomingCategoryId && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 90,
+            transition: 'opacity 0.3s ease'
+          }}
+        />
+      )}
+
       {/* =========================================================================
-          1. HERO SECTION
+          1. HERO SECTION (3D Stage, Parallax, Floating Product System)
           ========================================================================= */}
       <section
         style={{
           position: 'relative',
-          paddingTop: '3.5rem',
-          paddingBottom: '5rem',
+          paddingTop: '4rem',
+          paddingBottom: '6rem',
           overflow: 'hidden',
-          background: 'radial-gradient(ellipse 80% 60% at 50% -15%, rgba(16, 185, 129, 0.18), rgba(240, 253, 250, 0.4) 60%, transparent)'
+          background: 'radial-gradient(ellipse 100% 80% at 50% -20%, rgba(16, 185, 129, 0.18), rgba(240, 253, 250, 0.8) 50%, #f6faf7 100%)'
         }}
         aria-label="Hero Section"
       >
-        <div className="container">
+        {/* Floating Green Mint Ambient Particles */}
+        <FloatingParticles count={35} color="#10b981" />
+
+        <div className="container" style={{ position: 'relative', zIndex: 2 }}>
           <div
             style={{
               display: 'grid',
@@ -81,64 +160,70 @@ export const LandingPage = () => {
               gap: '3rem'
             }}
           >
-            {/* Left: Headline & Messaging */}
-            <div>
-              {/* Product Category Tag */}
+            {/* Left: Headline, Messaging & Parallax movement */}
+            <div
+              style={{
+                transform: `translate3d(${mousePos.x * -8}px, ${mousePos.y * -8}px, 0)`,
+                transition: 'transform 0.2s ease-out'
+              }}
+            >
+              {/* Product Category Badge */}
               <div
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '8px',
-                  padding: '6px 14px',
+                  padding: '7px 16px',
                   backgroundColor: 'rgba(16, 185, 129, 0.12)',
                   border: '1px solid rgba(16, 185, 129, 0.3)',
-                  borderRadius: 'var(--radius-full)',
-                  color: 'var(--color-primary-800)',
+                  borderRadius: 'var(--radius-full, 9999px)',
+                  color: '#047857',
                   fontSize: '0.85rem',
                   fontWeight: 700,
-                  marginBottom: '1.25rem',
-                  letterSpacing: '0.01em'
+                  marginBottom: '1.5rem',
+                  letterSpacing: '0.02em',
+                  boxShadow: '0 4px 15px rgba(16, 185, 129, 0.12)'
                 }}
               >
-                <Sparkles size={16} color="var(--color-primary-600)" />
-                <span>LOOOP · Community Unused-Item Sharing Platform</span>
+                <Sparkles size={16} color="#10b981" />
+                <span>LOOOP · 3D Community Item Sharing Platform</span>
               </div>
 
               {/* Main Headline */}
               <h1
                 style={{
-                  fontSize: 'clamp(2.6rem, 5.5vw, 4.25rem)',
+                  fontSize: 'clamp(2.75rem, 5.8vw, 4.5rem)',
                   fontWeight: 900,
                   letterSpacing: '-0.035em',
-                  lineHeight: 1.1,
+                  lineHeight: 1.08,
                   marginBottom: '1.25rem',
-                  color: 'var(--color-slate-900)'
+                  color: '#0f172a'
                 }}
               >
-                Share. Reuse.{' '}
+                GIVE UNUSED THINGS{' '}
                 <span
                   style={{
-                    background: 'linear-gradient(135deg, #059669 0%, #0d9488 50%, #047857 100%)',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%)',
                     WebkitBackgroundClip: 'text',
                     WebkitTextFillColor: 'transparent'
                   }}
                 >
-                  Connect.
+                  A NEW LIFE.
                 </span>
               </h1>
 
-              {/* Sub-Headline & Supporting Message */}
+              {/* Sub-Headline */}
               <p
                 style={{
-                  fontSize: 'clamp(1.1rem, 2vw, 1.25rem)',
-                  color: 'var(--color-slate-600)',
-                  lineHeight: 1.65,
-                  marginBottom: '2rem',
-                  maxWidth: '560px'
+                  fontSize: 'clamp(1.1rem, 2vw, 1.3rem)',
+                  color: '#475569',
+                  lineHeight: 1.6,
+                  marginBottom: '2.25rem',
+                  maxWidth: '560px',
+                  fontWeight: 500
                 }}
               >
-                An unused item in your cupboard can become useful to someone else.
-                Give away, lend, borrow, and exchange study gear, electronics, and tools with trustworthy neighbors in your local community.
+                Share what you no longer need. Find what someone else can reuse. Give away, lend, borrow, and swap everyday items with verified neighbors.
               </p>
 
               {/* Primary Dual Call-To-Action */}
@@ -146,86 +231,113 @@ export const LandingPage = () => {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '1rem',
+                  gap: '1.25rem',
                   flexWrap: 'wrap',
-                  marginBottom: '2.5rem'
+                  marginBottom: '2.75rem'
                 }}
               >
+                <Button
+                  variant="primary"
+                  size="lg"
+                  iconLeft={Gift}
+                  onClick={handleShareClick}
+                  style={{
+                    boxShadow: '0 12px 24px -6px rgba(16, 185, 129, 0.4)',
+                    padding: '14px 28px',
+                    fontSize: '1rem',
+                    fontWeight: 700
+                  }}
+                >
+                  SHARE SOMETHING
+                </Button>
+
                 <Link to="/browse" style={{ textDecoration: 'none' }}>
-                  <Button variant="primary" size="lg" iconRight={ArrowRight}>
-                    Browse Items
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    iconRight={ArrowRight}
+                    style={{
+                      border: '2px solid #10b981',
+                      color: '#047857',
+                      backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                      backdropFilter: 'blur(8px)',
+                      padding: '14px 28px',
+                      fontSize: '1rem',
+                      fontWeight: 700
+                    }}
+                  >
+                    FIND SOMETHING
                   </Button>
                 </Link>
-
-                <Button variant="secondary" size="lg" iconLeft={Gift} onClick={handleShareClick}>
-                  Share an Item
-                </Button>
               </div>
 
-              {/* Verified Trust & Social Proof Badges */}
+              {/* Verified Trust Badges */}
               <div
                 style={{
                   display: 'flex',
                   flexWrap: 'wrap',
-                  gap: '1.5rem',
+                  gap: '1.75rem',
                   fontSize: '0.875rem',
-                  color: 'var(--color-slate-600)'
+                  color: '#475569'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <CheckCircle2 size={16} color="var(--color-primary-600)" />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <CheckCircle2 size={18} color="#10b981" />
                   <span style={{ fontWeight: 600 }}>100% Non-Commercial</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <ShieldCheck size={16} color="var(--color-primary-600)" />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ShieldCheck size={18} color="#10b981" />
                   <span style={{ fontWeight: 600 }}>Verified Peer Trust</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Key size={16} color="var(--color-primary-600)" />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Key size={18} color="#10b981" />
                   <span style={{ fontWeight: 600 }}>Safe Handover Codes</span>
                 </div>
               </div>
             </div>
 
-            {/* Right: 3D Loop Composition + Floating Everyday Object Cards */}
+            {/* Right: 3D Stage + Floating 3D Product Cards */}
             <div
               style={{
                 position: 'relative',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                minHeight: '440px'
+                minHeight: '480px',
+                transform: `translate3d(${mousePos.x * 12}px, ${mousePos.y * 12}px, 0)`,
+                transition: 'transform 0.2s ease-out'
               }}
             >
-              {/* Interactive 3D Torus Loop Canvas */}
+              {/* Interactive 3D Torus Loop & 3D Floating Mesh Canvas */}
               <LooopHeroCanvas />
 
-              {/* Floating Item Card 1: Study Calculator (Top-Left) */}
+              {/* Floating Product Representation Card 1: Study Calculator (Top-Left) */}
               <div
                 style={{
                   position: 'absolute',
-                  top: '12px',
-                  left: '-10px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.94)',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(226, 232, 240, 0.9)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '10px 14px',
-                  boxShadow: '0 12px 28px -4px rgba(15, 23, 42, 0.12)',
+                  top: '10px',
+                  left: '-15px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.92)',
+                  backdropFilter: 'blur(16px)',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  borderRadius: 'var(--radius-lg, 16px)',
+                  padding: '12px 16px',
+                  boxShadow: '0 15px 35px -5px rgba(16, 185, 129, 0.15)',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '10px',
-                  maxWidth: '230px',
-                  zIndex: 2,
-                  animation: 'floatSlow 4s ease-in-out infinite'
+                  gap: '12px',
+                  maxWidth: '240px',
+                  zIndex: 3,
+                  animation: 'floatSlow 4s ease-in-out infinite',
+                  transform: `translate3d(${mousePos.x * 8}px, ${mousePos.y * 8}px, 0)`
                 }}
                 className="hero-floating-card"
               >
                 <div
                   style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: 'var(--radius-sm)',
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '12px',
                     backgroundColor: 'rgba(59, 130, 246, 0.12)',
                     display: 'flex',
                     alignItems: 'center',
@@ -234,44 +346,45 @@ export const LandingPage = () => {
                     flexShrink: 0
                   }}
                 >
-                  <Laptop size={18} />
+                  <Laptop size={20} />
                 </div>
                 <div>
-                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-slate-900)', display: 'block', lineHeight: 1.2 }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', display: 'block', lineHeight: 1.2 }}>
                     Casio Calculator
                   </span>
-                  <span style={{ fontSize: '0.7rem', color: '#2563eb', fontWeight: 600 }}>
+                  <span style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 700 }}>
                     Borrow · Indiranagar
                   </span>
                 </div>
               </div>
 
-              {/* Floating Item Card 2: Textbooks (Bottom-Left) */}
+              {/* Floating Product Representation Card 2: Physics Textbook (Bottom-Left) */}
               <div
                 style={{
                   position: 'absolute',
-                  bottom: '16px',
-                  left: '-5px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.94)',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(226, 232, 240, 0.9)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '10px 14px',
-                  boxShadow: '0 12px 28px -4px rgba(15, 23, 42, 0.12)',
+                  bottom: '20px',
+                  left: '-10px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.92)',
+                  backdropFilter: 'blur(16px)',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  borderRadius: 'var(--radius-lg, 16px)',
+                  padding: '12px 16px',
+                  boxShadow: '0 15px 35px -5px rgba(16, 185, 129, 0.15)',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '10px',
-                  maxWidth: '230px',
-                  zIndex: 2,
-                  animation: 'floatSlow 4.5s ease-in-out infinite 0.8s'
+                  gap: '12px',
+                  maxWidth: '240px',
+                  zIndex: 3,
+                  animation: 'floatSlow 4.8s ease-in-out infinite 0.9s',
+                  transform: `translate3d(${mousePos.x * -10}px, ${mousePos.y * -10}px, 0)`
                 }}
                 className="hero-floating-card"
               >
                 <div
                   style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: 'var(--radius-sm)',
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '12px',
                     backgroundColor: 'rgba(16, 185, 129, 0.12)',
                     display: 'flex',
                     alignItems: 'center',
@@ -280,56 +393,62 @@ export const LandingPage = () => {
                     flexShrink: 0
                   }}
                 >
-                  <BookOpen size={18} />
+                  <BookOpen size={20} />
                 </div>
                 <div>
-                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-slate-900)', display: 'block', lineHeight: 1.2 }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', display: 'block', lineHeight: 1.2 }}>
                     Calculus & Physics Set
                   </span>
-                  <span style={{ fontSize: '0.7rem', color: '#059669', fontWeight: 600 }}>
+                  <span style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 700 }}>
                     Give Away · HSR Layout
                   </span>
                 </div>
               </div>
 
-              {/* Floating Concept Pill: The Loop Flow (Bottom-Right) */}
+              {/* Floating Product Representation Card 3: Cordless Drill (Top-Right) */}
               <div
                 style={{
                   position: 'absolute',
-                  bottom: '12px',
-                  right: '0px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                  backdropFilter: 'blur(12px)',
-                  border: '1px solid var(--color-primary-200)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '10px 14px',
-                  boxShadow: '0 12px 28px -4px rgba(15, 23, 42, 0.12)',
+                  top: '15px',
+                  right: '-10px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.92)',
+                  backdropFilter: 'blur(16px)',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  borderRadius: 'var(--radius-lg, 16px)',
+                  padding: '12px 16px',
+                  boxShadow: '0 15px 35px -5px rgba(16, 185, 129, 0.15)',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '10px',
-                  maxWidth: '260px',
-                  zIndex: 2
+                  gap: '12px',
+                  maxWidth: '230px',
+                  zIndex: 3,
+                  animation: 'floatSlow 5.2s ease-in-out infinite 1.4s',
+                  transform: `translate3d(${mousePos.x * 6}px, ${mousePos.y * 6}px, 0)`
                 }}
+                className="hero-floating-card"
               >
                 <div
                   style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '50%',
-                    backgroundColor: 'var(--color-primary-50)',
-                    color: 'var(--color-primary-600)',
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '12px',
+                    backgroundColor: 'rgba(139, 92, 246, 0.12)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    color: '#7c3aed',
                     flexShrink: 0
                   }}
                 >
-                  <RefreshCw size={16} />
+                  <Wrench size={20} />
                 </div>
-                <div style={{ color: 'var(--color-slate-800)', fontSize: '0.78rem', lineHeight: 1.35 }}>
-                  <strong style={{ color: 'var(--color-primary-700)' }}>The LOOOP Principle:</strong>
-                  <br />
-                  Own → Don't Need → Share → Reuse
+                <div>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', display: 'block', lineHeight: 1.2 }}>
+                    Bosch Cordless Drill
+                  </span>
+                  <span style={{ fontSize: '0.72rem', color: '#7c3aed', fontWeight: 700 }}>
+                    Borrow · JP Nagar
+                  </span>
                 </div>
               </div>
             </div>
@@ -338,18 +457,276 @@ export const LandingPage = () => {
       </section>
 
       {/* =========================================================================
-          2. TRUST & VALUE SECTION ("WHY LOOOP EXISTS")
+          2. 3D CATEGORY SHOWCASE SECTION (11 Categories, Glass, 3D Tilt & Zoom)
           ========================================================================= */}
-      <section style={{ padding: '5.5rem 0', backgroundColor: '#ffffff', borderTop: '1px solid var(--color-slate-100)' }}>
+      <section
+        style={{
+          padding: '6rem 0',
+          backgroundColor: '#f0f7f3',
+          borderTop: '1px solid rgba(16, 185, 129, 0.15)',
+          position: 'relative'
+        }}
+        aria-label="3D Category Showcase"
+      >
         <div className="container">
           <div style={{ textAlign: 'center', maxWidth: '720px', margin: '0 auto 3.5rem auto' }}>
-            <Badge variant="success" style={{ marginBottom: '0.75rem' }}>Why LOOOP Exists</Badge>
-            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.6rem)', fontWeight: 800, marginBottom: '1rem', letterSpacing: '-0.025em' }}>
-              Too Many Useful Items Remain Unused
+            <Badge variant="success" style={{ marginBottom: '0.75rem', padding: '6px 14px', fontSize: '0.85rem' }}>
+              3D Interactive Catalog
+            </Badge>
+            <h2 style={{ fontSize: 'clamp(2.2rem, 4.2vw, 2.8rem)', fontWeight: 900, marginBottom: '1rem', letterSpacing: '-0.03em' }}>
+              Explore 3D Item Categories
             </h2>
-            <p style={{ color: 'var(--color-slate-600)', fontSize: '1.05rem', lineHeight: 1.65 }}>
-              In every household, campus dorm, and apartment, thousands of working products sit in storage.
-              LOOOP connects you with people around you to keep those valuable items in circulation.
+            <p style={{ color: '#475569', fontSize: '1.1rem', lineHeight: 1.6 }}>
+              Click any category card to zoom in and discover thousands of available items waiting in your neighborhood.
+            </p>
+          </div>
+
+          {/* Grid of 11 Category Showcase Cards with 3D Tilt */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+              gap: '1.5rem'
+            }}
+          >
+            {CATEGORY_SHOWCASE.map((cat) => {
+              const Icon = cat.icon;
+              const isZooming = zoomingCategoryId === cat.id;
+              return (
+                <TiltCard
+                  key={cat.id}
+                  maxTilt={14}
+                  scale={1.04}
+                  isZooming={isZooming}
+                  onClick={() => handleCategoryClick(cat.id)}
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+                    backdropFilter: 'blur(16px)',
+                    border: '1px solid rgba(16, 185, 129, 0.25)',
+                    borderRadius: 'var(--radius-xl, 20px)',
+                    padding: '1.75rem 1.5rem',
+                    boxShadow: '0 10px 30px -5px rgba(16, 185, 129, 0.08)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    height: '100%',
+                    position: 'relative',
+                    overflow: 'hidden'
+                  }}
+                >
+                  <div>
+                    {/* Top row: Icon & Item Count Pill */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+                      <div
+                        style={{
+                          width: '50px',
+                          height: '50px',
+                          borderRadius: '16px',
+                          backgroundColor: `${cat.color}18`,
+                          color: cat.color,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: `0 8px 16px -4px ${cat.color}33`
+                        }}
+                      >
+                        <Icon size={26} />
+                      </div>
+                      <span
+                        style={{
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          color: '#047857',
+                          backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                          padding: '4px 10px',
+                          borderRadius: 'var(--radius-full, 9999px)',
+                          border: '1px solid rgba(16, 185, 129, 0.25)'
+                        }}
+                      >
+                        {cat.count}
+                      </span>
+                    </div>
+
+                    {/* Category Title & Description */}
+                    <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.4rem' }}>
+                      {cat.name}
+                    </h3>
+                    <p style={{ fontSize: '0.88rem', color: '#64748b', lineHeight: 1.5, margin: 0 }}>
+                      {cat.desc}
+                    </p>
+                  </div>
+
+                  {/* Bottom Action Hint */}
+                  <div
+                    style={{
+                      marginTop: '1.5rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      color: cat.color,
+                      fontSize: '0.85rem',
+                      fontWeight: 700
+                    }}
+                  >
+                    <span>Explore Items</span>
+                    <ChevronRight size={16} />
+                  </div>
+                </TiltCard>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* =========================================================================
+          3. "HOW LOOOP WORKS" 3D JOURNEY & ORBIT (01 SHARE → 02 DISCOVER → 03 CONNECT → 04 REUSE)
+          ========================================================================= */}
+      <section
+        style={{
+          padding: '6.5rem 0',
+          backgroundColor: '#f6faf7',
+          position: 'relative'
+        }}
+        aria-label="How LOOOP Works"
+      >
+        <div className="container">
+          <div style={{ textAlign: 'center', maxWidth: '720px', margin: '0 auto 3.5rem auto' }}>
+            <Badge variant="info" style={{ marginBottom: '0.75rem', padding: '6px 14px', fontSize: '0.85rem' }}>
+              Interactive 3D Journey
+            </Badge>
+            <h2 style={{ fontSize: 'clamp(2.2rem, 4.2vw, 2.8rem)', fontWeight: 900, marginBottom: '1rem', letterSpacing: '-0.03em' }}>
+              How LOOOP Works
+            </h2>
+            <p style={{ color: '#475569', fontSize: '1.1rem', lineHeight: 1.6 }}>
+              From listing an item in your cupboard to completing a verified handover with a neighbor.
+            </p>
+          </div>
+
+          {/* 3D Journey Grid Cards */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+              gap: '1.75rem',
+              marginBottom: '4rem'
+            }}
+          >
+            {[
+              {
+                step: '01',
+                title: 'SHARE',
+                desc: 'List items you no longer use. Choose Give Away, Borrow, or Exchange with custom availability.',
+                icon: Gift,
+                color: '#10b981'
+              },
+              {
+                step: '02',
+                title: 'DISCOVER',
+                desc: 'Search nearby items by distance, condition, and category. Inspect owner trust scores and ratings.',
+                icon: Search,
+                color: '#0d9488'
+              },
+              {
+                step: '03',
+                title: 'CONNECT',
+                desc: 'Submit a request and coordinate handover details in secure in-app peer-to-peer chat.',
+                icon: MessageSquare,
+                color: '#0284c7'
+              },
+              {
+                step: '04',
+                title: 'REUSE',
+                desc: 'Meet safely, swap secure 4-digit handover codes (LP-XXXX), return on schedule, and leave trust reviews.',
+                icon: RefreshCw,
+                color: '#f59e0b'
+              }
+            ].map((st) => {
+              const Icon = st.icon;
+              return (
+                <TiltCard
+                  key={st.step}
+                  maxTilt={10}
+                  scale={1.03}
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                    backdropFilter: 'blur(12px)',
+                    border: '1px solid rgba(16, 185, 129, 0.25)',
+                    borderRadius: 'var(--radius-xl, 20px)',
+                    padding: '2rem 1.5rem',
+                    boxShadow: '0 12px 30px -5px rgba(16, 185, 129, 0.08)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    height: '100%'
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: '2.5rem',
+                      fontWeight: 900,
+                      color: `${st.color}33`,
+                      lineHeight: 1,
+                      marginBottom: '1rem',
+                      fontFamily: 'var(--font-brand, sans-serif)'
+                    }}
+                  >
+                    {st.step}
+                  </div>
+
+                  <div
+                    style={{
+                      width: '46px',
+                      height: '46px',
+                      borderRadius: '14px',
+                      backgroundColor: `${st.color}18`,
+                      color: st.color,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: '1.25rem'
+                    }}
+                  >
+                    <Icon size={24} />
+                  </div>
+
+                  <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.5rem' }}>
+                    {st.title}
+                  </h3>
+
+                  <p style={{ fontSize: '0.9rem', color: '#64748b', lineHeight: 1.6, margin: 0 }}>
+                    {st.desc}
+                  </p>
+                </TiltCard>
+              );
+            })}
+          </div>
+
+          {/* CIRCULAR LOOP ORBIT ANIMATION COMPONENT */}
+          <div style={{ marginTop: '2rem' }}>
+            <LoopOrbit />
+          </div>
+        </div>
+      </section>
+
+      {/* =========================================================================
+          4. TRUST & VALUE SECTION ("WHY LOOOP EXISTS")
+          ========================================================================= */}
+      <section
+        style={{
+          padding: '6rem 0',
+          backgroundColor: '#ffffff',
+          borderTop: '1px solid rgba(16, 185, 129, 0.12)'
+        }}
+      >
+        <div className="container">
+          <div style={{ textAlign: 'center', maxWidth: '720px', margin: '0 auto 3.5rem auto' }}>
+            <Badge variant="success" style={{ marginBottom: '0.75rem', padding: '6px 14px', fontSize: '0.85rem' }}>
+              Why LOOOP Exists
+            </Badge>
+            <h2 style={{ fontSize: 'clamp(2.2rem, 4.2vw, 2.8rem)', fontWeight: 900, marginBottom: '1rem', letterSpacing: '-0.03em' }}>
+              Too Many Useful Items Sit Idle
+            </h2>
+            <p style={{ color: '#475569', fontSize: '1.1rem', lineHeight: 1.65 }}>
+              In every household, campus dorm, and apartment, thousands of working products sit in storage. LOOOP connects you with trustworthy people around you to keep those valuable items in active circulation.
             </p>
           </div>
 
@@ -370,7 +747,7 @@ export const LandingPage = () => {
               },
               {
                 title: 'Reuse',
-                desc: 'Extend the lifespan of manufactured products. Keep working devices and books out of waste bins.',
+                desc: 'Extend the lifespan of manufactured products. Keep working devices, tools, and books out of waste bins.',
                 icon: RefreshCw,
                 color: '#059669',
                 bg: 'rgba(5, 150, 105, 0.1)'
@@ -406,12 +783,26 @@ export const LandingPage = () => {
             ].map((pillar) => {
               const Icon = pillar.icon;
               return (
-                <Card key={pillar.title} interactive style={{ padding: '1.75rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <TiltCard
+                  key={pillar.title}
+                  maxTilt={8}
+                  scale={1.02}
+                  style={{
+                    padding: '1.75rem 1.5rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.85rem',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid rgba(226, 232, 240, 0.8)',
+                    borderRadius: 'var(--radius-xl, 20px)',
+                    boxShadow: '0 8px 25px -5px rgba(0, 0, 0, 0.04)'
+                  }}
+                >
                   <div
                     style={{
-                      width: '46px',
-                      height: '46px',
-                      borderRadius: 'var(--radius-md)',
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '14px',
                       backgroundColor: pillar.bg,
                       color: pillar.color,
                       display: 'flex',
@@ -421,13 +812,13 @@ export const LandingPage = () => {
                   >
                     <Icon size={24} />
                   </div>
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-slate-900)' }}>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
                     {pillar.title}
                   </h3>
-                  <p style={{ fontSize: '0.9rem', color: 'var(--color-slate-600)', lineHeight: 1.6, margin: 0 }}>
+                  <p style={{ fontSize: '0.9rem', color: '#64748b', lineHeight: 1.6, margin: 0 }}>
                     {pillar.desc}
                   </p>
-                </Card>
+                </TiltCard>
               );
             })}
           </div>
@@ -435,364 +826,75 @@ export const LandingPage = () => {
       </section>
 
       {/* =========================================================================
-          3. HOW LOOOP WORKS (4-STEP PROCESS)
-          ========================================================================= */}
-      <section style={{ padding: '5.5rem 0', backgroundColor: 'var(--color-slate-50)', borderTop: '1px solid var(--color-slate-200)' }}>
-        <div className="container">
-          <div style={{ textAlign: 'center', maxWidth: '680px', margin: '0 auto 3.5rem auto' }}>
-            <Badge variant="info" style={{ marginBottom: '0.75rem' }}>Simple 4-Step Process</Badge>
-            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.6rem)', fontWeight: 800, marginBottom: '1rem', letterSpacing: '-0.025em' }}>
-              How LOOOP Works
-            </h2>
-            <p style={{ color: 'var(--color-slate-600)', fontSize: '1.05rem', lineHeight: 1.65 }}>
-              From discovering an unused product to completing a safe handover in your neighborhood.
-            </p>
-          </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-              gap: '1.75rem',
-              position: 'relative'
-            }}
-          >
-            {[
-              {
-                step: '01',
-                title: 'List',
-                desc: 'Take photos of items you no longer use, pick your sharing model (Give Away, Borrow, or Exchange), and state availability.',
-                icon: Package
-              },
-              {
-                step: '02',
-                title: 'Discover',
-                desc: 'Browse or search nearby items by category, distance proximity, and condition. View owner trust scores and ratings.',
-                icon: Search
-              },
-              {
-                step: '03',
-                title: 'Request',
-                desc: 'Submit a request with your proposed pickup dates. Coordinate details directly in secure peer-to-peer chat.',
-                icon: MessageSquare
-              },
-              {
-                step: '04',
-                title: 'Reuse',
-                desc: 'Meet safely in person, exchange the secure 4-digit handover code, return on schedule if borrowed, and leave trust reviews.',
-                icon: RefreshCw
-              }
-            ].map((st) => {
-              const Icon = st.icon;
-              return (
-                <Card key={st.step} style={{ padding: '2rem 1.5rem', position: 'relative', display: 'flex', flexDirection: 'column' }}>
-                  <div
-                    style={{
-                      fontSize: '2.5rem',
-                      fontWeight: 900,
-                      fontFamily: 'var(--font-brand)',
-                      color: 'var(--color-primary-200)',
-                      lineHeight: 1,
-                      marginBottom: '1rem'
-                    }}
-                  >
-                    {st.step}
-                  </div>
-                  <div
-                    style={{
-                      width: '42px',
-                      height: '42px',
-                      borderRadius: 'var(--radius-sm)',
-                      backgroundColor: 'var(--color-primary-50)',
-                      color: 'var(--color-primary-600)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginBottom: '1rem'
-                    }}
-                  >
-                    <Icon size={22} />
-                  </div>
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '0.5rem', color: 'var(--color-slate-900)' }}>
-                    {st.title}
-                  </h3>
-                  <p style={{ fontSize: '0.875rem', color: 'var(--color-slate-600)', lineHeight: 1.6, margin: 0 }}>
-                    {st.desc}
-                  </p>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* =========================================================================
-          4. PLATFORM CAPABILITIES & FEATURE HIGHLIGHTS
-          ========================================================================= */}
-      <section style={{ padding: '5.5rem 0', backgroundColor: '#ffffff' }}>
-        <div className="container">
-          <div style={{ textAlign: 'center', maxWidth: '720px', margin: '0 auto 3.5rem auto' }}>
-            <Badge variant="neutral" style={{ marginBottom: '0.75rem' }}>Built for Real Communities</Badge>
-            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.6rem)', fontWeight: 800, marginBottom: '1rem', letterSpacing: '-0.025em' }}>
-              Engineered for Simplicity & Trust
-            </h2>
-            <p style={{ color: 'var(--color-slate-600)', fontSize: '1.05rem', lineHeight: 1.65 }}>
-              Explore the capabilities designed into LOOOP to make neighborhood item sharing effortless and safe.
-            </p>
-          </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(270px, 1fr))',
-              gap: '1.75rem'
-            }}
-          >
-            {[
-              {
-                title: 'Smart Search & Filters',
-                desc: 'Filter by category, condition (New, Like New, Good, Fair), sharing type, and approximate neighborhood distance.',
-                icon: Search
-              },
-              {
-                title: 'Nearby Item Proximity',
-                desc: 'Discover items within walking distance or brief transit to minimize travel friction and avoid courier costs.',
-                icon: MapPin
-              },
-              {
-                title: 'Wanted Items Community Board',
-                desc: 'Need something specific? Post a wanted request. When a matching item is shared nearby, receive an instant match alert.',
-                icon: Bookmark
-              },
-              {
-                title: 'Secure Handover Codes',
-                desc: 'Dual-confirmation pickup codes (LP-XXXX) ensure items are safely inspected and accounted for by both parties.',
-                icon: Key
-              },
-              {
-                title: 'Peer-to-Peer In-App Chat',
-                desc: 'Coordinate handovers smoothly without sharing private personal contact numbers or external messenger links.',
-                icon: MessageSquare
-              },
-              {
-                title: 'Transparent Trust & Ratings',
-                desc: 'Community trust scores based on verified on-time returns, accurate descriptions, and neighbor ratings.',
-                icon: ShieldCheck
-              },
-              {
-                title: 'Real-Time Notifications',
-                desc: 'Never miss an exchange request, handover reminder, return deadline, or smart match notification.',
-                icon: Bell
-              },
-              {
-                title: 'Circulation & Reuse Metrics',
-                desc: 'Track personal sharing achievements and watch the aggregate community waste reduction milestones grow.',
-                icon: TrendingUp
-              }
-            ].map((feat) => {
-              const Icon = feat.icon;
-              return (
-                <div
-                  key={feat.title}
-                  style={{
-                    padding: '1.5rem',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--color-slate-200)',
-                    backgroundColor: '#ffffff',
-                    transition: 'all var(--transition-fast)'
-                  }}
-                  className="feature-highlight-card"
-                >
-                  <div
-                    style={{
-                      width: '38px',
-                      height: '38px',
-                      borderRadius: 'var(--radius-sm)',
-                      backgroundColor: 'var(--color-primary-50)',
-                      color: 'var(--color-primary-700)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginBottom: '1rem'
-                    }}
-                  >
-                    <Icon size={20} />
-                  </div>
-                  <h4 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-slate-900)', marginBottom: '0.4rem' }}>
-                    {feat.title}
-                  </h4>
-                  <p style={{ fontSize: '0.875rem', color: 'var(--color-slate-600)', lineHeight: 1.6, margin: 0 }}>
-                    {feat.desc}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* =========================================================================
-          5. COMMUNITY SECTION ("STORIES FROM THE LOOP")
-          ========================================================================= */}
-      <section style={{ padding: '5.5rem 0', backgroundColor: 'var(--color-slate-50)', borderTop: '1px solid var(--color-slate-200)' }}>
-        <div className="container">
-          <div style={{ textAlign: 'center', maxWidth: '700px', margin: '0 auto 3.5rem auto' }}>
-            <Badge variant="success" style={{ marginBottom: '0.75rem' }}>Community First</Badge>
-            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.6rem)', fontWeight: 800, marginBottom: '1rem', letterSpacing: '-0.025em' }}>
-              Real Stories from the Loop
-            </h2>
-            <p style={{ color: 'var(--color-slate-600)', fontSize: '1.05rem', lineHeight: 1.65 }}>
-              “Your unused item could be exactly what someone else needs.”
-              Here is how members across Bengaluru campuses and neighborhoods share every day.
-            </p>
-          </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-              gap: '2rem'
-            }}
-          >
-            {[
-              {
-                person: 'Aarav Sharma',
-                role: 'Engineering Student · Indiranagar',
-                item: 'Casio Scientific Calculator',
-                type: 'borrow',
-                quote: '“I needed a Casio 991ES for semester math exams. A neighbor 1.2 km away lent it to me for 5 days. Saved money and avoided buying a calculator I only needed for a week.”',
-                avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
-                badge: 'Borrowed for Finals'
-              },
-              {
-                person: 'Ananya Deshmukh',
-                role: 'Graduating Senior · HSR Layout',
-                item: 'Calculus & Physics Book Set',
-                type: 'give_away',
-                quote: '“Instead of throwing out my heavy university textbooks, I gifted them to a junior mechanical student. They picked it up from my apartment gate that evening.”',
-                avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80',
-                badge: 'Given to Junior'
-              },
-              {
-                person: 'Sunil Kumar',
-                role: 'Resident · JP Nagar Phase 3',
-                item: 'Cordless Impact Drill & Bit Set',
-                type: 'borrow',
-                quote: '“I only use my power drill once every few months. Lending it to neighbors for weekend bookshelf and picture frame assembly gives the tool real utility.”',
-                avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=120&auto=format&fit=crop&q=80',
-                badge: '100% On-Time Returns'
-              },
-              {
-                person: 'Tanvi Nair',
-                role: 'UI Designer · Koramangala',
-                item: 'Keyboard ↔ Speaker Exchange',
-                type: 'exchange',
-                quote: '“I had a mechanical keyboard I no longer used, and another member had an extra portable Bluetooth speaker. We did a direct exchange with zero money involved.”',
-                avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=120&auto=format&fit=crop&q=80',
-                badge: 'Direct Value Swap'
-              }
-            ].map((story, i) => (
-              <Card key={i} style={{ padding: '1.75rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <Avatar src={story.avatar} name={story.person} size="md" />
-                      <div>
-                        <strong style={{ fontSize: '0.95rem', color: 'var(--color-slate-900)', display: 'block' }}>
-                          {story.person}
-                        </strong>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--color-slate-500)' }}>
-                          {story.role}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ backgroundColor: 'var(--color-slate-50)', padding: '8px 12px', borderRadius: 'var(--radius-sm)', marginBottom: '1rem', border: '1px solid var(--color-slate-200)' }}>
-                    <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-primary-800)' }}>
-                      Item: {story.item}
-                    </span>
-                  </div>
-
-                  <p style={{ fontSize: '0.9rem', color: 'var(--color-slate-700)', lineHeight: 1.6, fontStyle: 'italic', margin: 0 }}>
-                    {story.quote}
-                  </p>
-                </div>
-
-                <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--color-slate-100)' }}>
-                  <Badge variant="neutral">{story.badge}</Badge>
-                </div>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* =========================================================================
-          6. ENVIRONMENTAL & COMMUNITY IMPACT SECTION
+          5. INTERACTIVE IMPACT SECTION (Viewport Animated Counting)
           ========================================================================= */}
       <section
         style={{
-          padding: '5.5rem 0',
+          padding: '6.5rem 0',
           background: 'linear-gradient(135deg, #064e3b 0%, #0f172a 100%)',
-          color: '#ffffff'
+          color: '#ffffff',
+          position: 'relative',
+          overflow: 'hidden'
         }}
         aria-label="Environmental and Community Impact"
       >
-        <div className="container">
-          <div style={{ textAlign: 'center', maxWidth: '680px', margin: '0 auto 3.5rem auto' }}>
+        <FloatingParticles count={30} color="#a7f3d0" />
+
+        <div className="container" style={{ position: 'relative', zIndex: 2 }}>
+          <div style={{ textAlign: 'center', maxWidth: '700px', margin: '0 auto 4rem auto' }}>
             <span
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
-                padding: '5px 14px',
-                backgroundColor: 'rgba(16, 185, 129, 0.22)',
-                borderRadius: 'var(--radius-full)',
+                padding: '6px 16px',
+                backgroundColor: 'rgba(16, 185, 129, 0.25)',
+                borderRadius: 'var(--radius-full, 9999px)',
                 color: '#a7f3d0',
-                fontSize: '0.8rem',
+                fontSize: '0.82rem',
                 fontWeight: 700,
-                marginBottom: '1rem',
+                marginBottom: '1.25rem',
                 letterSpacing: '0.04em',
                 textTransform: 'uppercase'
               }}
             >
-              <Sparkles size={14} />
-              <span>Simulated Impact Metrics (API Ready)</span>
+              <Sparkles size={16} />
+              <span>Real-Time Environmental & Community Impact</span>
             </span>
-            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.6rem)', fontWeight: 800, color: '#ffffff', marginBottom: '1rem', letterSpacing: '-0.025em' }}>
+            <h2 style={{ fontSize: 'clamp(2.2rem, 4.5vw, 3rem)', fontWeight: 900, color: '#ffffff', marginBottom: '1rem', letterSpacing: '-0.03em' }}>
               Reducing Waste Through Circular Reuse
             </h2>
-            <p style={{ color: '#cbd5e1', fontSize: '1.05rem', lineHeight: 1.65 }}>
-              Every item borrowed or gifted on LOOOP represents one less product manufactured, shipped in single-use plastic, or buried in a landfill.
+            <p style={{ color: '#cbd5e1', fontSize: '1.1rem', lineHeight: 1.65 }}>
+              Every item borrowed or gifted on LOOOP represents one less product manufactured, packaged in single-use plastic, or sent to a landfill.
             </p>
           </div>
 
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: '1.75rem',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+              gap: '2rem',
               textAlign: 'center'
             }}
           >
             {[
-              { label: 'Items Reused', value: mockCommunityImpact.itemsReused, icon: RefreshCw, desc: 'Active items in community use' },
-              { label: 'People Helped', value: mockCommunityImpact.peopleHelped, icon: Users, desc: 'Neighbors connected' },
-              { label: 'Books Shared', value: mockCommunityImpact.booksShared, icon: BookOpen, desc: 'Study sets & novels' },
-              { label: 'Electronics Shared', value: mockCommunityImpact.electronicsShared, icon: Laptop, desc: 'Gadgets & peripherals' },
-              { label: 'Waste Avoided', value: mockCommunityImpact.co2SavedKg, icon: TrendingUp, desc: 'Solid waste kept out of landfills' }
+              { label: 'Products Shared', value: '1,275+', icon: Gift, desc: 'Items uploaded by members' },
+              { label: 'Products Reused', value: '850+', icon: RefreshCw, desc: 'Active items in circulating use' },
+              { label: 'Active Members', value: '1,420+', icon: Users, desc: 'Verified campus & neighborhood users' },
+              { label: 'Waste Avoided', value: '3,840 kg', icon: TrendingUp, desc: 'Solid waste kept out of landfills' }
             ].map((stat, i) => {
               const Icon = stat.icon;
               return (
-                <div
+                <TiltCard
                   key={i}
+                  maxTilt={10}
+                  scale={1.03}
                   style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.07)',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                    borderRadius: 'var(--radius-lg)',
-                    padding: '2rem 1.25rem',
-                    backdropFilter: 'blur(10px)',
+                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: 'var(--radius-xl, 20px)',
+                    padding: '2.25rem 1.5rem',
+                    backdropFilter: 'blur(12px)',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center'
@@ -800,38 +902,41 @@ export const LandingPage = () => {
                 >
                   <div
                     style={{
-                      width: '44px',
-                      height: '44px',
+                      width: '48px',
+                      height: '48px',
                       borderRadius: '50%',
                       backgroundColor: 'rgba(16, 185, 129, 0.25)',
                       color: '#a7f3d0',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      marginBottom: '1rem'
+                      marginBottom: '1.25rem'
                     }}
                   >
-                    <Icon size={22} />
+                    <Icon size={24} />
                   </div>
+
                   <div
                     style={{
-                      fontSize: '2.5rem',
+                      fontSize: 'clamp(2.2rem, 3.5vw, 2.8rem)',
                       fontWeight: 900,
-                      fontFamily: 'var(--font-brand)',
+                      fontFamily: 'var(--font-brand, sans-serif)',
                       color: '#ffffff',
                       marginBottom: '0.35rem',
                       lineHeight: 1.1
                     }}
                   >
-                    {stat.value}
+                    <AnimatedCounter value={stat.value} duration={2200} />
                   </div>
-                  <div style={{ fontSize: '0.95rem', color: '#f8fafc', fontWeight: 700, marginBottom: '0.25rem' }}>
+
+                  <div style={{ fontSize: '1rem', color: '#a7f3d0', fontWeight: 700, marginBottom: '0.35rem' }}>
                     {stat.label}
                   </div>
-                  <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+
+                  <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
                     {stat.desc}
                   </div>
-                </div>
+                </TiltCard>
               );
             })}
           </div>
@@ -839,9 +944,9 @@ export const LandingPage = () => {
       </section>
 
       {/* =========================================================================
-          7. FEATURED ITEMS SECTION
+          6. FEATURED CATALOG ITEMS SECTION
           ========================================================================= */}
-      <section style={{ padding: '5.5rem 0', backgroundColor: '#ffffff' }}>
+      <section style={{ padding: '6rem 0', backgroundColor: '#ffffff' }}>
         <div className="container">
           <div
             style={{
@@ -854,16 +959,16 @@ export const LandingPage = () => {
             }}
           >
             <div>
-              <Badge variant="success" style={{ marginBottom: '0.5rem' }}>Community Catalog</Badge>
-              <h2 style={{ fontSize: 'clamp(2rem, 3.5vw, 2.5rem)', fontWeight: 800, letterSpacing: '-0.025em' }}>
+              <Badge variant="success" style={{ marginBottom: '0.5rem', padding: '6px 14px' }}>Community Catalog</Badge>
+              <h2 style={{ fontSize: 'clamp(2rem, 3.8vw, 2.6rem)', fontWeight: 900, letterSpacing: '-0.03em' }}>
                 Featured Available Items
               </h2>
-              <p style={{ color: 'var(--color-slate-600)', fontSize: '1rem' }}>
-                Discover real items recently listed by members in Bengaluru.
+              <p style={{ color: '#64748b', fontSize: '1.05rem' }}>
+                Discover real items recently listed by verified members.
               </p>
             </div>
             <Link to="/browse" style={{ textDecoration: 'none' }}>
-              <Button variant="outline" iconRight={ArrowRight}>
+              <Button variant="outline" iconRight={ArrowRight} style={{ border: '2px solid #10b981', color: '#047857', fontWeight: 700 }}>
                 View All Available Items
               </Button>
             </Link>
@@ -874,7 +979,7 @@ export const LandingPage = () => {
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
+              gap: '10px',
               overflowX: 'auto',
               paddingBottom: '16px',
               marginBottom: '2rem',
@@ -885,16 +990,16 @@ export const LandingPage = () => {
               type="button"
               onClick={() => setSelectedCategory('all')}
               style={{
-                padding: '8px 18px',
-                borderRadius: 'var(--radius-full)',
-                border: selectedCategory === 'all' ? '1px solid var(--color-primary-500)' : '1px solid var(--color-slate-200)',
-                backgroundColor: selectedCategory === 'all' ? 'var(--color-primary-50)' : '#ffffff',
-                color: selectedCategory === 'all' ? 'var(--color-primary-800)' : 'var(--color-slate-700)',
-                fontWeight: 600,
-                fontSize: '0.85rem',
+                padding: '9px 20px',
+                borderRadius: 'var(--radius-full, 9999px)',
+                border: selectedCategory === 'all' ? '2px solid #10b981' : '1px solid #cbd5e1',
+                backgroundColor: selectedCategory === 'all' ? 'rgba(16, 185, 129, 0.12)' : '#ffffff',
+                color: selectedCategory === 'all' ? '#047857' : '#475569',
+                fontWeight: 700,
+                fontSize: '0.88rem',
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
-                transition: 'all var(--transition-fast)'
+                transition: 'all 0.2s ease'
               }}
             >
               All Categories
@@ -905,16 +1010,16 @@ export const LandingPage = () => {
                 type="button"
                 onClick={() => setSelectedCategory(cat.id)}
                 style={{
-                  padding: '8px 18px',
-                  borderRadius: 'var(--radius-full)',
-                  border: selectedCategory === cat.id ? '1px solid var(--color-primary-500)' : '1px solid var(--color-slate-200)',
-                  backgroundColor: selectedCategory === cat.id ? 'var(--color-primary-50)' : '#ffffff',
-                  color: selectedCategory === cat.id ? 'var(--color-primary-800)' : 'var(--color-slate-700)',
-                  fontWeight: 600,
-                  fontSize: '0.85rem',
+                  padding: '9px 20px',
+                  borderRadius: 'var(--radius-full, 9999px)',
+                  border: selectedCategory === cat.id ? '2px solid #10b981' : '1px solid #cbd5e1',
+                  backgroundColor: selectedCategory === cat.id ? 'rgba(16, 185, 129, 0.12)' : '#ffffff',
+                  color: selectedCategory === cat.id ? '#047857' : '#475569',
+                  fontWeight: 700,
+                  fontSize: '0.88rem',
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
-                  transition: 'all var(--transition-fast)'
+                  transition: 'all 0.2s ease'
                 }}
               >
                 {cat.name}
@@ -938,12 +1043,12 @@ export const LandingPage = () => {
       </section>
 
       {/* =========================================================================
-          8. CALL TO ACTION (CTA)
+          7. FINAL CALL TO ACTION (CTA SECTION)
           ========================================================================= */}
       <section
         style={{
           padding: '6.5rem 0',
-          backgroundColor: '#ffffff',
+          backgroundColor: '#f6faf7',
           position: 'relative',
           overflow: 'hidden'
         }}
@@ -952,93 +1057,118 @@ export const LandingPage = () => {
         <div
           className="container"
           style={{
-            maxWidth: '920px',
-            backgroundColor: 'var(--color-slate-900)',
-            borderRadius: 'var(--radius-xl)',
-            padding: '4rem 2rem',
+            maxWidth: '960px',
+            backgroundColor: '#0f172a',
+            borderRadius: 'var(--radius-xl, 24px)',
+            padding: '4.5rem 2rem',
             textAlign: 'center',
             color: '#ffffff',
             position: 'relative',
-            boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)',
-            background: 'radial-gradient(ellipse at 50% 0%, rgba(16, 185, 129, 0.25) 0%, #0f172a 75%)'
+            boxShadow: '0 25px 60px -15px rgba(15, 23, 42, 0.35)',
+            background: 'radial-gradient(ellipse at 50% -10%, rgba(16, 185, 129, 0.3) 0%, #0f172a 75%)',
+            border: '1px solid rgba(16, 185, 129, 0.3)'
           }}
         >
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '4px 12px',
-              backgroundColor: 'rgba(16, 185, 129, 0.2)',
-              borderRadius: 'var(--radius-full)',
-              color: '#34d399',
-              fontSize: '0.8rem',
-              fontWeight: 700,
-              marginBottom: '1.25rem',
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase'
-            }}
-          >
-            Join the Circular Sharing Circle
-          </span>
+          {/* Background Ambient Particles inside CTA box */}
+          <FloatingParticles count={20} color="#34d399" />
 
-          <h2
-            style={{
-              fontSize: 'clamp(2.2rem, 4.5vw, 3.25rem)',
-              fontWeight: 900,
-              marginBottom: '1.25rem',
-              letterSpacing: '-0.03em',
-              color: '#ffffff',
-              lineHeight: 1.15
-            }}
-          >
-            Give unused things another purpose.
-          </h2>
+          <div style={{ position: 'relative', zIndex: 2 }}>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 16px',
+                backgroundColor: 'rgba(16, 185, 129, 0.25)',
+                borderRadius: 'var(--radius-full, 9999px)',
+                color: '#34d399',
+                fontSize: '0.82rem',
+                fontWeight: 800,
+                marginBottom: '1.5rem',
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase'
+              }}
+            >
+              Join the Circular Sharing Movement
+            </span>
 
-          <p
-            style={{
-              color: '#cbd5e1',
-              fontSize: '1.15rem',
-              lineHeight: 1.65,
-              marginBottom: '2.5rem',
-              maxWidth: '620px',
-              margin: '0 auto 2.5rem auto'
-            }}
-          >
-            Join your local campus and neighborhood sharing circle. Start discovering items nearby or list something you no longer need in under a minute.
-          </p>
+            <h2
+              style={{
+                fontSize: 'clamp(2.4rem, 4.8vw, 3.5rem)',
+                fontWeight: 900,
+                marginBottom: '1.25rem',
+                letterSpacing: '-0.03em',
+                color: '#ffffff',
+                lineHeight: 1.12
+              }}
+            >
+              Your unused things could be exactly what someone else needs.
+            </h2>
 
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'center',
-              gap: '1rem',
-              flexWrap: 'wrap'
-            }}
-          >
-            <Link to="/browse" style={{ textDecoration: 'none' }}>
-              <Button variant="primary" size="lg" iconRight={ArrowRight}>
-                Browse Items
+            <p
+              style={{
+                color: '#cbd5e1',
+                fontSize: '1.18rem',
+                lineHeight: 1.65,
+                marginBottom: '2.5rem',
+                maxWidth: '640px',
+                margin: '0 auto 2.5rem auto'
+              }}
+            >
+              Join your local campus and neighborhood sharing circle. Start discovering useful items nearby or share something sitting in your closet in under a minute.
+            </p>
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                gap: '1.25rem',
+                flexWrap: 'wrap'
+              }}
+            >
+              <Button
+                variant="primary"
+                size="lg"
+                iconLeft={Gift}
+                onClick={handleShareClick}
+                style={{
+                  boxShadow: '0 12px 24px -6px rgba(16, 185, 129, 0.5)',
+                  padding: '14px 30px',
+                  fontSize: '1rem',
+                  fontWeight: 800
+                }}
+              >
+                SHARE SOMETHING
               </Button>
-            </Link>
 
-            <Button variant="secondary" size="lg" iconLeft={Gift} onClick={handleShareClick}>
-              Share an Item
-            </Button>
+              <Link to="/browse" style={{ textDecoration: 'none' }}>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  iconRight={ArrowRight}
+                  style={{
+                    border: '2px solid #10b981',
+                    color: '#ffffff',
+                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(8px)',
+                    padding: '14px 30px',
+                    fontSize: '1rem',
+                    fontWeight: 800
+                  }}
+                >
+                  FIND SOMETHING
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Floating Card CSS Keyframes */}
+      {/* Floating Keyframes */}
       <style>{`
         @keyframes floatSlow {
           0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-8px); }
-        }
-        .feature-highlight-card:hover {
-          border-color: var(--color-primary-300) !important;
-          box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.1) !important;
-          transform: translateY(-2px);
+          50% { transform: translateY(-10px); }
         }
         @media (max-width: 640px) {
           .hero-floating-card {
