@@ -2,9 +2,60 @@ const Item = require('../models/Item');
 const User = require('../models/User');
 const mongoose = require('mongoose');
 const matchingService = require('../services/matchingService');
+const uploadRulesService = require('../services/uploadRulesService');
 const { query: pgQuery } = require('../config/postgres');
 const { invalidateDashboardCache } = require('../services/adminDashboardService');
 const { invalidateAnalyticsCache } = require('../services/adminAnalyticsService');
+
+/**
+ * GET /api/items/upload-rules
+ * Public route to fetch platform product upload rules
+ */
+exports.getUploadRules = async (req, res) => {
+  try {
+    const rules = await uploadRulesService.getUploadRules();
+    return res.status(200).json({
+      success: true,
+      rules
+    });
+  } catch (error) {
+    console.error('Error fetching upload rules:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to fetch upload rules.',
+      rules: uploadRulesService.DEFAULT_UPLOAD_RULES
+    });
+  }
+};
+
+/**
+ * POST /api/items/upload-media
+ * Uploads a single media item (image or pdf)
+ */
+exports.uploadMedia = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded.' });
+    }
+    const fileUrl = `/uploads/${req.file.filename}`;
+    return res.status(200).json({
+      success: true,
+      file: {
+        url: fileUrl,
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        size: req.file.size
+      }
+    });
+  } catch (error) {
+    console.error('Error uploading media:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to process file upload.'
+    });
+  }
+};
 
 /**
  * Item Controller
