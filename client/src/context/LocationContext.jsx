@@ -15,6 +15,7 @@ export const LocationProvider = ({ children }) => {
   const [geoError, setGeoError] = useState(null);
   const [isGeoLoading, setIsGeoLoading] = useState(false);
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -28,7 +29,7 @@ export const LocationProvider = ({ children }) => {
 
       if (savedLoc) {
         const parsed = JSON.parse(savedLoc);
-        if (parsed && (parsed.latitude || parsed.city)) {
+        if (parsed && (parsed.latitude || parsed.city || parsed.name)) {
           setLocationState(parsed);
           setLocationStatus(parsed.source === 'GPS' ? 'LOCATION_CONFIRMED' : 'LOCATION_MANUAL');
           return;
@@ -41,6 +42,7 @@ export const LocationProvider = ({ children }) => {
         const userObj = JSON.parse(storedUserRaw);
         if (userObj && (userObj.city || userObj.locality)) {
           const profileLoc = {
+            name: userObj.city || 'Detected City',
             city: userObj.city || 'Detected City',
             state: userObj.state || '',
             locality: userObj.locality || userObj.area || '',
@@ -56,8 +58,9 @@ export const LocationProvider = ({ children }) => {
         }
       }
 
-      // If no valid stored location, prompt user
+      // If no valid stored location on first visit, open BookMyShow location selector modal
       setLocationStatus('LOCATION_UNKNOWN');
+      setIsLocationModalOpen(true);
     } catch (err) {
       console.warn('[LocationContext] Init warning:', err);
       setLocationStatus('LOCATION_UNKNOWN');
@@ -102,6 +105,7 @@ export const LocationProvider = ({ children }) => {
             latitude: lat,
             longitude: lng,
             accuracy,
+            name: geoResult?.locality || geoResult?.city || 'Detected Area',
             city: geoResult?.city || 'Detected Area',
             state: geoResult?.state || '',
             locality: geoResult?.locality || geoResult?.city || '',
@@ -141,7 +145,7 @@ export const LocationProvider = ({ children }) => {
   };
 
   /**
-   * Confirm pending location from modal
+   * Confirm pending location from GPS modal
    */
   const confirmLocation = (locObj) => {
     const finalLoc = locObj || pendingLocation;
@@ -150,6 +154,7 @@ export const LocationProvider = ({ children }) => {
     setLocationState(finalLoc);
     setPendingLocation(null);
     setShowConfirmationModal(false);
+    setIsLocationModalOpen(false);
     setLocationStatus('LOCATION_CONFIRMED');
 
     try {
@@ -158,13 +163,14 @@ export const LocationProvider = ({ children }) => {
   };
 
   /**
-   * Set location manually from city / area selector
+   * Set location manually from BookMyShow location selector
    */
   const setManualLocation = (locData) => {
     const manualLoc = {
-      city: locData.city || 'Custom Area',
+      name: locData.name || locData.city || 'Custom Area',
+      city: locData.city || locData.name || 'Custom Area',
       state: locData.state || '',
-      locality: locData.locality || locData.area || '',
+      locality: locData.locality || locData.area || locData.name || '',
       district: locData.district || '',
       country: locData.country || 'India',
       latitude: locData.latitude || null,
@@ -177,18 +183,12 @@ export const LocationProvider = ({ children }) => {
     setLocationState(manualLoc);
     setPendingLocation(null);
     setShowConfirmationModal(false);
+    setIsLocationModalOpen(false);
     setLocationStatus('LOCATION_MANUAL');
 
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(manualLoc));
     } catch (e) {}
-  };
-
-  /**
-   * Change location (opens confirmation modal if pending or triggers GPS request)
-   */
-  const changeLocation = () => {
-    requestFreshGPS();
   };
 
   /**
@@ -203,7 +203,7 @@ export const LocationProvider = ({ children }) => {
   };
 
   const displayLocationText = location
-    ? `${location.locality ? location.locality + ', ' : ''}${location.city || ''}`
+    ? (location.city ? location.city : location.name)
     : 'Select Location';
 
   const value = {
@@ -214,11 +214,14 @@ export const LocationProvider = ({ children }) => {
     isGeoLoading,
     geoError,
     showConfirmationModal,
+    isLocationModalOpen,
+    openLocationModal: () => setIsLocationModalOpen(true),
+    closeLocationModal: () => setIsLocationModalOpen(false),
     requestFreshGPS,
-    requestBrowserLocation: requestFreshGPS, // Backwards compatibility alias
+    requestBrowserLocation: requestFreshGPS,
     confirmLocation,
     setManualLocation,
-    changeLocation,
+    changeLocation: () => setIsLocationModalOpen(true),
     setSearchRadius,
     closeConfirmationModal: () => setShowConfirmationModal(false),
     displayLocationText
@@ -236,7 +239,7 @@ export const LocationProvider = ({ children }) => {
         onRetryGPS={requestFreshGPS}
         onChangeManual={() => {
           setShowConfirmationModal(false);
-          setLocationStatus('LOCATION_MANUAL');
+          setIsLocationModalOpen(true);
         }}
         onClose={() => setShowConfirmationModal(false)}
       />

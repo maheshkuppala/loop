@@ -1,9 +1,51 @@
 const locationRulesService = require('../services/locationRulesService');
+const locationService = require('../services/locationService');
 const { logAction } = require('../services/adminAuditService');
 
 // Simple in-memory cache to respect Nominatim usage policy & speed up repeated requests
 const geocodeCache = new Map();
 const CACHE_TTL_MS = 1000 * 60 * 60; // 1 hour cache
+
+/**
+ * Search Location Autocomplete (BookMyShow-Style)
+ * GET /api/location/search?q=gunt
+ */
+exports.searchLocations = async (req, res) => {
+  try {
+    const query = req.query.q || req.query.query || '';
+    const results = await locationService.searchLocations(query);
+    return res.status(200).json({
+      success: true,
+      data: results
+    });
+  } catch (error) {
+    console.error('[LocationController] Search locations error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to search locations.'
+    });
+  }
+};
+
+/**
+ * Get Popular Cities
+ * GET /api/location/popular
+ */
+exports.getPopularLocations = async (req, res) => {
+  try {
+    const populars = await locationService.getPopularLocations();
+    return res.status(200).json({
+      success: true,
+      data: populars
+    });
+  } catch (error) {
+    console.error('[LocationController] Popular locations error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch popular locations.'
+    });
+  }
+};
 
 /**
  * Reverse Geocode (Lat/Lng -> Human Readable Address)
