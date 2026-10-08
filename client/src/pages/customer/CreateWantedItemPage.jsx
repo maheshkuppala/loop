@@ -30,6 +30,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../hooks/useToast';
 import { wantedService } from '../../services/wantedService';
 import { itemService } from '../../services/itemService';
+import { GoogleMapPicker } from '../../components/maps/GoogleMapPicker';
 import { mockCategories } from '../../data/mockData';
 
 export const CreateWantedItemPage = () => {
@@ -61,6 +62,7 @@ export const CreateWantedItemPage = () => {
   const [city, setCity] = useState(defaultCity || 'Bengaluru');
   const [locality, setLocality] = useState(defaultLocality || 'Indiranagar');
   const [state, setState] = useState('Karnataka');
+  const [coordinates, setCoordinates] = useState([12.9716, 77.5946]);
   const [gettingLocation, setGettingLocation] = useState(false);
 
   // Urgency & Dates
@@ -715,37 +717,16 @@ export const CreateWantedItemPage = () => {
               <span>Your exact address will not be publicly displayed. Community matching uses your approximate neighborhood.</span>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
-              <Input
-                label="City / Region"
-                id="input-city"
-                name="city"
-                value={city}
-                onChange={(e) => {
-                  setCity(e.target.value);
-                  if (errors.city) setErrors((prev) => ({ ...prev, city: null }));
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+              <GoogleMapPicker
+                initialCoordinates={coordinates}
+                initialLocality={locality}
+                initialCity={city}
+                onChange={({ coordinates: newCoords, locality: newLoc, city: newCity }) => {
+                  setCoordinates(newCoords);
+                  if (newLoc) setLocality(newLoc);
+                  if (newCity) setCity(newCity);
                 }}
-                required
-                error={errors.city}
-                placeholder="e.g. Bengaluru"
-              />
-
-              <Input
-                label="Locality / Neighborhood"
-                id="input-locality"
-                name="locality"
-                value={locality}
-                onChange={(e) => setLocality(e.target.value)}
-                placeholder="e.g. Indiranagar, HSR Layout"
-              />
-
-              <Input
-                label="State"
-                id="input-state"
-                name="state"
-                value={state}
-                onChange={(e) => setState(e.target.value)}
-                placeholder="e.g. Karnataka"
               />
             </div>
           </Card>

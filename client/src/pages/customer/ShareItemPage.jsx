@@ -26,7 +26,7 @@ import Textarea from '../../components/common/Textarea';
 import Button from '../../components/common/Button';
 import Badge from '../../components/common/Badge';
 import ProductMediaUploader from '../../components/upload/ProductMediaUploader';
-import { LeafletLocationPreview } from '../../components/share/LeafletLocationPreview';
+import { GoogleMapPicker } from '../../components/maps/GoogleMapPicker';
 import { LiveListingPreview } from '../../components/share/LiveListingPreview';
 import { PublishSuccessState } from '../../components/share/PublishSuccessState';
 import { useAuth } from '../../context/AuthContext';
@@ -1020,8 +1020,17 @@ export const ShareItemPage = () => {
                 </span>
               </div>
 
-              {/* Small Privacy-Safe Leaflet Radar Zone Preview */}
-              <LeafletLocationPreview city={city} locality={locality} coordinates={coordinates} />
+              {/* Google Maps Location Selector */}
+              <GoogleMapPicker
+                initialCoordinates={coordinates}
+                initialLocality={locality}
+                initialCity={city}
+                onChange={({ coordinates: newCoords, locality: newLoc, city: newCity }) => {
+                  setCoordinates(newCoords);
+                  if (newLoc) setLocality(newLoc);
+                  if (newCity) setCity(newCity);
+                }}
+              />
             </div>
           </Card>
 
