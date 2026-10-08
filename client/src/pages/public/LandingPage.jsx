@@ -45,6 +45,7 @@ export const LandingPage = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [realItems, setRealItems] = useState([]);
+  const [liveImpact, setLiveImpact] = useState(() => getLiveImpactMetrics());
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -55,6 +56,16 @@ export const LandingPage = () => {
         const res = await itemService.getItems({ limit: 12 });
         if (isMounted && res?.items) {
           setRealItems(res.items);
+          const metrics = getLiveImpactMetrics();
+          const books = res.items.filter(i => (i.category || '').toLowerCase() === 'books').length;
+          const electronics = res.items.filter(i => (i.category || '').toLowerCase() === 'electronics').length;
+          setLiveImpact({
+            itemsReused: Math.max(metrics.itemsReused, res.items.length),
+            peopleHelped: Math.max(metrics.peopleHelped, res.items.length > 0 ? 1 : 0),
+            booksShared: Math.max(metrics.booksShared, books),
+            electronicsShared: Math.max(metrics.electronicsShared, electronics),
+            wasteAvoidedKg: Math.max(metrics.wasteAvoidedKg, Math.round(res.items.length * 2.5))
+          });
         }
       } catch (err) {
         console.warn('Failed to load items for homepage:', err);
