@@ -38,6 +38,7 @@ const SavedItemsPage = lazy(() => import('../pages/customer/SavedItemsPage'));
 const ProfilePage = lazy(() => import('../pages/customer/ProfilePage'));
 const ReviewsPage = lazy(() => import('../pages/customer/ReviewsPage'));
 const ImpactPage = lazy(() => import('../pages/customer/ImpactPage'));
+const PointsDashboardPage = lazy(() => import('../pages/customer/PointsDashboardPage'));
 
 // 3. Lazy-loaded Admin Pages
 const AdminLoginPage = lazy(() => import('../pages/admin/AdminLoginPage'));
@@ -267,6 +268,17 @@ export const AppRoutes = () => {
           <ProtectedRoute>
             <CustomerLayout>
               <MessagesPage />
+            </CustomerLayout>
+          </ProtectedRoute>
+        }
+      />
+      {/* Points & Rewards Dashboard Route */}
+      <Route
+        path="/points"
+        element={
+          <ProtectedRoute>
+            <CustomerLayout>
+              <PointsDashboardPage />
             </CustomerLayout>
           </ProtectedRoute>
         }

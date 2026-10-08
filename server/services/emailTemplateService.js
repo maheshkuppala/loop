@@ -255,6 +255,92 @@ const looopEmailTemplates = {
       extraNote: 'Your item is now visible to people looking for products like yours.<br><br>Thank you for helping give unused products a second life.',
       signoffTeam: '— The LOOOP Team'
     })
+  }),
+
+  newRequestOwner: ({ name = 'Owner', requesterName = 'Community Member', itemTitle = 'Product', requestType = 'Reuse', message = '', appUrl = 'https://loop-five-azure.vercel.app' }) => ({
+    subject: `New Request for Your Product: ${itemTitle}`,
+    html: buildLooopEmailHtml({
+      headline: `New ${requestType} Request`,
+      recipientName: name,
+      bodyParagraphs: [
+        `You have received a new ${requestType.toLowerCase()} request on LOOOP.`
+      ],
+      cardTitle: 'REQUEST DETAILS',
+      cardRows: [
+        { label: 'Product', value: itemTitle },
+        { label: 'Requested By', value: requesterName },
+        { label: 'Request Type', value: requestType },
+        { label: 'Message', value: message || 'No custom message provided.' }
+      ],
+      buttonText: 'Review & Respond to Request',
+      buttonUrl: `${appUrl}/requests`,
+      extraNote: 'Please review and accept or decline this request promptly to coordinate the handover.',
+      signoffTeam: '— The LOOOP Team'
+    })
+  }),
+
+  requestAcceptedCustomer: ({ name = 'Member', ownerName = 'Owner', itemTitle = 'Product', appUrl = 'https://loop-five-azure.vercel.app' }) => ({
+    subject: `Your request for "${itemTitle}" has been accepted!`,
+    html: buildLooopEmailHtml({
+      headline: 'Request Accepted!',
+      recipientName: name,
+      bodyParagraphs: [
+        `Great news! ${ownerName} accepted your request for "${itemTitle}".`,
+        'You can now message the owner directly to arrange a safe meeting time and handover location.'
+      ],
+      cardTitle: 'PRODUCT & OWNER',
+      cardRows: [
+        { label: 'Product', value: itemTitle },
+        { label: 'Shared By', value: ownerName },
+        { label: 'Status', value: '✅ Accepted - Handover Coordination Open' }
+      ],
+      buttonText: 'View Handover & Message Owner',
+      buttonUrl: `${appUrl}/transactions`,
+      extraNote: 'When you physically receive the item, click "I RECEIVED THE PRODUCT" in your dashboard to confirm completion.',
+      signoffTeam: '— The LOOOP Team'
+    })
+  }),
+
+  requestDeclinedCustomer: ({ name = 'Member', ownerName = 'Owner', itemTitle = 'Product', reason = '', appUrl = 'https://loop-five-azure.vercel.app' }) => ({
+    subject: `Update on your request for "${itemTitle}"`,
+    html: buildLooopEmailHtml({
+      headline: 'Request Declined',
+      recipientName: name,
+      bodyParagraphs: [
+        `Your request for "${itemTitle}" was not accepted by ${ownerName}.`
+      ],
+      cardTitle: 'REQUEST DETAILS',
+      cardRows: [
+        { label: 'Product', value: itemTitle },
+        { label: 'Status', value: 'Declined' },
+        { label: 'Reason', value: reason || 'Item is no longer available or was reserved.' }
+      ],
+      buttonText: 'Browse Similar Products',
+      buttonUrl: `${appUrl}/browse`,
+      extraNote: 'Don\'t worry! Many other great items are available for reuse in your community.',
+      signoffTeam: '— The LOOOP Team'
+    })
+  }),
+
+  pointsEarnedCustomer: ({ name = 'Member', pointsAmount = 100, itemTitle = 'Product', transactionType = 'Reuse', newBalance = 450, appUrl = 'https://loop-five-azure.vercel.app' }) => ({
+    subject: `You earned +${pointsAmount} LOOOP Points! 🎉`,
+    html: buildLooopEmailHtml({
+      headline: `Congratulations! You Earned +${pointsAmount} Points`,
+      recipientName: name,
+      bodyParagraphs: [
+        `Your ${transactionType.toLowerCase()} transaction for "${itemTitle}" has been successfully completed.`
+      ],
+      cardTitle: 'REWARD SUMMARY',
+      cardRows: [
+        { label: 'Product', value: itemTitle },
+        { label: 'Points Earned', value: `+${pointsAmount} Points` },
+        { label: 'Current Points Balance', value: `${newBalance} Points` }
+      ],
+      buttonText: 'View My Points History',
+      buttonUrl: `${appUrl}/points`,
+      extraNote: 'Thank you for participating in circular sharing and helping protect our environment!',
+      signoffTeam: '— The LOOOP Team'
+    })
   })
 };
 

@@ -6,6 +6,7 @@ const conversationService = require('../services/conversationService');
 const notificationService = require('../services/notificationService');
 const Review = require('../models/Review');
 const environmentalImpactService = require('../services/environmentalImpactService');
+const pointsService = require('../services/pointsService');
 
 /**
  * Transaction Controller
@@ -427,10 +428,13 @@ exports.confirmHandover = async (req, res) => {
 
     await transaction.save();
 
-    // Trigger environmental impact creation if transaction reached COMPLETED
+    // Trigger environmental impact creation and points award if transaction reached COMPLETED
     if (transaction.status === 'COMPLETED') {
       environmentalImpactService.createImpactForTransaction(transaction._id).catch((err) => {
         console.error('[ImpactHook] Handover impact creation failed:', err.message);
+      });
+      pointsService.awardPointsForTransaction(transaction._id).catch((err) => {
+        console.error('[PointsHook] Award points error:', err.message);
       });
     }
 
@@ -631,10 +635,13 @@ exports.confirmReturn = async (req, res) => {
 
     await transaction.save();
 
-    // Trigger environmental impact creation if borrow reached COMPLETED
+    // Trigger environmental impact creation and points award if borrow reached COMPLETED
     if (transaction.status === 'COMPLETED') {
       environmentalImpactService.createImpactForTransaction(transaction._id).catch((err) => {
         console.error('[ImpactHook] Return impact creation failed:', err.message);
+      });
+      pointsService.awardPointsForTransaction(transaction._id).catch((err) => {
+        console.error('[PointsHook] Award points error:', err.message);
       });
     }
 
@@ -677,3 +684,77 @@ exports.confirmReturn = async (req, res) => {
     });
   }
 };
+
+// 8. Explicit Customer Receipt Confirmation (PATCH /api/transactions/:id/confirm-receipt)
+exports.confirmCustomerReceipt = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id || req.user?._id;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(404).json({ success: false, message: 'Transaction not found.' });
+    }
+
+    const transaction = await Transaction.findById(id);
+    if (!transaction) {
+      return res.status(404).json({ success: false, message: 'Transaction not found.' });
+    }
+
+    const isRecipient = transaction.recipient.toString() === userId?.toString();
+    if (!isRecipient && req.user?.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only the recipient customer can confirm receiving the product.'
+      });
+    }
+
+    transaction.handoverConfirmedByRecipient = true;
+    transaction.customerConfirmedAt = new Date();
+
+    if (transaction.type === 'BORROW') {
+      transaction.status = 'ACTIVE';
+      if (transaction.item) {
+        await Item.findByIdAndUpdate(transaction.item, { availability: 'Unavailable' });
+      }
+    } else {
+      transaction.status = 'COMPLETED';
+      transaction.completedAt = new Date();
+      if (transaction.item) {
+        await Item.findByIdAndUpdate(transaction.item, { availability: 'Unavailable' });
+      }
+      if (transaction.request) {
+        await Request.findByIdAndUpdate(transaction.request, { status: 'COMPLETED', completedAt: new Date() });
+      }
+    }
+
+    await transaction.save();
+
+    if (transaction.status === 'COMPLETED') {
+      environmentalImpactService.createImpactForTransaction(transaction._id).catch(() => {});
+      pointsService.awardPointsForTransaction(transaction._id).catch((err) => {
+        console.error('[PointsHook] Award points error:', err.message);
+      });
+    }
+
+    await transaction.populate([
+      { path: 'item', select: 'title images category condition sharingType location availability status' },
+      { path: 'owner', select: 'name avatar trustScore rating' },
+      { path: 'recipient', select: 'name avatar trustScore rating' }
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      message: transaction.status === 'COMPLETED'
+        ? 'Product receipt confirmed! Transaction completed and points awarded.'
+        : 'Product receipt confirmed! Borrowing is now active.',
+      transaction: {
+        ...transaction.toObject(),
+        id: transaction._id
+      }
+    });
+  } catch (error) {
+    console.error('Error in confirmCustomerReceipt:', error);
+    return res.status(500).json({ success: false, message: 'Unable to confirm receipt.' });
+  }
+};
+

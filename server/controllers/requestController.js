@@ -178,6 +178,52 @@ exports.createRequest = async (req, res) => {
         actor: req.user
       }).catch((err) => console.error('Notification trigger error:', err.message));
 
+      // Auto-initialize chat conversation & initial message
+      try {
+        const conversation = await conversationService.getOrCreateConversationForRequest({
+          request: newRequest,
+          requestId: newRequest._id
+        });
+        if (conversation && trimmedMessage) {
+          const Message = require('../models/Message');
+          const initialMsg = new Message({
+            conversation: conversation._id,
+            sender: userId,
+            receiver: item.owner,
+            text: trimmedMessage,
+            relatedItem: item._id
+          });
+          await initialMsg.save();
+          conversation.lastMessage = initialMsg._id;
+          conversation.lastMessageText = trimmedMessage;
+          conversation.lastMessageAt = new Date();
+          await conversation.save();
+        }
+        if (conversation) {
+          newRequest.conversation = conversation._id;
+          await newRequest.save();
+        }
+      } catch (chatErr) {
+        console.warn('Initial chat setup warning:', chatErr.message);
+      }
+
+      // Trigger transactional email to item owner
+      if (newRequest.owner?.email) {
+        const { sendLooopEmail } = require('../services/brevoService');
+        sendLooopEmail({
+          toEmail: newRequest.owner.email,
+          recipientName: newRequest.owner.name || 'Owner',
+          templateType: 'newRequestOwner',
+          templateParams: {
+            requesterName: newRequest.requester?.name || 'Community Member',
+            itemTitle: item.title,
+            requestType: resolvedType === 'BORROW' ? 'Borrow' : 'Reuse',
+            message: trimmedMessage,
+            appUrl: process.env.CLIENT_URL || 'http://localhost:3000'
+          }
+        }).catch((e) => console.error('Email dispatch error:', e.message));
+      }
+
       return res.status(201).json({
         success: true,
         message: 'Your request has been submitted to the owner.',
@@ -585,6 +631,21 @@ exports.acceptRequest = async (req, res) => {
       conversation
     }).catch((err) => console.error('Notification trigger error:', err.message));
 
+    // Send email notification to requester
+    if (request.requester?.email) {
+      const { sendLooopEmail } = require('../services/brevoService');
+      sendLooopEmail({
+        toEmail: request.requester.email,
+        recipientName: request.requester.name || 'Member',
+        templateType: 'requestAcceptedCustomer',
+        templateParams: {
+          ownerName: request.owner?.name || 'Item Owner',
+          itemTitle: item ? item.title : 'the product',
+          appUrl: process.env.CLIENT_URL || 'http://localhost:3000'
+        }
+      }).catch((e) => console.error('Email dispatch error:', e.message));
+    }
+
     return res.status(200).json({
       success: true,
       message: 'Request accepted successfully. Handover coordination and messaging are now open.',
@@ -617,6 +678,7 @@ exports.acceptRequest = async (req, res) => {
 exports.declineRequest = async (req, res) => {
   try {
     const { id } = req.params;
+    const { reason = '' } = req.body || {};
     const userId = req.user?.id || req.user?._id;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -656,8 +718,8 @@ exports.declineRequest = async (req, res) => {
     await request.populate([
       { path: 'item', select: 'title images category condition sharingType availability status location owner' },
       { path: 'wantedItem', select: 'title category location urgency description' },
-      { path: 'requester', select: 'name avatar trustScore rating' },
-      { path: 'owner', select: 'name avatar trustScore rating' },
+      { path: 'requester', select: 'name avatar trustScore rating email' },
+      { path: 'owner', select: 'name avatar trustScore rating email' },
       { path: 'offeredItem', select: 'title images category condition location availability' }
     ]);
 
@@ -667,6 +729,22 @@ exports.declineRequest = async (req, res) => {
       item: request.item,
       actor: req.user
     }).catch((err) => console.error('Notification trigger error:', err.message));
+
+    // Send email notification to requester
+    if (request.requester?.email) {
+      const { sendLooopEmail } = require('../services/brevoService');
+      sendLooopEmail({
+        toEmail: request.requester.email,
+        recipientName: request.requester.name || 'Member',
+        templateType: 'requestDeclinedCustomer',
+        templateParams: {
+          ownerName: request.owner?.name || 'Item Owner',
+          itemTitle: request.item?.title || 'the product',
+          reason: reason ? String(reason).trim() : '',
+          appUrl: process.env.CLIENT_URL || 'http://localhost:3000'
+        }
+      }).catch((e) => console.error('Email dispatch error:', e.message));
+    }
 
     return res.status(200).json({
       success: true,
