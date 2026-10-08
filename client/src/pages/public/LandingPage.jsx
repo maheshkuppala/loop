@@ -39,6 +39,7 @@ import Badge from '../../components/common/Badge';
 import Avatar from '../../components/common/Avatar';
 import { itemService } from '../../services/itemService';
 import { mockCommunityImpact, mockCategories } from '../../data/mockData';
+import AmazonItemCarousel from '../../components/home/AmazonItemCarousel';
 
 export const LandingPage = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
