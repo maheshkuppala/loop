@@ -153,18 +153,22 @@ export const LocationConfirmationModal = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981' }}>
                   <MapPin size={18} />
                   <span style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Detected Area
+                    YOUR LOCATION
                   </span>
                 </div>
 
-                <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f8fafc' }}>
-                  {pendingLocation?.locality ? `${pendingLocation.locality}, ` : ''}{pendingLocation?.city || 'Unknown City'}
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#f8fafc' }}>
+                  {(pendingLocation?.city && pendingLocation.city !== 'Detected Area' && pendingLocation.city !== 'Current Location') 
+                    ? pendingLocation.city 
+                    : (pendingLocation?.locality && pendingLocation.locality !== 'Detected Area' ? pendingLocation.locality : 'Guntur')}
                 </div>
 
-                <div style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
-                  {[pendingLocation?.district, pendingLocation?.state, pendingLocation?.country, pendingLocation?.postcode]
-                    .filter(Boolean)
-                    .join(', ')}
+                <div style={{ fontSize: '0.875rem', color: '#94a3b8' }}>
+                  {[
+                    pendingLocation?.locality && pendingLocation.locality !== pendingLocation.city ? pendingLocation.locality : null,
+                    pendingLocation?.state || 'Andhra Pradesh',
+                    pendingLocation?.country || 'India'
+                  ].filter(Boolean).join(', ')}
                 </div>
 
                 {pendingLocation?.formattedAddress && (

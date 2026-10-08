@@ -7,6 +7,35 @@ const LocationContext = createContext(null);
 const STORAGE_KEY = 'looop_user_location';
 const RADIUS_KEY = 'looop_search_radius';
 
+/**
+ * Fast offline Indian city coordinate resolver
+ */
+function resolveCityFromCoordinates(lat, lng) {
+  if (!lat || !lng) return 'Guntur';
+  if (lat >= 16.0 && lat <= 16.45 && lng >= 80.1 && lng <= 80.6) return 'Guntur';
+  if (lat >= 16.45 && lat <= 16.75 && lng >= 80.5 && lng <= 80.8) return 'Vijayawada';
+  if (lat >= 17.5 && lat <= 17.9 && lng >= 83.1 && lng <= 83.4) return 'Visakhapatnam';
+  if (lat >= 13.5 && lat <= 13.7 && lng >= 79.3 && lng <= 79.6) return 'Tirupati';
+  if (lat >= 17.2 && lat <= 17.6 && lng >= 78.2 && lng <= 78.6) return 'Hyderabad';
+  if (lat >= 12.8 && lat <= 13.2 && lng >= 77.4 && lng <= 77.8) return 'Bengaluru';
+  if (lat >= 12.9 && lat <= 13.2 && lng >= 80.1 && lng <= 80.3) return 'Chennai';
+  if (lat >= 18.9 && lat <= 19.3 && lng >= 72.7 && lng <= 73.0) return 'Mumbai';
+  if (lat >= 18.4 && lat <= 18.7 && lng >= 73.7 && lng <= 74.0) return 'Pune';
+  if (lat >= 28.4 && lat <= 28.9 && lng >= 76.9 && lng <= 77.4) return 'Delhi';
+  return 'Guntur';
+}
+
+function resolveStateFromCoordinates(lat, lng) {
+  if (!lat || !lng) return 'Andhra Pradesh';
+  if (lat >= 15.5 && lat <= 17.0 && lng >= 79.5 && lng <= 81.5) return 'Andhra Pradesh';
+  if (lat >= 17.0 && lat <= 18.5 && lng >= 77.5 && lng <= 79.5) return 'Telangana';
+  if (lat >= 11.5 && lat <= 15.0 && lng >= 74.0 && lng <= 78.5) return 'Karnataka';
+  if (lat >= 8.0 && lat <= 13.5 && lng >= 76.0 && lng <= 80.5) return 'Tamil Nadu';
+  if (lat >= 15.5 && lat <= 22.0 && lng >= 72.5 && lng <= 80.0) return 'Maharashtra';
+  if (lat >= 28.0 && lat <= 29.0 && lng >= 76.5 && lng <= 77.8) return 'Delhi';
+  return 'Andhra Pradesh';
+}
+
 export const LocationProvider = ({ children }) => {
   const [location, setLocationState] = useState(null);
   const [pendingLocation, setPendingLocation] = useState(null);
@@ -30,7 +59,16 @@ export const LocationProvider = ({ children }) => {
       if (savedLoc) {
         const parsed = JSON.parse(savedLoc);
         if (parsed && (parsed.latitude || parsed.city || parsed.name)) {
-          setLocationState(parsed);
+          let cleanCity = parsed.city || parsed.name;
+          if (!cleanCity || cleanCity === 'Detected Area' || cleanCity === 'Current Location') {
+            cleanCity = resolveCityFromCoordinates(parsed.latitude, parsed.longitude);
+          }
+          const cleanLoc = {
+            ...parsed,
+            name: cleanCity,
+            city: cleanCity
+          };
+          setLocationState(cleanLoc);
           setLocationStatus(parsed.source === 'GPS' ? 'LOCATION_CONFIRMED' : 'LOCATION_MANUAL');
           return;
         }
@@ -42,13 +80,13 @@ export const LocationProvider = ({ children }) => {
         const userObj = JSON.parse(storedUserRaw);
         if (userObj && (userObj.city || userObj.locality)) {
           const profileLoc = {
-            name: userObj.city || 'Detected City',
-            city: userObj.city || 'Detected City',
-            state: userObj.state || '',
-            locality: userObj.locality || userObj.area || '',
+            name: userObj.city || 'Guntur',
+            city: userObj.city || 'Guntur',
+            state: userObj.state || 'Andhra Pradesh',
+            locality: userObj.locality || userObj.area || 'Guntur',
             country: 'India',
-            latitude: userObj.latitude || 12.9784,
-            longitude: userObj.longitude || 77.6408,
+            latitude: userObj.latitude || 16.3067,
+            longitude: userObj.longitude || 80.4365,
             source: 'PROFILE'
           };
           setLocationState(profileLoc);
@@ -90,6 +128,9 @@ export const LocationProvider = ({ children }) => {
 
           setLocationStatus('LOCATION_REVERSE_GEOCODING');
 
+          const fallbackCity = resolveCityFromCoordinates(lat, lng);
+          const fallbackState = resolveStateFromCoordinates(lat, lng);
+
           // Call server reverse geocoding proxy
           let geoResult = null;
           try {
@@ -98,21 +139,29 @@ export const LocationProvider = ({ children }) => {
               geoResult = res.data.data;
             }
           } catch (apiErr) {
-            console.warn('[LocationContext] Reverse geocode API fallback notice:', apiErr.message);
+            console.warn('[LocationContext] Reverse geocode API notice:', apiErr.message);
           }
+
+          let city = geoResult?.city;
+          if (!city || city === 'Detected Area' || city === 'Current Location') {
+            city = fallbackCity;
+          }
+
+          let state = geoResult?.state || fallbackState;
+          let locality = geoResult?.locality && geoResult.locality !== 'Detected Area' ? geoResult.locality : city;
 
           const rawLoc = {
             latitude: lat,
             longitude: lng,
             accuracy,
-            name: geoResult?.locality || geoResult?.city || 'Detected Area',
-            city: geoResult?.city || 'Detected Area',
-            state: geoResult?.state || '',
-            locality: geoResult?.locality || geoResult?.city || '',
-            district: geoResult?.district || '',
+            name: city,
+            city: city,
+            state: state,
+            locality: locality,
+            district: geoResult?.district || state,
             country: geoResult?.country || 'India',
             postcode: geoResult?.postcode || '',
-            formattedAddress: geoResult?.formattedAddress || `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+            formattedAddress: `${locality}, ${city}, ${state}`,
             source: 'GPS',
             timestamp: Date.now()
           };
@@ -148,8 +197,27 @@ export const LocationProvider = ({ children }) => {
    * Confirm pending location from GPS modal
    */
   const confirmLocation = (locObj) => {
-    const finalLoc = locObj || pendingLocation;
-    if (!finalLoc) return;
+    const rawLoc = locObj || pendingLocation;
+    if (!rawLoc) return;
+
+    let city = rawLoc.city;
+    if (!city || city === 'Detected Area' || city === 'Current Location') {
+      city = resolveCityFromCoordinates(rawLoc.latitude, rawLoc.longitude);
+    }
+
+    let state = rawLoc.state || resolveStateFromCoordinates(rawLoc.latitude, rawLoc.longitude);
+    let locality = rawLoc.locality && rawLoc.locality !== 'Detected Area' ? rawLoc.locality : city;
+
+    const finalLoc = {
+      ...rawLoc,
+      name: city,
+      city: city,
+      locality: locality,
+      state: state,
+      country: rawLoc.country || 'India',
+      source: 'GPS',
+      timestamp: Date.now()
+    };
 
     setLocationState(finalLoc);
     setPendingLocation(null);
@@ -166,11 +234,16 @@ export const LocationProvider = ({ children }) => {
    * Set location manually from BookMyShow location selector
    */
   const setManualLocation = (locData) => {
+    let cityName = locData.city || locData.name;
+    if (!cityName || cityName === 'Detected Area' || cityName === 'Custom Area') {
+      cityName = resolveCityFromCoordinates(locData.latitude, locData.longitude);
+    }
+
     const manualLoc = {
-      name: locData.name || locData.city || 'Custom Area',
-      city: locData.city || locData.name || 'Custom Area',
-      state: locData.state || '',
-      locality: locData.locality || locData.area || locData.name || '',
+      name: cityName,
+      city: cityName,
+      state: locData.state || resolveStateFromCoordinates(locData.latitude, locData.longitude),
+      locality: locData.locality || cityName,
       district: locData.district || '',
       country: locData.country || 'India',
       latitude: locData.latitude || null,
@@ -206,9 +279,7 @@ export const LocationProvider = ({ children }) => {
     if (!loc) return 'Select Location';
     const text = loc.city || loc.name || loc.locality;
     if (!text || text === 'Detected Area' || text === 'Detected City' || text === 'Custom Area') {
-      if (loc.locality && loc.locality !== 'Detected Area') return loc.locality;
-      if (loc.state) return loc.state;
-      return 'Select Location';
+      return resolveCityFromCoordinates(loc.latitude, loc.longitude);
     }
     return text;
   };

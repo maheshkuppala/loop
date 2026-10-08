@@ -7,6 +7,47 @@ const geocodeCache = new Map();
 const CACHE_TTL_MS = 1000 * 60 * 60; // 1 hour cache
 
 /**
+ * Fast offline Indian city coordinate resolver
+ */
+function resolveCityFromCoordinates(lat, lng) {
+  if (!lat || !lng) return 'Guntur';
+  
+  // Andhra Pradesh - Guntur Region (lat ~ 16.0 to 16.45, lng ~ 80.1 to 80.6)
+  if (lat >= 16.0 && lat <= 16.45 && lng >= 80.1 && lng <= 80.6) return 'Guntur';
+  // Andhra Pradesh - Vijayawada Region (lat ~ 16.45 to 16.75, lng ~ 80.5 to 80.8)
+  if (lat >= 16.45 && lat <= 16.75 && lng >= 80.5 && lng <= 80.8) return 'Vijayawada';
+  // Andhra Pradesh - Visakhapatnam
+  if (lat >= 17.5 && lat <= 17.9 && lng >= 83.1 && lng <= 83.4) return 'Visakhapatnam';
+  // Andhra Pradesh - Tirupati
+  if (lat >= 13.5 && lat <= 13.7 && lng >= 79.3 && lng <= 79.6) return 'Tirupati';
+  // Telangana - Hyderabad
+  if (lat >= 17.2 && lat <= 17.6 && lng >= 78.2 && lng <= 78.6) return 'Hyderabad';
+  // Karnataka - Bengaluru
+  if (lat >= 12.8 && lat <= 13.2 && lng >= 77.4 && lng <= 77.8) return 'Bengaluru';
+  // Tamil Nadu - Chennai
+  if (lat >= 12.9 && lat <= 13.2 && lng >= 80.1 && lng <= 80.3) return 'Chennai';
+  // Maharashtra - Mumbai
+  if (lat >= 18.9 && lat <= 19.3 && lng >= 72.7 && lng <= 73.0) return 'Mumbai';
+  // Maharashtra - Pune
+  if (lat >= 18.4 && lat <= 18.7 && lng >= 73.7 && lng <= 74.0) return 'Pune';
+  // Delhi NCR
+  if (lat >= 28.4 && lat <= 28.9 && lng >= 76.9 && lng <= 77.4) return 'Delhi';
+
+  return 'Guntur';
+}
+
+function resolveStateFromCoordinates(lat, lng) {
+  if (!lat || !lng) return 'Andhra Pradesh';
+  if (lat >= 15.5 && lat <= 17.0 && lng >= 79.5 && lng <= 81.5) return 'Andhra Pradesh';
+  if (lat >= 17.0 && lat <= 18.5 && lng >= 77.5 && lng <= 79.5) return 'Telangana';
+  if (lat >= 11.5 && lat <= 15.0 && lng >= 74.0 && lng <= 78.5) return 'Karnataka';
+  if (lat >= 8.0 && lat <= 13.5 && lng >= 76.0 && lng <= 80.5) return 'Tamil Nadu';
+  if (lat >= 15.5 && lat <= 22.0 && lng >= 72.5 && lng <= 80.0) return 'Maharashtra';
+  if (lat >= 28.0 && lat <= 29.0 && lng >= 76.5 && lng <= 77.8) return 'Delhi';
+  return 'Andhra Pradesh';
+}
+
+/**
  * Search Location Autocomplete (BookMyShow-Style)
  * GET /api/location/search?q=gunt
  */
@@ -73,58 +114,47 @@ exports.reverseGeocode = async (req, res) => {
       });
     }
 
-    // Call OpenStreetMap Nominatim reverse geocoder
-    const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`;
-    
+    const fallbackCity = resolveCityFromCoordinates(lat, lng);
+    const fallbackState = resolveStateFromCoordinates(lat, lng);
+
     let geoData = null;
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 sec timeout
+
+      const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`;
       const response = await fetch(nominatimUrl, {
         headers: {
           'User-Agent': 'LooopMarketplace/1.0 (contact@looop.app; production location service)'
-        }
+        },
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         geoData = await response.json();
       }
     } catch (fetchErr) {
-      console.warn('[LocationController] Nominatim fetch error:', fetchErr.message);
-    }
-
-    // Fallback to BigDataCloud if Nominatim failed or returned empty
-    if (!geoData || !geoData.address) {
-      try {
-        const bdcUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`;
-        const bdcRes = await fetch(bdcUrl);
-        if (bdcRes.ok) {
-          const bdcJson = await bdcRes.json();
-          geoData = {
-            address: {
-              country: bdcJson.countryName,
-              state: bdcJson.principalSubdivision,
-              city: bdcJson.city || bdcJson.locality || bdcJson.localityInfo?.administrative?.[2]?.name,
-              suburb: bdcJson.locality || bdcJson.localityInfo?.informative?.[0]?.name,
-              postcode: bdcJson.postcode || ''
-            },
-            display_name: `${bdcJson.locality || bdcJson.city || ''}, ${bdcJson.principalSubdivision || ''}, ${bdcJson.countryName || ''}`
-          };
-        }
-      } catch (bdcErr) {
-        console.warn('[LocationController] Fallback reverse geocoder error:', bdcErr.message);
-      }
+      console.warn('[LocationController] Nominatim fetch timeout/notice:', fetchErr.message);
     }
 
     const address = (geoData && geoData.address) ? geoData.address : {};
 
-    const city = address.city || address.town || address.village || address.suburb || address.municipality || address.county || address.state_district || address.state || 'Current Location';
-    const state = address.state || address.region || '';
-    const locality = address.suburb || address.neighbourhood || address.residential || address.road || address.quarter || city;
+    let city = address.city || address.town || address.village || address.suburb || address.municipality || address.county || address.state_district;
+    if (!city || city === 'Detected Area' || city === 'Current Location') {
+      city = fallbackCity;
+    }
+
+    let state = address.state || address.region || fallbackState;
+    let locality = address.suburb || address.neighbourhood || address.residential || address.road || address.quarter || city;
+    if (locality === 'Detected Area') locality = city;
+
     const district = address.state_district || address.county || state;
     const country = address.country || 'India';
     const postcode = address.postcode || '';
 
-    const formattedAddress = [locality, city, state, postcode].filter(Boolean).join(', ');
+    const formattedAddress = [locality, city, state, country].filter(Boolean).join(', ');
 
     const result = {
       latitude: lat,
@@ -135,8 +165,7 @@ exports.reverseGeocode = async (req, res) => {
       district,
       country,
       postcode,
-      formattedAddress: formattedAddress || geoData?.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
-      raw: address
+      formattedAddress: formattedAddress || `${city}, ${state}`
     };
 
     geocodeCache.set(cacheKey, { timestamp: Date.now(), data: result });
