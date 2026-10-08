@@ -109,8 +109,7 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
         try {
           autocompleteServiceRef.current.getPlacePredictions(
             {
-              input: q,
-              types: ['(cities)', 'geocode', 'establishment']
+              input: q
             },
             (predictions, status) => {
               if (requestId !== lastRequestIdRef.current) return; // Ignore stale responses
@@ -126,10 +125,6 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
                 }));
                 setSearchResults(results);
                 setSearchStatus('results');
-              } else if (status === window.google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
-                setSearchResults([]);
-                setSearchStatus('no_results');
-                setStatusMessage(`No locations found for "${q}".`);
               } else {
                 console.warn('[LOOOP Places] Search status:', status);
                 fallbackSearch(q, requestId);
@@ -149,9 +144,36 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Fallback search using Geocoder or Backend API if Places Autocomplete is loading
+  // Fallback search using Backend API & Geocoder if Places Autocomplete returns no results or fails
   const fallbackSearch = async (q, requestId) => {
     try {
+      // First try Backend API search (pre-seeded cities + Nominatim)
+      try {
+        const res = await api.get(`/location/search?q=${encodeURIComponent(q)}`);
+        if (requestId !== lastRequestIdRef.current) return;
+
+        if (res.data?.success && Array.isArray(res.data.data) && res.data.data.length > 0) {
+          const parsed = res.data.data.map((item) => ({
+            placeId: item._id || item.id,
+            name: item.name || item.city,
+            mainText: item.name || item.city,
+            secondaryText: [item.city !== item.name ? item.city : '', item.state, item.country].filter(Boolean).join(', '),
+            city: item.city || item.name,
+            locality: item.locality || item.name,
+            state: item.state || '',
+            latitude: item.latitude,
+            longitude: item.longitude,
+            source: 'BACKEND'
+          }));
+          setSearchResults(parsed);
+          setSearchStatus('results');
+          return;
+        }
+      } catch (backendErr) {
+        console.warn('[LOOOP Search] Backend fallback notice:', backendErr);
+      }
+
+      // Second try Google Geocoder
       if (geocoderRef.current) {
         geocoderRef.current.geocode({ address: q }, (results, status) => {
           if (requestId !== lastRequestIdRef.current) return;
@@ -193,33 +215,17 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
             setSearchStatus('results');
             return;
           }
+
+          setSearchResults([]);
+          setSearchStatus('no_results');
+          setStatusMessage(`No locations found for "${q}".`);
         });
+        return;
       }
 
-      // Backend fallback API
-      const res = await api.get(`/location/search?q=${encodeURIComponent(q)}`);
-      if (requestId !== lastRequestIdRef.current) return;
-
-      if (res.data?.success && Array.isArray(res.data.data) && res.data.data.length > 0) {
-        const parsed = res.data.data.map((item) => ({
-          placeId: item._id,
-          name: item.name || item.city,
-          mainText: item.name || item.city,
-          secondaryText: [item.city !== item.name ? item.city : '', item.state, item.country].filter(Boolean).join(', '),
-          city: item.city,
-          locality: item.locality || item.name,
-          state: item.state,
-          latitude: item.latitude,
-          longitude: item.longitude,
-          source: 'BACKEND'
-        }));
-        setSearchResults(parsed);
-        setSearchStatus('results');
-      } else {
-        setSearchResults([]);
-        setSearchStatus('no_results');
-        setStatusMessage(`No locations found for "${q}".`);
-      }
+      setSearchResults([]);
+      setSearchStatus('no_results');
+      setStatusMessage(`No locations found for "${q}".`);
     } catch (err) {
       if (requestId !== lastRequestIdRef.current) return;
       setSearchResults([]);
