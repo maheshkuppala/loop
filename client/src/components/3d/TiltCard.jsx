@@ -6,7 +6,8 @@ export const TiltCard = ({
   style = {},
   maxTilt = 12,
   perspective = 1000,
-  scale = 1.03,
+  scale = 1.05,
+  translateZ = 35,
   glare = true,
   onClick,
   isZooming = false,
@@ -44,15 +45,15 @@ export const TiltCard = ({
     const rotY = (centerX / (width / 2)) * maxTilt;
 
     setTransformStyle(
-      `perspective(${perspective}px) rotateX(${rotX.toFixed(2)}deg) rotateY(${rotY.toFixed(2)}deg) scale3d(${scale}, ${scale}, ${scale})`
+      `perspective(${perspective}px) rotateX(${rotX.toFixed(2)}deg) rotateY(${rotY.toFixed(2)}deg) translateZ(${translateZ}px) scale3d(${scale}, ${scale}, ${scale})`
     );
 
     if (glare) {
       const glareX = (mouseX / width) * 100;
       const glareY = (mouseY / height) * 100;
       setGlareStyle({
-        opacity: 0.25,
-        background: `radial-gradient(circle at ${glareX}% ${glareY}%, rgba(16, 185, 129, 0.35), rgba(255, 255, 255, 0) 70%)`
+        opacity: 0.35,
+        background: `radial-gradient(circle at ${glareX}% ${glareY}%, rgba(16, 185, 129, 0.4), rgba(255, 255, 255, 0) 70%)`
       });
     }
   };
@@ -65,7 +66,7 @@ export const TiltCard = ({
 
   const handleMouseLeave = () => {
     setIsHovered(false);
-    setTransformStyle(`perspective(${perspective}px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)`);
+    setTransformStyle(`perspective(${perspective}px) rotateX(0deg) rotateY(0deg) translateZ(0px) scale3d(1, 1, 1)`);
     setGlareStyle({ opacity: 0 });
   };
 
@@ -81,14 +82,14 @@ export const TiltCard = ({
         position: 'relative',
         transformStyle: 'preserve-3d',
         transition: isHovered
-          ? 'transform 0.1s cubic-bezier(0.03, 0.98, 0.52, 0.99), box-shadow 0.3s ease'
-          : 'transform 0.5s ease-out, box-shadow 0.5s ease',
+          ? 'transform 0.12s cubic-bezier(0.03, 0.98, 0.52, 0.99), box-shadow 0.3s ease, border-color 0.3s ease'
+          : 'transform 0.5s ease-out, box-shadow 0.5s ease, border-color 0.5s ease',
         transform: isZooming
-          ? `perspective(${perspective}px) translateZ(80px) scale3d(1.12, 1.12, 1.12)`
-          : transformStyle || `perspective(${perspective}px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)`,
+          ? `perspective(${perspective}px) translateZ(140px) scale3d(1.18, 1.18, 1.18) rotateX(-2deg)`
+          : transformStyle || `perspective(${perspective}px) rotateX(0deg) rotateY(0deg) translateZ(0px) scale3d(1, 1, 1)`,
         cursor: onClick ? 'pointer' : 'default',
         willChange: 'transform',
-        zIndex: isZooming ? 50 : 1,
+        zIndex: isZooming ? 50 : isHovered ? 10 : 1,
         ...style
       }}
       {...restProps}

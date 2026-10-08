@@ -311,16 +311,23 @@ export const ItemCard = ({ item, onSaveToggle, isSaved: propIsSaved, isSaving = 
       />
 
       <style>{`
+        .item-card-3d {
+          transform-style: preserve-3d;
+          perspective: 1000px;
+          will-change: transform;
+        }
         .item-card-3d:hover {
-          transform: translateY(-6px) rotateX(1.5deg) rotateY(-1deg);
-          box-shadow: 0 16px 32px -6px rgba(16, 185, 129, 0.22), 0 4px 12px rgba(15, 23, 42, 0.08) !important;
+          transform: perspective(1000px) translateZ(28px) scale(1.04) rotateX(1.5deg) rotateY(-1deg) !important;
+          box-shadow: 0 20px 40px -8px rgba(16, 185, 129, 0.28), 0 8px 20px rgba(15, 23, 42, 0.1) !important;
           border-color: #10b981 !important;
+          z-index: 10;
         }
         .item-card-3d:hover .item-card-image {
-          transform: scale(1.04) !important;
+          transform: scale(1.08) translateZ(15px) !important;
         }
         .item-card-3d:hover .card-action-btn {
           background-color: #047857 !important;
+          box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4) !important;
         }
       `}</style>
     </div>
