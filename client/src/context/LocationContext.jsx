@@ -202,9 +202,18 @@ export const LocationProvider = ({ children }) => {
     } catch (e) {}
   };
 
-  const displayLocationText = location
-    ? (location.city ? location.city : location.name)
-    : 'Select Location';
+  const getCleanLocationText = (loc) => {
+    if (!loc) return 'Select Location';
+    const text = loc.city || loc.name || loc.locality;
+    if (!text || text === 'Detected Area' || text === 'Detected City' || text === 'Custom Area') {
+      if (loc.locality && loc.locality !== 'Detected Area') return loc.locality;
+      if (loc.state) return loc.state;
+      return 'Select Location';
+    }
+    return text;
+  };
+
+  const displayLocationText = getCleanLocationText(location);
 
   const value = {
     location,

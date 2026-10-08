@@ -117,7 +117,7 @@ exports.reverseGeocode = async (req, res) => {
 
     const address = (geoData && geoData.address) ? geoData.address : {};
 
-    const city = address.city || address.town || address.village || address.municipality || address.county || address.state_district || 'Detected Area';
+    const city = address.city || address.town || address.village || address.suburb || address.municipality || address.county || address.state_district || address.state || 'Current Location';
     const state = address.state || address.region || '';
     const locality = address.suburb || address.neighbourhood || address.residential || address.road || address.quarter || city;
     const district = address.state_district || address.county || state;

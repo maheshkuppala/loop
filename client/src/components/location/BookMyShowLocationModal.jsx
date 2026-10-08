@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, MapPin, Navigation, X, Check, ArrowLeft, Building2, Compass, AlertCircle } from 'lucide-react';
+import { Search, MapPin, Navigation, X, Building2, AlertCircle } from 'lucide-react';
 import { useLocationContext } from '../../context/LocationContext';
 import api from '../../services/api';
 
@@ -27,7 +27,6 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
   const [popularCities, setPopularCities] = useState(DEFAULT_POPULAR);
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [detectedDraft, setDetectedDraft] = useState(null);
   const searchInputRef = useRef(null);
 
   // Fetch popular cities on mount
@@ -40,18 +39,17 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
           setPopularCities(res.data.data);
         }
       } catch (err) {
-        // Fallback to default popular list
+        // Fallback to default list
       }
     };
     fetchPopular();
 
-    // Auto-focus search input
     setTimeout(() => {
       if (searchInputRef.current) searchInputRef.current.focus();
-    }, 100);
+    }, 120);
   }, [isOpen]);
 
-  // Debounced search query
+  // Debounced autocomplete search
   useEffect(() => {
     const q = searchQuery.trim();
     if (!q) {
@@ -72,7 +70,7 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
       } finally {
         setIsSearching(false);
       }
-    }, 250);
+    }, 200);
 
     return () => clearTimeout(timer);
   }, [searchQuery]);
@@ -80,14 +78,15 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   const handleSelectLocation = (locObj) => {
+    const cityName = locObj.city || locObj.name || 'Guntur';
     const finalLoc = {
-      name: locObj.name || locObj.city,
-      city: locObj.city || locObj.name,
-      locality: locObj.locality || locObj.name || '',
+      name: cityName,
+      city: cityName,
+      locality: locObj.locality || cityName,
       state: locObj.state || '',
       country: locObj.country || 'India',
-      latitude: locObj.latitude || 12.9716,
-      longitude: locObj.longitude || 77.5946,
+      latitude: locObj.latitude || 16.3067,
+      longitude: locObj.longitude || 80.4365,
       source: locObj.source || 'MANUAL'
     };
 
@@ -96,8 +95,8 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
   };
 
   const handleDetectGPS = () => {
-    requestFreshGPS();
     if (onClose) onClose();
+    requestFreshGPS();
   };
 
   const currentCityName = location?.city || location?.name || '';
@@ -106,15 +105,20 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
     <div
       style={{
         position: 'fixed',
-        inset: 0,
-        zIndex: 9999,
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100vw',
+        height: '100vh',
+        zIndex: 999999,
         backgroundColor: 'rgba(15, 23, 42, 0.75)',
         backdropFilter: 'blur(8px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         padding: '16px',
-        animation: 'fadeIn 0.2s ease-out'
+        overflow: 'hidden'
       }}
       role="dialog"
       aria-modal="true"
@@ -122,14 +126,17 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
       <div
         style={{
           width: '100%',
-          maxWidth: '560px',
+          maxWidth: '540px',
+          maxHeight: '85vh',
           backgroundColor: '#ffffff',
           borderRadius: '24px',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.3)',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          maxHeight: '88vh'
+          margin: 'auto',
+          position: 'relative',
+          animation: 'fadeIn 0.2s ease-out'
         }}
       >
         {/* Header */}
@@ -143,11 +150,11 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
             backgroundColor: '#ffffff'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div
               style={{
-                width: '38px',
-                height: '38px',
+                width: '40px',
+                height: '40px',
                 borderRadius: '12px',
                 backgroundColor: 'rgba(16, 185, 129, 0.12)',
                 color: '#10b981',
@@ -159,11 +166,11 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
               <MapPin size={22} />
             </div>
             <div>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.3px' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.3px' }}>
                 Select Location
               </h2>
               <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>
-                Find items available in your community
+                Find products available near you
               </p>
             </div>
           </div>
@@ -176,8 +183,8 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
                 background: '#f1f5f9',
                 border: 'none',
                 borderRadius: '50%',
-                width: '32px',
-                height: '32px',
+                width: '34px',
+                height: '34px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -192,7 +199,7 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
 
         {/* Body Content */}
         <div style={{ padding: '1.25rem 1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          {/* Search Box */}
+          {/* Search Input Box */}
           <div style={{ position: 'relative' }}>
             <Search
               size={18}
@@ -204,7 +211,7 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search for your city or area (e.g. Guntur, Hyderabad)..."
+              placeholder="Search city or area (e.g. Guntur, Brodipet)..."
               style={{
                 width: '100%',
                 padding: '12px 40px 12px 42px',
@@ -212,7 +219,7 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
                 border: '2px solid #e2e8f0',
                 backgroundColor: '#f8fafc',
                 fontSize: '0.95rem',
-                fontWeight: 500,
+                fontWeight: 600,
                 color: '#0f172a',
                 outline: 'none',
                 transition: 'all 0.2s ease'
@@ -238,7 +245,7 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
             )}
           </div>
 
-          {/* Detect Location Button */}
+          {/* Detect Location Action */}
           {!searchQuery && (
             <button
               type="button"
@@ -246,13 +253,13 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
               disabled={isGeoLoading}
               style={{
                 width: '100%',
-                padding: '12px 16px',
+                padding: '13px 16px',
                 borderRadius: '14px',
                 backgroundColor: '#ecfdf5',
                 border: '1.5px solid #a7f3d0',
                 color: '#047857',
                 fontWeight: 700,
-                fontSize: '0.925rem',
+                fontSize: '0.95rem',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -288,7 +295,7 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
           {searchQuery ? (
             <div>
               <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
-                {isSearching ? 'Searching...' : `Search Results for "${searchQuery}"`}
+                {isSearching ? 'Searching...' : `Results for "${searchQuery}"`}
               </div>
 
               {searchResults.length > 0 ? (
@@ -335,7 +342,7 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
               ) : null}
             </div>
           ) : (
-            /* Popular Locations Grid (BookMyShow Style) */
+            /* Popular Locations Grid */
             <div>
               <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
                 Popular Locations
@@ -343,10 +350,11 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px' }}>
                 {popularCities.map((pop) => {
-                  const isSelected = currentCityName.toLowerCase() === (pop.city || pop.name).toLowerCase();
+                  const popName = pop.name || pop.city;
+                  const isSelected = currentCityName.toLowerCase() === popName.toLowerCase();
                   return (
                     <button
-                      key={pop.name || pop._id}
+                      key={popName}
                       type="button"
                       onClick={() => handleSelectLocation(pop)}
                       style={{
@@ -367,7 +375,7 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
                       }}
                     >
                       <Building2 size={18} color={isSelected ? '#10b981' : '#64748b'} />
-                      <span style={{ textAlign: 'center', lineHeight: 1.2 }}>{pop.name || pop.city}</span>
+                      <span style={{ textAlign: 'center', lineHeight: 1.2 }}>{popName}</span>
                       {isSelected && (
                         <span style={{ fontSize: '0.65rem', color: '#10b981', fontWeight: 800, textTransform: 'uppercase' }}>
                           Selected
