@@ -54,7 +54,7 @@ export const Navbar = () => {
         }}
       >
         {/* LOOOP Brand Mark */}
-        <LooopLogo size="md" showTagline={true} linkTo="/" />
+        <LooopLogo size="md" showTagline={false} linkTo="/" />
 
         {/* Desktop Primary Navigation */}
         <nav
@@ -192,14 +192,8 @@ export const Navbar = () => {
         {/* Right Section: Auth Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
           <Link to="/login" style={{ textDecoration: 'none' }}>
-            <Button variant="ghost" size="sm">
+            <Button variant="primary" size="sm">
               Login
-            </Button>
-          </Link>
-
-          <Link to="/login" style={{ textDecoration: 'none' }}>
-            <Button variant="primary" size="sm" iconRight={ArrowRight}>
-              Get Started
             </Button>
           </Link>
 
@@ -300,13 +294,8 @@ export const Navbar = () => {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
             <Link to="/login" onClick={() => setMobileMenuOpen(false)} style={{ textDecoration: 'none' }}>
-              <Button variant="secondary" size="sm" style={{ width: '100%' }}>
+              <Button variant="primary" size="sm" style={{ width: '100%' }}>
                 Login
-              </Button>
-            </Link>
-            <Link to="/login" onClick={() => setMobileMenuOpen(false)} style={{ textDecoration: 'none' }}>
-              <Button variant="primary" size="sm" style={{ width: '100%' }} iconRight={ArrowRight}>
-                Get Started
               </Button>
             </Link>
           </div>
