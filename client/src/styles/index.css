@@ -79,7 +79,10 @@
   --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-smooth: 350ms cubic-bezier(0.16, 1, 0.3, 1);
 
-  /* Layout Containers */
+  /* Layout Containers & Backgrounds */
+  --color-bg-main: #f8fafc;
+  --color-surface-card: #ffffff;
+  --color-border-subtle: #e2e8f0;
   --container-max: 1240px;
   --header-height: 72px;
 }
@@ -95,12 +98,13 @@ html {
   font-size: 16px;
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
+  background-color: var(--color-bg-main);
 }
 
 body {
   font-family: var(--font-body);
   color: var(--color-slate-800);
-  background-color: #fcfdfd;
+  background-color: var(--color-bg-main);
   line-height: 1.6;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
@@ -132,10 +136,12 @@ button, input, select, textarea {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  background-color: var(--color-bg-main);
 }
 
 .main-content {
   flex: 1;
+  background-color: var(--color-bg-main);
 }
 
 .container {
@@ -710,4 +716,6 @@ html, body {
   max-width: 100%;
   overflow-x: hidden;
 }
+
+@import './looop-loading.css';
 

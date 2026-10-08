@@ -84,6 +84,11 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true
     },
+    points: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
     resetPasswordToken: {
       type: String,
       select: false

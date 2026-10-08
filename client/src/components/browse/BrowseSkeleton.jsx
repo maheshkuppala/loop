@@ -1,5 +1,8 @@
 import React from 'react';
-import Skeleton, { CardSkeleton } from '../common/Skeleton';
+import LooopSkeleton, { LooopCardSkeleton as CardSkeleton } from '../common/LooopSkeleton';
+
+// Re-alias for minimal changes below
+const Skeleton = LooopSkeleton;
 
 export const BrowseSkeleton = () => {
   return (

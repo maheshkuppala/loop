@@ -22,6 +22,8 @@ router.patch('/users/:id/status', adminController.updateUserStatus);
 router.get('/items', adminController.getItems);
 router.get('/items/:id', adminController.getItemDetails);
 router.patch('/items/:id/moderation', adminController.moderateItem);
+router.patch('/items/:id/approve', adminController.approveItem);
+router.patch('/items/:id/reject', adminController.rejectItem);
 
 // 5. Wanted Items Oversight
 router.get('/wanted', adminController.getWantedItems);
@@ -33,6 +35,7 @@ router.get('/requests/:id', adminController.getRequestDetails);
 // 7. Transactions Oversight
 router.get('/transactions', adminController.getTransactions);
 router.get('/transactions/:id', adminController.getTransactionDetails);
+router.patch('/transactions/:id/complete', adminController.adminCompleteTransaction);
 
 // 8. Reports & Dispute Moderation
 router.get('/reports', adminController.getReports);
@@ -48,6 +51,10 @@ router.patch('/categories/:id/status', adminController.toggleCategoryStatus);
 // 10. Platform Settings
 router.get('/settings', adminController.getSettings);
 router.put('/settings', adminController.updateSettings);
+router.get('/upload-rules', adminController.getUploadRules);
+router.put('/upload-rules', adminController.updateUploadRules);
+router.get('/points-settings', adminController.getPointsSettings);
+router.put('/points-settings', adminController.updatePointsSettings);
 
 // 11. Security Audit Logs
 router.get('/audit-logs', adminController.getAuditLogs);

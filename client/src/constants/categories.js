@@ -51,10 +51,11 @@ export const SUBCATEGORIES_MAP = {
 
 export const SHARING_TYPES = [
   { id: 'all', label: 'All Types' },
-  { id: 'free', label: 'Free', description: 'Share it with someone who needs it', icon: HeartHandshake, color: '#059669' },
-  { id: 'give_away', label: 'Give Away', description: 'Pass it on permanently', icon: Gift, color: '#10b981' },
-  { id: 'borrow', label: 'Borrow', description: 'Let someone use it for a period and return it', icon: Clock, color: '#0284c7' },
-  { id: 'exchange', label: 'Exchange', description: 'Trade it for something useful', icon: Repeat, color: '#b45309' }
+  { id: 'free', label: 'Free / Give Away', description: 'Pass it on permanently for zero cost', icon: HeartHandshake, color: '#059669' },
+  { id: 'give_away', label: 'Give Away', description: 'Free community giveaway', icon: Gift, color: '#10b981' },
+  { id: 'borrow', label: 'Borrow', description: 'Use for a duration and return', icon: Clock, color: '#0284c7' },
+  { id: 'exchange', label: 'Exchange', description: 'Trade for a useful item', icon: Repeat, color: '#b45309' },
+  { id: 'low_cost', label: 'Low Cost', description: 'Low cost community share', icon: Package, color: '#7c3aed' }
 ];
 
 export const CONDITIONS = [
@@ -63,6 +64,7 @@ export const CONDITIONS = [
   { id: 'like_new', label: 'Like New', description: 'Opened or tested, zero flaws or signs of wear' },
   { id: 'good', label: 'Good', description: 'Used but fully functional with normal signs of use' },
   { id: 'fair', label: 'Fair', description: 'Fully functional, noticeable cosmetic wear or scratches' },
+  { id: 'used', label: 'Used', description: 'Well used functional item' },
   { id: 'needs_repair', label: 'Needs Repair', description: 'Requires fixing, servicing, or useful for spare parts' }
 ];
 
@@ -77,15 +79,17 @@ export const DISTANCE_OPTIONS = [
 
 export const AVAILABILITY_OPTIONS = [
   { id: 'available', label: 'Available Now' },
+  { id: 'reserved', label: 'Reserved' },
   { id: 'recently_added', label: 'Recently Added' },
   { id: 'all', label: 'All Items' }
 ];
 
 export const SORT_OPTIONS = [
+  { id: 'relevant', label: 'Most Relevant' },
   { id: 'newest', label: 'Newest First' },
   { id: 'nearest', label: 'Nearest Location' },
-  { id: 'recently_updated', label: 'Recently Updated' },
-  { id: 'most_relevant', label: 'Most Relevant' }
+  { id: 'available_first', label: 'Available First' },
+  { id: 'recently_updated', label: 'Recently Updated' }
 ];
 
 export default {

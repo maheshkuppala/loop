@@ -9,17 +9,14 @@ export const Skeleton = ({
 }) => {
   return (
     <div
-      className={`skeleton-shimmer ${className}`}
+      className={`looop-skeleton-green ${className}`}
       style={{
         width,
         height,
         borderRadius,
-        backgroundColor: 'var(--color-slate-200)',
-        backgroundImage: 'linear-gradient(90deg, var(--color-slate-200) 0%, var(--color-slate-100) 50%, var(--color-slate-200) 100%)',
-        backgroundSize: '200% 100%',
-        animation: 'shimmer 1.5s infinite',
         ...style
       }}
+      aria-hidden="true"
     />
   );
 };

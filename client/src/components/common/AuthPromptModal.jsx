@@ -10,7 +10,7 @@ export const AuthPromptModal = ({
   title = 'Sign In or Create Account',
   actionTitle = 'Account Required',
   actionDescription = 'To continue, please sign in to your LOOOP account or create a free account.',
-  redirectPath = window.location.pathname
+  redirectPath = window.location.pathname + window.location.search
 }) => {
   const navigate = useNavigate();
 

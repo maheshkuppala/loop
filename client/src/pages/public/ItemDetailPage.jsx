@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
   ArrowLeft,
   AlertCircle,
@@ -33,6 +33,7 @@ import AuthPromptModal from '../../components/common/AuthPromptModal';
 
 export const ItemDetailPage = () => {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const { addToast } = useToast();
@@ -87,10 +88,15 @@ export const ItemDetailPage = () => {
         setItem(itemObj);
         setIsSaved(Boolean(itemObj.saved));
 
-        // Fetch related items in parallel
+        // Fetch similar items prioritizing AVAILABLE items
         try {
-          const related = await itemService.getRelatedItems(itemObj.id, itemObj.category);
-          setRelatedItems(related || []);
+          const similar = await itemService.getSimilarItems(itemObj.id || itemObj._id, {
+            category: itemObj.category,
+            subcategory: itemObj.subcategory,
+            sharingType: itemObj.sharingType,
+            limit: 6
+          });
+          setRelatedItems(similar || []);
         } catch {
           setRelatedItems([]);
         }
@@ -118,8 +124,33 @@ export const ItemDetailPage = () => {
     window.scrollTo(0, 0);
   }, [loadItemData]);
 
+  // Handle returning unauthenticated user with action=request or intent=request in URL query parameter
+  useEffect(() => {
+    const isRequestIntent = searchParams.get('action') === 'request' || searchParams.get('intent') === 'request';
+    if (item && (isAuthenticated || user) && isRequestIntent) {
+      setRequestModalOpen(true);
+      addToast({
+        title: 'Continue Your Request',
+        message: 'Your account is verified. Continue with your reuse request?',
+        variant: 'info'
+      });
+    }
+  }, [item, isAuthenticated, user, searchParams]);
+
   // Auth-guarded action triggers
   const handleRequestClick = () => {
+    if (!isAuthenticated && !user) {
+      const currentUrl = window.location.pathname + window.location.search;
+      const separator = currentUrl.includes('?') ? '&' : '?';
+      setAuthPromptConfig({
+        isOpen: true,
+        title: 'Sign In to Request Item',
+        actionTitle: 'Account Required to Reuse or Borrow',
+        actionDescription: `To request or borrow "${item?.title || 'this item'}", please sign in or create an account. You will automatically return here to complete your request.`,
+        redirectPath: `${currentUrl}${separator}action=request`
+      });
+      return;
+    }
     setRequestModalOpen(true);
   };
 
@@ -130,7 +161,7 @@ export const ItemDetailPage = () => {
         title: 'Sign In or Create Account',
         actionTitle: 'Account Required to Save Items',
         actionDescription: `To save "${item?.title || 'this item'}" to your favorites collection, please sign in or create a free account.`,
-        redirectPath: window.location.pathname
+        redirectPath: window.location.pathname + window.location.search
       });
       return;
     }
@@ -158,7 +189,7 @@ export const ItemDetailPage = () => {
         title: 'Sign In or Create Account',
         actionTitle: 'Account Required to Report',
         actionDescription: 'To submit a listing report to community moderation, please sign in or create a free account.',
-        redirectPath: window.location.pathname
+        redirectPath: window.location.pathname + window.location.search
       });
       return;
     }
@@ -374,16 +405,17 @@ export const ItemDetailPage = () => {
         </div>
       </div>
 
-      {/* Related Items Section */}
+      {/* YOU MAY ALSO REUSE (Similar Products) Section */}
       {relatedItems.length > 0 && (
         <section style={{ paddingTop: '2.5rem', borderTop: '1px solid var(--color-slate-200)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '8px' }}>
             <div>
-              <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--color-slate-900)', margin: 0 }}>
-                More in {item.category?.toUpperCase() || 'This Category'}
+              <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--color-slate-900)', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Sparkles size={18} color="#059669" />
+                <span>YOU MAY ALSO REUSE</span>
               </h2>
               <p style={{ fontSize: '0.85rem', color: 'var(--color-slate-500)', margin: '4px 0 0 0' }}>
-                Other useful items shared by neighbors in your area
+                Similar useful items shared by neighbors in your community
               </p>
             </div>
             <Link

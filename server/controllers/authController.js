@@ -270,12 +270,8 @@ exports.register = async (req, res) => {
     const assignedId = mongoUser?._id ? String(mongoUser._id) : userId;
     const token = generateToken(assignedId, roleToAssign);
 
-    // Dispatch Welcome Email asynchronously
-    sendLooopEmail({
-      toEmail: cleanEmail,
-      recipientName: cleanName,
-      templateType: 'welcomeAccountCreated'
-    }).catch((err) => console.warn('Welcome email dispatch notice:', err.message));
+    // NOTE: Welcome email is sent AFTER OTP verification, not here.
+    // See verifyOtp handler for the welcome email dispatch.
 
     return res.status(201).json({
       success: true,
@@ -436,26 +432,48 @@ exports.logout = async (req, res) => {
 
 exports.getMe = async (req, res) => {
   try {
-    if (req.user) {
-      return res.status(200).json({
-        success: true,
-        user: req.user
+    const userId = req.user?.id || req.user?._id;
+    if (!userId && !req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authenticated.'
       });
     }
-    return res.status(401).json({
-      success: false,
-      message: 'Not authenticated.'
+
+    let fullUser = null;
+
+    if (mongoose.connection.readyState === 1 && userId && mongoose.Types.ObjectId.isValid(userId)) {
+      try {
+        fullUser = await User.findById(userId).select('-password');
+      } catch (err) {}
+    }
+
+    if (!fullUser && req.user?.email && mongoose.connection.readyState === 1) {
+      try {
+        fullUser = await User.findOne({ email: req.user.email }).select('-password');
+      } catch (err) {}
+    }
+
+    if (!fullUser) {
+      fullUser = req.user;
+    }
+
+    return res.status(200).json({
+      success: true,
+      user: fullUser
     });
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: 'Error fetching profile.'
+      message: 'Error fetching authenticated user profile.'
     });
   }
 };
 
 const { sendOtpEmail, sendLooopEmail } = require('../services/brevoService');
 const otpMemoryCache = new Map();
+
+const otpRateLimiter = new Map(); // email -> { count, windowStart }
 
 exports.sendOtp = async (req, res) => {
   try {
@@ -465,27 +483,60 @@ exports.sendOtp = async (req, res) => {
     }
 
     const cleanEmail = String(email).toLowerCase().trim();
+
+    // Rate limiting: max 5 OTP requests per hour, min 30s between requests
+    const rateEntry = otpRateLimiter.get(cleanEmail);
+    const now = Date.now();
+    if (rateEntry) {
+      const timeSinceLast = now - rateEntry.lastSent;
+      if (timeSinceLast < 30000) {
+        const waitSec = Math.ceil((30000 - timeSinceLast) / 1000);
+        return res.status(429).json({ 
+          success: false, 
+          message: `Please wait ${waitSec} seconds before requesting a new code.`,
+          retryAfter: waitSec
+        });
+      }
+      // Reset window every hour
+      if (now - rateEntry.windowStart > 3600000) {
+        rateEntry.count = 0;
+        rateEntry.windowStart = now;
+      }
+      if (rateEntry.count >= 5) {
+        return res.status(429).json({ 
+          success: false, 
+          message: 'Too many verification code requests. Please try again later.' 
+        });
+      }
+      rateEntry.count += 1;
+      rateEntry.lastSent = now;
+    } else {
+      otpRateLimiter.set(cleanEmail, { count: 1, windowStart: now, lastSent: now });
+    }
+
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = Date.now() + 5 * 60 * 1000;
 
-    otpMemoryCache.set(cleanEmail, { code, expiresAt });
+    otpMemoryCache.set(cleanEmail, { code, expiresAt, attempts: 0 });
 
+    console.log(`[AUTH] OTP generated for ${cleanEmail}`);
     const brevoResult = await sendOtpEmail(cleanEmail, code);
+    console.log(`[EMAIL] OTP email dispatched for ${cleanEmail} (simulated: ${!!brevoResult.simulated})`);
 
     return res.status(200).json({
       success: true,
-      message: 'A 6-digit verification code has been dispatched to your email.',
+      message: 'A 6-digit verification code has been sent to your email.',
       simulated: !!brevoResult.simulated
     });
   } catch (error) {
-    console.error('sendOtp error:', error);
+    console.error('[AUTH] sendOtp error:', error);
     return res.status(500).json({ success: false, message: 'Failed to send verification code.' });
   }
 };
 
 exports.verifyOtp = async (req, res) => {
   try {
-    const { email, otp } = req.body;
+    const { email, otp, isRegistration } = req.body;
     if (!email || !otp) {
       return res.status(400).json({ success: false, message: 'Email and verification code are required.' });
     }
@@ -493,22 +544,44 @@ exports.verifyOtp = async (req, res) => {
     const cleanEmail = String(email).toLowerCase().trim();
     const cleanOtp = String(otp).trim();
 
+    // Check OTP attempt limits (max 5 attempts per code)
     const stored = otpMemoryCache.get(cleanEmail);
-    const isValidCode = (stored && stored.code === cleanOtp && stored.expiresAt > Date.now()) || cleanOtp === '123456';
-
-    if (!isValidCode) {
-      return res.status(400).json({ success: false, message: 'Invalid or expired verification code.' });
+    if (!stored) {
+      console.log(`[AUTH] OTP verification failed - no code found for ${cleanEmail}`);
+      return res.status(400).json({ success: false, message: 'No verification code found. Please request a new one.' });
     }
 
+    // Track attempts
+    if (!stored.attempts) stored.attempts = 0;
+    stored.attempts += 1;
+
+    if (stored.attempts > 5) {
+      otpMemoryCache.delete(cleanEmail);
+      console.log(`[AUTH] OTP blocked - too many attempts for ${cleanEmail}`);
+      return res.status(429).json({ success: false, message: 'Too many attempts. Please request a new verification code.' });
+    }
+
+    // Check expiration
+    if (stored.expiresAt < Date.now()) {
+      otpMemoryCache.delete(cleanEmail);
+      console.log(`[AUTH] OTP expired for ${cleanEmail}`);
+      return res.status(400).json({ success: false, message: 'Your verification code has expired. Please request a new one.' });
+    }
+
+    // Verify the code (NO backdoor bypass)
+    if (stored.code !== cleanOtp) {
+      console.log(`[AUTH] OTP mismatch for ${cleanEmail} (attempt ${stored.attempts}/5)`);
+      return res.status(400).json({ 
+        success: false, 
+        message: `Invalid verification code. Please try again. (${5 - stored.attempts} attempts remaining)` 
+      });
+    }
+
+    // OTP is valid - delete it to prevent reuse
     otpMemoryCache.delete(cleanEmail);
+    console.log(`[AUTH] OTP verified successfully for ${cleanEmail}`);
 
-    const isAdmin =
-      cleanEmail === 'looop.support@gmail.com' ||
-      cleanEmail === 'maheshkuppala321@gmail.com' ||
-      cleanEmail === 'admin@looop.community' ||
-      cleanEmail.includes('admin');
-    const role = isAdmin ? 'admin' : 'customer';
-
+    // Look up user
     let user = null;
     try {
       const pgRes = await pgQuery('SELECT id, name, email, role, avatar FROM users WHERE LOWER(email) = $1', [cleanEmail]);
@@ -524,7 +597,8 @@ exports.verifyOtp = async (req, res) => {
     }
 
     if (!user) {
-      // Pure email verification for registration: DO NOT pre-create user in database!
+      // Pure email verification for registration: user not yet created in DB
+      console.log(`[AUTH] Email verified (pre-registration) for ${cleanEmail}`);
       return res.status(200).json({
         success: true,
         verified: true,
@@ -532,7 +606,33 @@ exports.verifyOtp = async (req, res) => {
       });
     }
 
-    const token = generateToken(user.id || user._id, user.role || role);
+    // Mark email as verified in PG
+    try {
+      await pgQuery('UPDATE users SET verified = true WHERE LOWER(email) = $1', [cleanEmail]);
+    } catch {}
+
+    // Mark email as verified in Mongo
+    if (mongoose.connection && mongoose.connection.readyState === 1) {
+      try {
+        await User.updateOne({ email: cleanEmail }, { verified: true });
+      } catch {}
+    }
+
+    console.log(`[AUTH] Account activated for ${cleanEmail}`);
+
+    const token = generateToken(user.id || user._id, user.role);
+
+    // Send welcome email AFTER successful OTP verification (for new registrations)
+    if (isRegistration) {
+      console.log(`[EMAIL] Welcome email requested for ${cleanEmail}`);
+      const appUrl = process.env.CLIENT_URL || process.env.APP_URL || 'https://loop-five-azure.vercel.app';
+      sendLooopEmail({
+        toEmail: cleanEmail,
+        recipientName: user.name || 'LOOOP Member',
+        templateType: 'welcomeAccountCreated',
+        templateParams: { appUrl }
+      }).catch((err) => console.warn('[EMAIL] Welcome email dispatch notice:', err.message));
+    }
 
     return res.status(200).json({
       success: true,
@@ -543,13 +643,13 @@ exports.verifyOtp = async (req, res) => {
         _id: user.id || user._id,
         name: user.name || cleanEmail,
         email: cleanEmail,
-        role: user.role || role,
+        role: user.role,
         avatar: user.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
         trustScore: 100
       }
     });
   } catch (error) {
-    console.error('verifyOtp error:', error);
+    console.error('[AUTH] verifyOtp error:', error);
     return res.status(500).json({ success: false, message: 'Failed to verify code.' });
   }
 };

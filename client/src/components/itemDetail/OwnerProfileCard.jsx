@@ -1,52 +1,49 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ShieldCheck, Star, Clock, ArrowRight, User } from 'lucide-react';
+import { ShieldCheck, ArrowRight } from 'lucide-react';
 import Avatar from '../common/Avatar';
-import RatingStars from '../reviews/RatingStars';
 
 export const OwnerProfileCard = ({ owner }) => {
   if (!owner) return null;
 
   const displayName = owner.name || 'Community Sharer';
   const ownerId = owner._id || owner.id;
-  const rating = Number(owner.rating || 0);
-  const reviewsCount = Number(owner.reviewsCount || 0);
   const isVerified = owner.verified !== false;
 
   return (
     <div
       style={{
         backgroundColor: '#ffffff',
-        borderRadius: 'var(--radius-xl)',
-        border: '1px solid var(--color-slate-200)',
-        padding: '1.5rem',
-        boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)',
+        borderRadius: '16px',
+        border: '1px solid #e2e8f0',
+        padding: '1.25rem',
+        boxShadow: '0 4px 14px rgba(15, 23, 42, 0.03)',
         display: 'flex',
         flexDirection: 'column',
-        gap: '1rem'
+        gap: '0.85rem'
       }}
       className="owner-profile-card"
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-slate-100)', paddingBottom: '12px' }}>
-        <span style={{ fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-slate-400)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' }}>
+        <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#94a3b8' }}>
           Shared by
         </span>
         {isVerified && (
           <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#059669', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <ShieldCheck size={14} />
+            <ShieldCheck size={14} color="#059669" />
             <span>Verified Member</span>
           </span>
         )}
       </div>
 
-      {/* Owner Avatar & Brief */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+      {/* Owner Avatar & Name */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         {ownerId ? (
           <Link to={`/users/${ownerId}`} style={{ textDecoration: 'none' }}>
-            <Avatar src={owner.avatar} name={displayName} size="lg" />
+            <Avatar src={owner.avatar} name={displayName} size="md" />
           </Link>
         ) : (
-          <Avatar src={owner.avatar} name={displayName} size="lg" />
+          <Avatar src={owner.avatar} name={displayName} size="md" />
         )}
 
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -54,78 +51,40 @@ export const OwnerProfileCard = ({ owner }) => {
             <Link
               to={`/users/${ownerId}`}
               style={{
-                fontSize: '1.1rem',
+                fontSize: '1.05rem',
                 fontWeight: 800,
-                color: 'var(--color-slate-900)',
-                margin: '0 0 4px 0',
+                color: '#0f172a',
+                margin: 0,
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 textDecoration: 'none',
                 display: 'block'
               }}
-              className="owner-name-link hover:underline"
+              className="owner-name-link"
             >
               {displayName}
             </Link>
           ) : (
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--color-slate-900)', margin: '0 0 4px 0' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
               {displayName}
             </h3>
           )}
-
-          {/* Real Reviews / Rating Display */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-            {reviewsCount > 0 ? (
-              <>
-                <RatingStars rating={Math.round(rating)} size={14} />
-                <span style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--color-slate-800)' }}>
-                  ★ {rating.toFixed(1)}
-                </span>
-                <span style={{ fontSize: '0.78rem', color: 'var(--color-slate-500)' }}>
-                  · {reviewsCount} {reviewsCount === 1 ? 'review' : 'reviews'}
-                </span>
-              </>
-            ) : (
-              <span style={{ fontSize: '0.8rem', color: 'var(--color-slate-500)', fontWeight: 500 }}>
-                New member · No reviews yet
-              </span>
-            )}
-          </div>
+          <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 500 }}>
+            Active Looop Member
+          </span>
         </div>
-      </div>
-
-      {/* Trust & Activity Badges */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '10px 14px',
-          borderRadius: 'var(--radius-md)',
-          backgroundColor: '#f8fafc',
-          border: '1px solid var(--color-slate-200)',
-          fontSize: '0.8rem'
-        }}
-      >
-        <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-slate-700)', fontWeight: 600 }}>
-          <ShieldCheck size={15} color="#059669" />
-          <span>Peer-confirmed handovers</span>
-        </span>
-        <span style={{ color: '#047857', fontWeight: 700 }}>
-          Community verified
-        </span>
       </div>
 
       {/* Public Profile Link */}
       {ownerId && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '2px' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '4px' }}>
           <Link
             to={`/users/${ownerId}`}
             style={{
-              fontSize: '0.825rem',
+              fontSize: '0.8rem',
               fontWeight: 700,
-              color: 'var(--color-primary-700)',
+              color: '#047857',
               textDecoration: 'none',
               display: 'inline-flex',
               alignItems: 'center',
@@ -133,7 +92,7 @@ export const OwnerProfileCard = ({ owner }) => {
             }}
             className="view-member-profile-link"
           >
-            <span>View community profile & reviews</span>
+            <span>View member profile</span>
             <ArrowRight size={13} />
           </Link>
         </div>
@@ -144,7 +103,7 @@ export const OwnerProfileCard = ({ owner }) => {
           text-decoration: underline;
         }
         .owner-name-link:hover {
-          color: var(--color-primary-700);
+          color: #047857;
         }
       `}</style>
     </div>
@@ -152,3 +111,4 @@ export const OwnerProfileCard = ({ owner }) => {
 };
 
 export default OwnerProfileCard;
+

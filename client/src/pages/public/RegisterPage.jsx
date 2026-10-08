@@ -90,6 +90,35 @@ export const RegisterPage = () => {
     return () => clearInterval(timer);
   }, [inlineOtpSent, inlineOtpCountdown]);
 
+  // Store intended redirect URL in sessionStorage if present
+  useEffect(() => {
+    if (redirectUrl) {
+      try {
+        sessionStorage.setItem('looop_auth_redirect', redirectUrl);
+      } catch {}
+    }
+  }, [redirectUrl]);
+
+  const handlePostAuthRedirect = (userObj) => {
+    let target = redirectUrl;
+    if (!target) {
+      try {
+        target = sessionStorage.getItem('looop_auth_redirect');
+      } catch {}
+    }
+    try {
+      sessionStorage.removeItem('looop_auth_redirect');
+    } catch {}
+
+    if (target && target !== '/login' && target !== '/register') {
+      navigate(target);
+    } else if (userObj?.role === 'admin' || userObj?.role === 'ADMIN') {
+      navigate('/admin/dashboard');
+    } else {
+      navigate('/');
+    }
+  };
+
   // Password Requirement Checks
   const hasMinLength = password.length >= 8;
   const hasUppercase = /[A-Z]/.test(password);
@@ -271,13 +300,7 @@ export const RegisterPage = () => {
           message: `Welcome to LOOOP, ${res.user.name || 'Member'}! Your account details have been securely saved to the database.`,
           variant: 'success'
         });
-        if (redirectUrl) {
-          navigate(redirectUrl);
-        } else if (res.user.role === 'admin' || res.user.role === 'ADMIN') {
-          navigate('/admin/dashboard');
-        } else {
-          navigate('/dashboard');
-        }
+        handlePostAuthRedirect(res.user);
       }
     } catch (err) {
       setServerError(err.message || 'Account creation failed. Please try again.');
@@ -351,13 +374,7 @@ export const RegisterPage = () => {
           message: `Welcome to LOOOP, ${response.user.name || 'Member'}! Your account details have been securely saved to the database.`,
           variant: 'success'
         });
-        if (redirectUrl) {
-          navigate(redirectUrl);
-        } else if (response.user.role === 'admin' || response.user.role === 'ADMIN') {
-          navigate('/admin/dashboard');
-        } else {
-          navigate('/dashboard');
-        }
+        handlePostAuthRedirect(response.user);
       } else {
         throw new Error('Verification completed but account creation failed.');
       }
@@ -390,13 +407,7 @@ export const RegisterPage = () => {
           variant: 'success'
         });
 
-        if (redirectUrl) {
-          navigate(redirectUrl);
-        } else if (result.user.role === 'admin' || result.user.role === 'ADMIN') {
-          navigate('/admin/dashboard');
-        } else {
-          navigate('/dashboard');
-        }
+        handlePostAuthRedirect(result.user);
       }
     } catch (err) {
       console.error('Google sign-up error:', err);
