@@ -1,10 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Heart, ShieldCheck, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
+import { Heart, ArrowRight, Loader2, MapPin, Layers } from 'lucide-react';
 import Badge from './Badge';
-import Rating from './Rating';
-import Avatar from './Avatar';
-import LocationBadge from './LocationBadge';
 import { formatSharingType, formatCondition } from '../../utils/formatters';
 import { useToast } from '../../hooks/useToast';
 import { useAuth } from '../../context/AuthContext';
@@ -14,9 +11,13 @@ export const ItemCard = ({ item, onSaveToggle, isSaved: propIsSaved, isSaving = 
   const itemId = item?.id || item?._id;
   const [isSaved, setIsSaved] = useState(propIsSaved ?? item?.isSaved ?? item?.saved ?? false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const cardRef = useRef(null);
+  const [transformStyle, setTransformStyle] = useState('');
+  const [imageTransformStyle, setImageTransformStyle] = useState('');
+  const [isHovered, setIsHovered] = useState(false);
+  
   const { addToast } = useToast();
   const { user, isAuthenticated } = useAuth();
-  const navigate = useNavigate();
 
   useEffect(() => {
     if (propIsSaved !== undefined) {
@@ -30,13 +31,16 @@ export const ItemCard = ({ item, onSaveToggle, isSaved: propIsSaved, isSaving = 
 
   const sharingInfo = formatSharingType(item.sharingType);
   const conditionInfo = formatCondition(item.condition);
+  const images = Array.isArray(item.images) ? item.images : [];
   const primaryImage =
-    item.images && item.images.length > 0
-      ? typeof item.images[0] === 'string'
-        ? item.images[0]
-        : item.images[0]?.url || null
+    images.length > 0
+      ? typeof images[0] === 'string'
+        ? images[0]
+        : images[0]?.url || null
       : null;
-  const isItemUnavailable = item.isUnavailable || item.availability === 'Unavailable' || item.status === 'removed';
+      
+  const photoCount = images.length;
+  const isItemUnavailable = item.isUnavailable || item.availability === 'Unavailable' || item.status === 'removed' || item.status === 'RESERVED';
 
   const handleSaveClick = (e) => {
     e.preventDefault();
@@ -61,18 +65,66 @@ export const ItemCard = ({ item, onSaveToggle, isSaved: propIsSaved, isSaving = 
     }
   };
 
+  // 3D Tilt Mouse Move Handler
+  const handleMouseMove = (e) => {
+    if (!cardRef.current || window.innerWidth <= 768) return;
+    const rect = cardRef.current.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    // Calculate rotation (-5 to +5 deg)
+    const rotateX = ((mouseY / height) - 0.5) * -10;
+    const rotateY = ((mouseX / width) - 0.5) * 10;
+    
+    // Parallax image shift
+    const imgTranslateX = ((mouseX / width) - 0.5) * -12;
+    const imgTranslateY = ((mouseY / height) - 0.5) * -12;
+
+    setTransformStyle(`perspective(1000px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) translateY(-8px) translateZ(12px)`);
+    setImageTransformStyle(`scale(1.06) translateX(${imgTranslateX.toFixed(2)}px) translateY(${imgTranslateY.toFixed(2)}px)`);
+  };
+
+  const handleMouseEnter = () => {
+    setIsHovered(true);
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+    setTransformStyle('perspective(1000px) rotateX(0deg) rotateY(0deg) translateY(0px) translateZ(0px)');
+    setImageTransformStyle('scale(1) translateX(0px) translateY(0px)');
+  };
+
+  // Extract clean location text
+  const rawLocation = typeof item.location === 'string' ? item.location : item.location?.city || item.location?.address || 'Bengaluru';
+  const distanceText = item.distanceKm ? ` · ${item.distanceKm} km` : '';
+  const displayLocation = `${rawLocation}${distanceText}`;
+
   return (
     <div
-      className="item-card card card-interactive"
+      ref={cardRef}
+      onMouseMove={handleMouseMove}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      className="item-card premium-3d-card"
       style={{
         display: 'flex',
         flexDirection: 'column',
-        padding: '0',
+        padding: 0,
         overflow: 'hidden',
         position: 'relative',
         height: '100%',
         backgroundColor: '#ffffff',
-        opacity: isItemUnavailable ? 0.88 : 1
+        borderRadius: '20px',
+        border: isHovered ? '1.5px solid rgba(16, 185, 129, 0.4)' : '1.5px solid #e2e8f0',
+        boxShadow: isHovered
+          ? '0 20px 35px -10px rgba(15, 23, 42, 0.12), 0 8px 16px -4px rgba(16, 185, 129, 0.08)'
+          : '0 4px 14px rgba(15, 23, 42, 0.04)',
+        transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s ease, border-color 0.3s ease',
+        transform: transformStyle || 'perspective(1000px) rotateX(0deg) rotateY(0deg)',
+        transformStyle: 'preserve-3d',
+        opacity: isItemUnavailable ? 0.85 : 1
       }}
     >
       <Link
@@ -85,14 +137,16 @@ export const ItemCard = ({ item, onSaveToggle, isSaved: propIsSaved, isSaving = 
           color: 'inherit'
         }}
       >
-        {/* Card Media Header */}
+        {/* A. Product Image Container (approx 55-60% of card) */}
         <div
           style={{
             position: 'relative',
             width: '100%',
-            height: '200px',
-            backgroundColor: 'var(--color-slate-100)',
-            overflow: 'hidden'
+            height: '220px',
+            backgroundColor: '#f1f5f9',
+            overflow: 'hidden',
+            borderTopLeftRadius: '18px',
+            borderTopRightRadius: '18px'
           }}
         >
           {primaryImage ? (
@@ -105,9 +159,9 @@ export const ItemCard = ({ item, onSaveToggle, isSaved: propIsSaved, isSaving = 
                 height: '100%',
                 objectFit: 'cover',
                 filter: isItemUnavailable ? 'grayscale(40%)' : 'none',
-                transition: 'transform var(--transition-normal)'
+                transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+                transform: imageTransformStyle || 'scale(1)'
               }}
-              className="item-card-image"
               onError={(e) => {
                 e.target.src = 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80';
               }}
@@ -120,27 +174,28 @@ export const ItemCard = ({ item, onSaveToggle, isSaved: propIsSaved, isSaving = 
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: 'var(--color-slate-400)',
-                fontSize: '0.9rem'
+                color: '#94a3b8',
+                fontSize: '0.875rem',
+                fontWeight: 600
               }}
             >
-              No Photo Provided
+              No Photo Available
             </div>
           )}
 
-          {/* Top-Left Sharing Type Badge */}
-          <div style={{ position: 'absolute', top: '12px', left: '12px', zIndex: 2, display: 'flex', gap: '6px' }}>
+          {/* B. Status Badge (Top-Left Pill) */}
+          <div style={{ position: 'absolute', top: '12px', left: '12px', zIndex: 3, display: 'flex', gap: '6px' }}>
             <Badge variant={sharingInfo.badgeVariant}>
-              {sharingInfo.label}
+              {sharingInfo.label.toUpperCase()}
             </Badge>
             {isItemUnavailable && (
               <Badge variant="warning">
-                Unavailable
+                {item.status === 'RESERVED' ? 'RESERVED' : 'UNAVAILABLE'}
               </Badge>
             )}
           </div>
 
-          {/* Top-Right Save Item Button */}
+          {/* C. Wishlist Heart Button (Top-Right) */}
           <button
             type="button"
             onClick={handleSaveClick}
@@ -151,100 +206,136 @@ export const ItemCard = ({ item, onSaveToggle, isSaved: propIsSaved, isSaving = 
               position: 'absolute',
               top: '12px',
               right: '12px',
-              zIndex: 2,
-              width: '36px',
-              height: '36px',
+              zIndex: 3,
+              width: '38px',
+              height: '38px',
               borderRadius: '50%',
-              backgroundColor: 'rgba(255, 255, 255, 0.94)',
-              backdropFilter: 'blur(4px)',
-              border: 'none',
+              backgroundColor: 'rgba(255, 255, 255, 0.92)',
+              backdropFilter: 'blur(8px)',
+              border: '1px solid rgba(255, 255, 255, 0.6)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: isSaving ? 'not-allowed' : 'pointer',
-              boxShadow: 'var(--shadow-md)',
-              transition: 'transform var(--transition-fast)'
+              boxShadow: '0 4px 12px rgba(15, 23, 42, 0.12)',
+              transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s ease',
+              transform: isSaved ? 'scale(1.05)' : 'scale(1)'
             }}
-            className="save-btn"
+            className="wishlist-btn-3d"
           >
             {isSaving ? (
-              <Loader2 size={16} className="animate-spin" color="var(--color-primary-600)" />
+              <Loader2 size={16} className="animate-spin" color="#10b981" />
             ) : (
               <Heart
                 size={18}
-                color={isSaved ? 'var(--color-danger)' : 'var(--color-slate-600)'}
-                fill={isSaved ? 'var(--color-danger)' : 'none'}
+                color={isSaved ? '#ef4444' : '#64748b'}
+                fill={isSaved ? '#ef4444' : 'none'}
+                style={{ transition: 'all 0.2s ease' }}
               />
             )}
           </button>
 
-          {/* Bottom-Left Condition Chip */}
-          <div
-            style={{
-              position: 'absolute',
-              bottom: '10px',
-              left: '12px',
-              zIndex: 2,
-              backgroundColor: 'rgba(15, 23, 42, 0.75)',
-              backdropFilter: 'blur(4px)',
-              color: '#ffffff',
-              padding: '2px 8px',
-              borderRadius: 'var(--radius-xs)',
-              fontSize: '0.725rem',
-              fontWeight: 600
-            }}
-          >
-            {conditionInfo.label}
-          </div>
+          {/* Multiple Photos Count Badge (Bottom-Right of Image) */}
+          {photoCount > 1 && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '10px',
+                right: '12px',
+                zIndex: 3,
+                backgroundColor: 'rgba(15, 23, 42, 0.72)',
+                backdropFilter: 'blur(4px)',
+                color: '#ffffff',
+                padding: '3px 8px',
+                borderRadius: '12px',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                letterSpacing: '0.02em',
+                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.2)'
+              }}
+            >
+              <Layers size={11} />
+              <span>+{photoCount} Photos</span>
+            </div>
+          )}
         </div>
 
-        {/* Card Content Body */}
-        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', flex: 1 }}>
+        {/* Card Body Information */}
+        <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', flex: 1, gap: '10px' }}>
+          {/* D. Product Title (Max 2 lines, strong typography) */}
           <h3
             style={{
-              fontSize: '1.05rem',
-              fontWeight: 700,
-              color: 'var(--color-slate-900)',
+              fontSize: '1.025rem',
+              fontWeight: 800,
+              color: '#0f172a',
               lineHeight: 1.35,
-              marginBottom: '6px',
+              margin: 0,
               display: '-webkit-box',
               WebkitLineClamp: 2,
               WebkitBoxOrient: 'vertical',
-              overflow: 'hidden'
+              overflow: 'hidden',
+              minHeight: '2.7em'
             }}
           >
             {item.title}
           </h3>
 
-          <div style={{ marginBottom: '12px' }}>
-            <LocationBadge location={item.location} distanceKm={item.distanceKm} />
+          {/* E. Condition Badge */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span
+              style={{
+                display: 'inline-block',
+                fontSize: '0.725rem',
+                fontWeight: 700,
+                color: '#047857',
+                backgroundColor: '#ecfdf5',
+                border: '1px solid #a7f3d0',
+                padding: '2px 8px',
+                borderRadius: '6px',
+                letterSpacing: '0.01em'
+              }}
+            >
+              {conditionInfo.label}
+            </span>
           </div>
 
-          <div style={{ marginTop: 'auto', paddingTop: '12px', borderTop: '1px solid var(--color-slate-100)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            {/* Owner info */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Avatar
-                src={item.owner?.avatar}
-                name={item.owner?.name}
-                size="sm"
-              />
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-slate-800)', lineHeight: 1.2 }}>
-                  {item.owner?.name}
-                </span>
-                {item.owner?.trustScore && (
-                  <span style={{ fontSize: '0.72rem', color: 'var(--color-primary-700)', display: 'flex', alignItems: 'center', gap: '2px', fontWeight: 600 }}>
-                    <ShieldCheck size={11} />
-                    <span>{item.owner.trustScore}% Trust</span>
-                  </span>
-                )}
-              </div>
-            </div>
+          {/* F. Location */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#64748b', fontSize: '0.8rem', fontWeight: 500 }}>
+            <MapPin size={13} color="#10b981" style={{ flexShrink: 0 }} />
+            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {displayLocation}
+            </span>
+          </div>
 
-            {/* Rating */}
-            {item.owner?.rating && (
-              <Rating score={item.owner.rating} count={item.owner.reviewsCount} size={13} />
-            )}
+          {/* G. Primary Action: VIEW PRODUCT → */}
+          <div style={{ marginTop: 'auto', paddingTop: '10px' }}>
+            <div
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                borderRadius: '12px',
+                backgroundColor: isItemUnavailable ? '#f1f5f9' : '#059669',
+                color: isItemUnavailable ? '#64748b' : '#ffffff',
+                fontSize: '0.825rem',
+                fontWeight: 800,
+                textAlign: 'center',
+                letterSpacing: '0.04em',
+                boxShadow: isItemUnavailable ? 'none' : (isHovered ? '0 6px 18px rgba(16, 185, 129, 0.35)' : '0 2px 8px rgba(16, 185, 129, 0.2)'),
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                transition: 'all 0.3s ease',
+                transform: isHovered && !isItemUnavailable ? 'translateY(-2px)' : 'translateY(0px)'
+              }}
+              className="view-product-btn-3d"
+            >
+              <span>VIEW PRODUCT</span>
+              <ArrowRight size={14} style={{ transition: 'transform 0.2s ease', transform: isHovered ? 'translateX(3px)' : 'translateX(0)' }} />
+            </div>
           </div>
         </div>
       </Link>
@@ -255,11 +346,27 @@ export const ItemCard = ({ item, onSaveToggle, isSaved: propIsSaved, isSaving = 
         onClose={() => setShowAuthModal(false)}
         title="Sign In or Create Account"
         actionTitle="Account Required to Save Items"
-        actionDescription={`To save "${item.title || 'this item'}" to your collection, please sign in or create a free account.`}
+        actionDescription={`To save "${item.title || 'this item'}" to your wishlist, please sign in or create a free account.`}
         redirectPath={window.location.pathname + window.location.search}
       />
+
+      <style>{`
+        .wishlist-btn-3d:hover {
+          transform: scale(1.12) !important;
+          background-color: #ffffff !important;
+        }
+        @media (max-width: 768px) {
+          .premium-3d-card {
+            transform: none !important;
+          }
+          .premium-3d-card:active {
+            transform: scale(0.98) !important;
+          }
+        }
+      `}</style>
     </div>
   );
 };
 
 export default ItemCard;
+

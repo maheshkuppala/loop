@@ -27,4 +27,7 @@ router.patch('/:id/return', transactionController.startReturn);
 // PATCH /api/transactions/:id/return/confirm - Confirm return
 router.patch('/:id/return/confirm', transactionController.confirmReturn);
 
+// PATCH /api/transactions/:id/confirm-receipt - Customer confirms product receipt
+router.patch('/:id/confirm-receipt', transactionController.confirmCustomerReceipt);
+
 module.exports = router;

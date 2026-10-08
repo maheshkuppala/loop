@@ -522,6 +522,142 @@ exports.moderateItem = async (req, res) => {
   }
 };
 
+exports.approveItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid item ID format.' });
+    }
+
+    const item = await Item.findById(id);
+    if (!item) {
+      return res.status(404).json({ success: false, message: 'Item not found.' });
+    }
+
+    item.approvalStatus = 'APPROVED';
+    item.status = 'active';
+    item.availability = 'Available';
+    item.rejectionReason = '';
+    await item.save();
+
+    await logAction({
+      adminId: req.admin._id,
+      action: 'ITEM_APPROVED',
+      targetType: 'ITEM',
+      targetId: item._id,
+      targetTitle: item.title,
+      ipAddress: req.ip
+    });
+
+    try {
+      await notificationService.createNotification({
+        recipient: item.owner,
+        type: 'ITEM_UPDATED',
+        title: 'Listing Approved!',
+        message: `Your listing "${item.title}" has been approved by admin and is now live!`,
+        link: `/items/${item._id}`
+      });
+    } catch (notifErr) {
+      // non-critical
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Item has been approved and published to the marketplace.',
+      item
+    });
+  } catch (error) {
+    console.error('Error approving item:', error);
+    return res.status(500).json({ success: false, message: 'Failed to approve item.' });
+  }
+};
+
+exports.rejectItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason = '' } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid item ID format.' });
+    }
+
+    const item = await Item.findById(id);
+    if (!item) {
+      return res.status(404).json({ success: false, message: 'Item not found.' });
+    }
+
+    item.approvalStatus = 'REJECTED';
+    item.status = 'rejected';
+    item.availability = 'Unavailable';
+    item.rejectionReason = reason || 'Item does not meet platform reuse criteria.';
+    await item.save();
+
+    await logAction({
+      adminId: req.admin._id,
+      action: 'ITEM_REJECTED',
+      targetType: 'ITEM',
+      targetId: item._id,
+      targetTitle: item.title,
+      metadata: { reason },
+      ipAddress: req.ip
+    });
+
+    try {
+      await notificationService.createNotification({
+        recipient: item.owner,
+        type: 'ITEM_UPDATED',
+        title: 'Listing Needs Revision',
+        message: `Your listing "${item.title}" was not approved. Reason: ${item.rejectionReason}`,
+        link: '/my-items'
+      });
+    } catch (notifErr) {
+      // non-critical
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Item rejected.',
+      item
+    });
+  } catch (error) {
+    console.error('Error rejecting item:', error);
+    return res.status(500).json({ success: false, message: 'Failed to reject item.' });
+  }
+};
+
+exports.getUploadRules = async (req, res) => {
+  try {
+    const rules = await uploadRulesService.getUploadRules();
+    return res.status(200).json({ success: true, rules });
+  } catch (error) {
+    console.error('Error getting upload rules:', error);
+    return res.status(500).json({ success: false, message: 'Failed to get upload rules.' });
+  }
+};
+
+exports.updateUploadRules = async (req, res) => {
+  try {
+    const adminId = req.admin?._id || req.user?._id;
+    const rules = await uploadRulesService.updateUploadRules(req.body, adminId);
+    await logAction({
+      adminId,
+      action: 'UPLOAD_RULES_UPDATED',
+      targetType: 'SETTINGS',
+      metadata: rules,
+      ipAddress: req.ip
+    });
+    return res.status(200).json({
+      success: true,
+      message: 'Product upload rules updated successfully.',
+      rules
+    });
+  } catch (error) {
+    console.error('Error updating upload rules:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update upload rules.' });
+  }
+};
+
+
 // -------------------------------------------------------------
 // 5. WANTED ITEMS MONITORING
 // -------------------------------------------------------------
@@ -1240,3 +1376,114 @@ exports.getAuditLogs = async (req, res) => {
     });
   }
 };
+
+// -------------------------------------------------------------
+// 12. ADMIN POINTS CONFIGURATION & MANUAL COMPLETION
+// -------------------------------------------------------------
+exports.getPointsSettings = async (req, res) => {
+  try {
+    const pointsService = require('../services/pointsService');
+    const settings = await pointsService.getPointsSettings();
+    return res.status(200).json({
+      success: true,
+      settings
+    });
+  } catch (err) {
+    console.error('Error in getPointsSettings:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch points settings.'
+    });
+  }
+};
+
+exports.updatePointsSettings = async (req, res) => {
+  try {
+    const { reusePoints, borrowPoints, returnPoints, enabled } = req.body;
+    const adminId = req.admin?._id || req.user?._id;
+
+    const updates = {};
+    if (reusePoints !== undefined) updates.points_reuse = Number(reusePoints);
+    if (borrowPoints !== undefined) updates.points_borrow = Number(borrowPoints);
+    if (returnPoints !== undefined) updates.points_return_borrow = Number(returnPoints);
+    if (enabled !== undefined) updates.points_enabled = Boolean(enabled);
+
+    for (const [key, value] of Object.entries(updates)) {
+      await AdminSetting.findOneAndUpdate(
+        { key },
+        { key, value, updatedBy: adminId },
+        { upsert: true, new: true }
+      );
+    }
+
+    await logAction({
+      adminId,
+      action: 'POINTS_SETTINGS_UPDATED',
+      targetType: 'SETTINGS',
+      metadata: updates,
+      ipAddress: req.ip
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Points configuration updated successfully.',
+      settings: updates
+    });
+  } catch (err) {
+    console.error('Error in updatePointsSettings:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update points settings.'
+    });
+  }
+};
+
+exports.adminCompleteTransaction = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const pointsService = require('../services/pointsService');
+
+    const transaction = await Transaction.findById(id);
+    if (!transaction) {
+      return res.status(404).json({ success: false, message: 'Transaction not found.' });
+    }
+
+    transaction.status = 'COMPLETED';
+    transaction.completedAt = new Date();
+    transaction.adminConfirmedAt = new Date();
+    await transaction.save();
+
+    if (transaction.item) {
+      await Item.findByIdAndUpdate(transaction.item, { availability: 'Unavailable' });
+    }
+    if (transaction.request) {
+      await Request.findByIdAndUpdate(transaction.request, { status: 'COMPLETED', completedAt: new Date() });
+    }
+
+    // Award points safely and idempotently
+    const pointsResult = await pointsService.awardPointsForTransaction(transaction._id);
+
+    await logAction({
+      adminId: req.admin?._id || req.user?._id,
+      action: 'TRANSACTION_ADMIN_COMPLETED',
+      targetType: 'TRANSACTION',
+      targetId: transaction._id,
+      metadata: { pointsResult },
+      ipAddress: req.ip
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Transaction manually marked COMPLETED by Admin. Points process executed.',
+      transaction,
+      pointsResult
+    });
+  } catch (err) {
+    console.error('Error in adminCompleteTransaction:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Admin transaction completion failed.'
+    });
+  }
+};
+

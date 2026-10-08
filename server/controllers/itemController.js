@@ -12,6 +12,10 @@ const { invalidateAnalyticsCache } = require('../services/adminAnalyticsService'
  */
 exports.createItem = async (req, res) => {
   try {
+    const rules = await uploadRulesService.getUploadRules();
+    const userRole = (req.user?.role || '').toLowerCase();
+    const isAdmin = userRole === 'admin';
+
     const {
       title,
       description,
@@ -25,58 +29,73 @@ exports.createItem = async (req, res) => {
       location,
       coordinates,
       borrowSettings,
-      exchangeDetails
+      exchangeDetails,
+      specifications
     } = req.body;
 
-    // 1. Validation of required basics
-    if (!title || !title.trim()) {
-      return res.status(400).json({
+    // Rules validation
+    if (rules.customerUploadAllowed === false && !isAdmin) {
+      return res.status(403).json({
         success: false,
-        message: 'Item title is required.'
+        message: 'Product listing uploads by customers are currently disabled by platform administration.'
       });
     }
 
-    if (!description || !description.trim()) {
+    if (rules.requiredTitle && (!title || !title.trim())) {
+      return res.status(400).json({ success: false, message: 'Item title is required.' });
+    }
+
+    if (rules.requiredDescription && (!description || !description.trim())) {
+      return res.status(400).json({ success: false, message: 'Item description is required.' });
+    }
+
+    if (rules.requiredCategory && !category) {
+      return res.status(400).json({ success: false, message: 'Please select a category.' });
+    }
+
+    if (rules.requiredCondition && !condition) {
+      return res.status(400).json({ success: false, message: 'Please select the item condition.' });
+    }
+
+    if (!images || !Array.isArray(images) || images.length < rules.minImages) {
       return res.status(400).json({
         success: false,
-        message: 'Item description is required.'
+        message: `Please upload at least ${rules.minImages} photo(s) of the item.`
       });
     }
 
-    if (!category) {
+    if (images.length > rules.maxImages) {
       return res.status(400).json({
         success: false,
-        message: 'Please select a category.'
+        message: `You can upload up to ${rules.maxImages} photos per item according to current settings.`
       });
     }
 
-    if (!condition) {
+    if (rules.requiredPrimaryImage && !images.some(img => typeof img === 'object' && img.isPrimary)) {
+      if (typeof images[0] === 'object') {
+        images[0].isPrimary = true;
+      }
+    }
+
+    if (rules.requiredSpecifications && (!specifications || !Array.isArray(specifications) || specifications.length === 0)) {
       return res.status(400).json({
         success: false,
-        message: 'Please select the item condition.'
+        message: 'Product specifications are required.'
       });
     }
 
-    if (!images || !Array.isArray(images) || images.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please add at least one photo of the item.'
-      });
-    }
-
-    // 2. Format sanitized images array
-    const formattedImages = images.slice(0, 6).map((img, index) => {
+    // Format sanitized images array
+    const formattedImages = images.slice(0, rules.maxImages).map((img, index) => {
       if (typeof img === 'string') {
         return { url: img, isPrimary: index === 0 };
       }
       return {
         url: img.url,
-        isPrimary: img.isPrimary !== undefined ? img.isPrimary : index === 0,
+        isPrimary: img.isPrimary !== undefined ? Boolean(img.isPrimary) : index === 0,
         caption: img.caption || ''
       };
     });
 
-    // 3. Location construction
     const parsedCity = location?.city || (typeof location === 'string' ? location.split(',')[0] : 'Bengaluru');
     const locationObj = {
       city: parsedCity.trim(),
@@ -141,8 +160,11 @@ exports.createItem = async (req, res) => {
       images: formattedImages,
       sharingType: sharingType || 'give_away',
       condition: condition || 'good',
-      availability: 'Available',
-      status: 'active',
+      availability: approvalStatus === 'APPROVED' ? 'Available' : 'Unavailable',
+      status: status,
+      approvalStatus: approvalStatus,
+      rejectionReason: '',
+      specifications: Array.isArray(specifications) ? specifications : [],
       location: locationObj,
       locationCoordinates: {
         type: 'Point',
@@ -289,6 +311,8 @@ exports.createItem = async (req, res) => {
     });
   }
 };
+
+const { calculateHaversineDistance, resolveCoordinates } = require('../utils/geoUtils');
 
 exports.getItems = async (req, res) => {
   return exports.discoverItems(req, res);
@@ -1061,6 +1085,104 @@ exports.getItemMatches = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to retrieve item matches.'
+    });
+  }
+};
+
+/**
+ * GET /api/items/:id/similar or GET /api/items/similar
+ * Returns similar available items based on category, subcategory, brand, sharing type, and condition
+ * Prioritizes AVAILABLE items over reserved/reused ones.
+ */
+exports.getSimilarItems = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { category, subcategory, brand, sharingType, condition, limit = 8 } = req.query;
+    const parsedLimit = Math.min(24, Math.max(1, parseInt(limit, 10) || 8));
+
+    let sourceCategory = category || '';
+    let sourceSubcategory = subcategory || '';
+    let sourceBrand = brand || '';
+    let sourceSharingType = sharingType || '';
+    let sourceCondition = condition || '';
+    let excludeId = null;
+
+    if (id && mongoose.Types.ObjectId.isValid(id)) {
+      excludeId = id;
+      if (mongoose.connection.readyState === 1) {
+        const sourceItem = await Item.findById(id);
+        if (sourceItem) {
+          sourceCategory = sourceCategory || sourceItem.category || '';
+          sourceSubcategory = sourceSubcategory || sourceItem.subcategory || '';
+          sourceBrand = sourceBrand || sourceItem.brand || '';
+          sourceSharingType = sourceSharingType || sourceItem.sharingType || '';
+          sourceCondition = sourceCondition || sourceItem.condition || '';
+        }
+      }
+    }
+
+    const filter = {
+      status: { $ne: 'removed' }
+    };
+    if (excludeId) {
+      filter._id = { $ne: excludeId };
+    }
+    if (sourceCategory && sourceCategory !== 'all') {
+      filter.category = sourceCategory.toLowerCase().trim();
+    }
+
+    let rawItems = [];
+    if (mongoose.connection.readyState === 1) {
+      rawItems = await Item.find(filter)
+        .sort({ createdAt: -1 })
+        .limit(40)
+        .populate('owner', 'name avatar trustScore verified rating reviewsCount');
+    }
+
+    // Score and rank candidates
+    const scoredItems = rawItems.map((item) => {
+      let score = 0;
+      const isAvailable = item.availability === 'Available' || item.status === 'active';
+
+      // Priority 1: AVAILABLE items prioritized FIRST over reserved/reused ones
+      if (isAvailable) score += 1000;
+
+      if (sourceSubcategory && item.subcategory && item.subcategory.toLowerCase() === sourceSubcategory.toLowerCase()) {
+        score += 50;
+      }
+      if (sourceBrand && item.brand && item.brand.toLowerCase() === sourceBrand.toLowerCase()) {
+        score += 40;
+      }
+      if (sourceSharingType && item.sharingType === sourceSharingType) {
+        score += 20;
+      }
+      if (sourceCondition && item.condition === sourceCondition) {
+        score += 10;
+      }
+
+      return { item, score };
+    });
+
+    scoredItems.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return new Date(b.item.createdAt || 0) - new Date(a.item.createdAt || 0);
+    });
+
+    const items = scoredItems.slice(0, parsedLimit).map((s) => ({
+      ...s.item.toObject(),
+      id: s.item._id
+    }));
+
+    return res.status(200).json({
+      success: true,
+      items,
+      total: items.length
+    });
+  } catch (error) {
+    console.error('Error in getSimilarItems:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve similar items.'
     });
   }
 };

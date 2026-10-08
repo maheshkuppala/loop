@@ -17,6 +17,7 @@ const reportRoutes = require('./reportRoutes');
 const matchRoutes = require('./matchRoutes');
 const adminRoutes = require('./adminRoutes');
 const impactRoutes = require('./impactRoutes');
+const pointsRoutes = require('./pointsRoutes');
 
 // Health and Diagnostics
 router.use('/health', healthRoutes);
@@ -24,7 +25,7 @@ router.use('/health', healthRoutes);
 // Admin Portal REST API
 router.use('/admin', adminRoutes);
 
-// Auth, Users, Reviews, Reports, Items, Saved, Categories, Wanted, Requests, Transactions, Conversations, Notifications, Matches, and Impact Routes
+// Auth, Users, Reviews, Reports, Items, Saved, Categories, Wanted, Requests, Transactions, Conversations, Notifications, Matches, Points, and Impact Routes
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/reviews', reviewRoutes);
@@ -40,6 +41,7 @@ router.use('/messages', conversationRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/matches', matchRoutes);
 router.use('/impact', impactRoutes);
+router.use('/points', pointsRoutes);
 
 // Root /api info
 router.get('/', (req, res) => {

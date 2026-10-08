@@ -74,9 +74,9 @@ const itemSchema = new mongoose.Schema(
         },
         {
           validator: function (val) {
-            return Array.isArray(val) && val.length <= 6;
+            return Array.isArray(val) && val.length <= 20;
           },
-          message: 'You can attach up to 6 photos per item'
+          message: 'Photos limit exceeded'
         }
       ]
     },
@@ -102,6 +102,21 @@ const itemSchema = new mongoose.Schema(
       enum: ['active', 'pending moderation', 'rejected', 'removed', 'suspended'],
       default: 'active'
     },
+    approvalStatus: {
+      type: String,
+      enum: ['APPROVED', 'PENDING', 'REJECTED'],
+      default: 'APPROVED'
+    },
+    rejectionReason: {
+      type: String,
+      default: ''
+    },
+    specifications: [
+      {
+        key: { type: String, trim: true, default: '' },
+        value: { type: String, trim: true, default: '' }
+      }
+    ],
     location: {
       city: {
         type: String,

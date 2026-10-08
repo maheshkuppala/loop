@@ -278,16 +278,20 @@ export const authService = {
    * @param {string} email
    * @param {string} otp
    */
-  verifyOtp: async (email, otp) => {
+  verifyOtp: async (email, otp, options = {}) => {
     const cleanEmail = (email || '').trim().toLowerCase();
     const cleanOtp = (otp || '').trim();
 
     try {
-      const response = await api.post('/auth/otp/verify', { email: cleanEmail, otp: cleanOtp });
+      const response = await api.post('/auth/otp/verify', { 
+        email: cleanEmail, 
+        otp: cleanOtp,
+        isRegistration: !!options.isRegistration 
+      });
       return response.data;
     } catch {
       const saved = sessionStorage.getItem(`looop_otp_${cleanEmail}`);
-      const isValid = cleanOtp === saved || cleanOtp === '123456' || cleanOtp.length === 6;
+      const isValid = saved ? cleanOtp === saved : false;
 
       if (!isValid) {
         throw new Error('Invalid verification code. Please check and try again.');
@@ -410,8 +414,8 @@ export const authService = {
     const pendingRaw = sessionStorage.getItem('looop_pending_reg');
     const pending = pendingRaw ? JSON.parse(pendingRaw) : { email: cleanEmail };
 
-    // Verify OTP code
-    await authService.verifyOtp(cleanEmail, otpCode);
+    // Verify OTP code (pass isRegistration: true to trigger welcome email after verification)
+    await authService.verifyOtp(cleanEmail, otpCode, { isRegistration: true });
 
     // Perform final account creation & database persistence
     const regResult = await authService.register({

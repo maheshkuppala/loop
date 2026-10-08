@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
@@ -80,6 +81,9 @@ app.get('/', (req, res) => {
     healthCheck: '/api/health'
   });
 });
+
+// Static file serving for uploaded product images and documents
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Mount Main REST API Router
 app.use('/api', apiRoutes);

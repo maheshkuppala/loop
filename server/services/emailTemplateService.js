@@ -141,23 +141,27 @@ function buildLooopEmailHtml({
 }
 
 const looopEmailTemplates = {
-  welcomeAccountCreated: ({ name = 'Mahesh' }) => ({
-    subject: 'Welcome to LOOOP 👋',
+  welcomeAccountCreated: ({ name = 'Member', appUrl = 'https://loop-five-azure.vercel.app' }) => ({
+    subject: 'Welcome to LOOOP! Give Unused Things a New Life',
     html: buildLooopEmailHtml({
-      headline: 'Welcome to LOOOP',
+      headline: 'Welcome to LOOOP!',
       recipientName: name,
       bodyParagraphs: [
-        'Welcome to LOOOP!',
-        "You're now ready to discover unused products, share what you no longer need, and connect with people in your community."
+        'Your account has been successfully created and your email has been verified.',
+        'You are now part of LOOOP — the circular reuse platform where communities keep things out of landfills and give unused products a second life.',
+        'Here is how you can get started:',
+        '• <strong>Share an unused product:</strong> Have books, tools, electronics, or gear sitting around? Post them in minutes so neighbors can reuse them.<br>' +
+        '• <strong>Borrow or request what you need:</strong> Why buy something you will only use once? Discover items shared by people nearby.<br>' +
+        '• <strong>Explore products in your area:</strong> Find high-quality items available for reuse, borrowing, or exchange right in your community.'
       ],
-      cardTitle: 'ACCOUNT STATUS',
+      cardTitle: 'YOUR LOOOP ACCOUNT',
       cardRows: [
-        { label: 'Status', value: 'Active & Ready' },
-        { label: 'Community', value: 'LOOOP Network' }
+        { label: 'Status', value: '✅ Verified & Active' },
+        { label: 'Platform Mission', value: 'Circular Community Reuse' }
       ],
-      buttonText: 'Explore LOOOP',
-      buttonUrl: 'https://loop-five-azure.vercel.app/explore',
-      extraNote: "We're happy to have you with us.",
+      buttonText: 'Start Browsing Products',
+      buttonUrl: `${appUrl}/browse`,
+      extraNote: 'Every item reused or shared prevents landfill waste and strengthens your neighborhood community.',
       signoffTeam: '— The LOOOP Team'
     })
   }),
@@ -178,18 +182,18 @@ const looopEmailTemplates = {
     })
   }),
 
-  otpEmail: ({ name = 'Mahesh', otpCode = '482731', expiry = '10 minutes' }) => ({
-    subject: 'Your LOOOP verification code',
+  otpEmail: ({ name = 'Member', otpCode = '482731', expiry = '5 minutes' }) => ({
+    subject: 'Verify your LOOOP account',
     html: buildLooopEmailHtml({
-      headline: 'Verify your account',
+      headline: 'Verify your LOOOP account',
       recipientName: name,
       bodyParagraphs: [
-        'Use the verification code below to continue with your LOOOP account.'
+        'Your LOOOP verification code is:'
       ],
       isOtp: true,
       otpCode,
-      otpExpiry: expiry,
-      extraNote: 'For your security, never share this code with anyone, including LOOOP support.<br><br>If you didn\'t request this code, you can safely ignore this email.',
+      otpExpiry: expiry || '5 minutes',
+      extraNote: 'This code expires soon.<br><br>For your security, never share this code with anyone, including LOOOP support.<br><br>If you did not request this verification code, you can safely ignore this email.',
       signoffTeam: '— The LOOOP Team'
     })
   }),
@@ -249,6 +253,92 @@ const looopEmailTemplates = {
       buttonText: 'View My Listing',
       buttonUrl: itemUrl,
       extraNote: 'Your item is now visible to people looking for products like yours.<br><br>Thank you for helping give unused products a second life.',
+      signoffTeam: '— The LOOOP Team'
+    })
+  }),
+
+  newRequestOwner: ({ name = 'Owner', requesterName = 'Community Member', itemTitle = 'Product', requestType = 'Reuse', message = '', appUrl = 'https://loop-five-azure.vercel.app' }) => ({
+    subject: `New Request for Your Product: ${itemTitle}`,
+    html: buildLooopEmailHtml({
+      headline: `New ${requestType} Request`,
+      recipientName: name,
+      bodyParagraphs: [
+        `You have received a new ${requestType.toLowerCase()} request on LOOOP.`
+      ],
+      cardTitle: 'REQUEST DETAILS',
+      cardRows: [
+        { label: 'Product', value: itemTitle },
+        { label: 'Requested By', value: requesterName },
+        { label: 'Request Type', value: requestType },
+        { label: 'Message', value: message || 'No custom message provided.' }
+      ],
+      buttonText: 'Review & Respond to Request',
+      buttonUrl: `${appUrl}/requests`,
+      extraNote: 'Please review and accept or decline this request promptly to coordinate the handover.',
+      signoffTeam: '— The LOOOP Team'
+    })
+  }),
+
+  requestAcceptedCustomer: ({ name = 'Member', ownerName = 'Owner', itemTitle = 'Product', appUrl = 'https://loop-five-azure.vercel.app' }) => ({
+    subject: `Your request for "${itemTitle}" has been accepted!`,
+    html: buildLooopEmailHtml({
+      headline: 'Request Accepted!',
+      recipientName: name,
+      bodyParagraphs: [
+        `Great news! ${ownerName} accepted your request for "${itemTitle}".`,
+        'You can now message the owner directly to arrange a safe meeting time and handover location.'
+      ],
+      cardTitle: 'PRODUCT & OWNER',
+      cardRows: [
+        { label: 'Product', value: itemTitle },
+        { label: 'Shared By', value: ownerName },
+        { label: 'Status', value: '✅ Accepted - Handover Coordination Open' }
+      ],
+      buttonText: 'View Handover & Message Owner',
+      buttonUrl: `${appUrl}/transactions`,
+      extraNote: 'When you physically receive the item, click "I RECEIVED THE PRODUCT" in your dashboard to confirm completion.',
+      signoffTeam: '— The LOOOP Team'
+    })
+  }),
+
+  requestDeclinedCustomer: ({ name = 'Member', ownerName = 'Owner', itemTitle = 'Product', reason = '', appUrl = 'https://loop-five-azure.vercel.app' }) => ({
+    subject: `Update on your request for "${itemTitle}"`,
+    html: buildLooopEmailHtml({
+      headline: 'Request Declined',
+      recipientName: name,
+      bodyParagraphs: [
+        `Your request for "${itemTitle}" was not accepted by ${ownerName}.`
+      ],
+      cardTitle: 'REQUEST DETAILS',
+      cardRows: [
+        { label: 'Product', value: itemTitle },
+        { label: 'Status', value: 'Declined' },
+        { label: 'Reason', value: reason || 'Item is no longer available or was reserved.' }
+      ],
+      buttonText: 'Browse Similar Products',
+      buttonUrl: `${appUrl}/browse`,
+      extraNote: 'Don\'t worry! Many other great items are available for reuse in your community.',
+      signoffTeam: '— The LOOOP Team'
+    })
+  }),
+
+  pointsEarnedCustomer: ({ name = 'Member', pointsAmount = 100, itemTitle = 'Product', transactionType = 'Reuse', newBalance = 450, appUrl = 'https://loop-five-azure.vercel.app' }) => ({
+    subject: `You earned +${pointsAmount} LOOOP Points! 🎉`,
+    html: buildLooopEmailHtml({
+      headline: `Congratulations! You Earned +${pointsAmount} Points`,
+      recipientName: name,
+      bodyParagraphs: [
+        `Your ${transactionType.toLowerCase()} transaction for "${itemTitle}" has been successfully completed.`
+      ],
+      cardTitle: 'REWARD SUMMARY',
+      cardRows: [
+        { label: 'Product', value: itemTitle },
+        { label: 'Points Earned', value: `+${pointsAmount} Points` },
+        { label: 'Current Points Balance', value: `${newBalance} Points` }
+      ],
+      buttonText: 'View My Points History',
+      buttonUrl: `${appUrl}/points`,
+      extraNote: 'Thank you for participating in circular sharing and helping protect our environment!',
       signoffTeam: '— The LOOOP Team'
     })
   })

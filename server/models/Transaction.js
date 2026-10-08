@@ -143,6 +143,36 @@ const transactionSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: ''
+    },
+    rejectionReason: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    pointsAwarded: {
+      type: Boolean,
+      default: false,
+      index: true
+    },
+    pointsAwardedAmount: {
+      type: Number,
+      default: 0
+    },
+    pointsAwardedAt: {
+      type: Date,
+      default: null
+    },
+    customerConfirmedAt: {
+      type: Date,
+      default: null
+    },
+    ownerConfirmedAt: {
+      type: Date,
+      default: null
+    },
+    adminConfirmedAt: {
+      type: Date,
+      default: null
     }
   },
   {

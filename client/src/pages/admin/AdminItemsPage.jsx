@@ -137,6 +137,22 @@ export const AdminItemsPage = () => {
     }
   };
 
+  const handleApproveItem = async (itemId) => {
+    try {
+      setIsLoading(true);
+      const res = await adminService.approveItem(itemId);
+      if (res?.success) {
+        setNotification({ type: 'success', message: res.message || 'Listing approved and published!' });
+        fetchData();
+      }
+    } catch (err) {
+      console.error('Approval error:', err);
+      setNotification({ type: 'error', message: err.response?.data?.message || 'Failed to approve listing.' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Item Table Columns
   const itemColumns = [
     {
@@ -215,6 +231,29 @@ export const AdminItemsPage = () => {
             <Eye size={12} />
             <span>Details</span>
           </button>
+
+          {(item.status === 'pending moderation' || item.approvalStatus === 'PENDING') && (
+            <button
+              type="button"
+              onClick={() => handleApproveItem(item._id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '6px 12px',
+                backgroundColor: '#10b981',
+                border: 'none',
+                borderRadius: 'var(--radius-xs)',
+                color: '#022c22',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              <CheckCircle size={12} />
+              <span>Approve &amp; Publish</span>
+            </button>
+          )}
 
           {item.status === 'suspended' || item.status === 'removed' ? (
             <button
@@ -511,7 +550,9 @@ export const AdminItemsPage = () => {
           }}
         >
           <option value="">All Statuses</option>
+          <option value="pending moderation">Pending Moderation</option>
           <option value="active">Active</option>
+          <option value="rejected">Rejected</option>
           <option value="suspended">Suspended / Hidden</option>
           <option value="removed">Removed</option>
         </select>

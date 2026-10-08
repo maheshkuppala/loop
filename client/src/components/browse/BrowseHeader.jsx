@@ -27,7 +27,7 @@ export const BrowseHeader = ({ userLocation = 'Indiranagar, Bengaluru', totalIte
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
             <h1 style={{ fontSize: 'clamp(1.75rem, 2.5vw, 2.25rem)', fontWeight: 900, color: 'var(--color-slate-900)', margin: 0, letterSpacing: '-0.02em' }}>
-              Browse Items
+              Find Something to Reuse
             </h1>
             <span
               style={{

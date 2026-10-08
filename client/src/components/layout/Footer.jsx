@@ -7,11 +7,11 @@ export const Footer = () => {
   return (
     <footer
       style={{
-        backgroundColor: '#ffffff',
+        backgroundColor: 'var(--color-bg-main, #f8fafc)',
         borderTop: '1px solid var(--color-slate-200)',
         paddingTop: '4.5rem',
         paddingBottom: '2.5rem',
-        marginTop: '5rem'
+        marginTop: '0'
       }}
     >
       <div className="container">

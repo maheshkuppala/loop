@@ -18,6 +18,12 @@ const startServer = async () => {
     // Connect to MongoDB
     await connectDB();
 
+    // Idempotently seed demo accounts and initial products
+    const seedDemoData = require('./scripts/seedDemoData');
+    seedDemoData().catch((err) => {
+      console.warn('[DemoSeeder] Initial demo seed warning:', err.message);
+    });
+
     // Idempotently sync any existing completed transactions with impact events
     const environmentalImpactService = require('./services/environmentalImpactService');
     environmentalImpactService.syncCompletedTransactions().catch((err) => {

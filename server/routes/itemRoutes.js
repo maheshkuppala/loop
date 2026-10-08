@@ -3,6 +3,12 @@ const router = express.Router();
 const itemController = require('../controllers/itemController');
 const auth = require('../middleware/auth');
 
+const uploadMiddleware = require('../middleware/uploadMiddleware');
+
+// Upload rules and media routes
+router.get('/upload-rules', itemController.getUploadRules);
+router.post('/upload-media', auth, uploadMiddleware.single('file'), itemController.uploadMedia);
+
 // Protected personal user listing endpoints (scoped to authenticated user)
 router.get('/my/summary', auth, itemController.getMyItemsSummary);
 router.get('/my', auth, itemController.getMyItems);
@@ -22,6 +28,9 @@ router.get('/:id/save-status', auth, savedItemController.getSavedStatus);
 // Public item discovery endpoints
 router.get('/discover', itemController.discoverItems);
 router.get('/nearby', itemController.getNearbyItems);
+router.get('/similar', itemController.getSimilarItems);
+router.get('/:id/similar', itemController.getSimilarItems);
+router.get('/:id/related', itemController.getSimilarItems);
 router.get('/:id/matches', itemController.getItemMatches);
 router.get('/', itemController.getItems);
 router.get('/:id', itemController.getItemById);
