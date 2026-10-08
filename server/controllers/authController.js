@@ -432,20 +432,40 @@ exports.logout = async (req, res) => {
 
 exports.getMe = async (req, res) => {
   try {
-    if (req.user) {
-      return res.status(200).json({
-        success: true,
-        user: req.user
+    const userId = req.user?.id || req.user?._id;
+    if (!userId && !req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authenticated.'
       });
     }
-    return res.status(401).json({
-      success: false,
-      message: 'Not authenticated.'
+
+    let fullUser = null;
+
+    if (mongoose.connection.readyState === 1 && userId && mongoose.Types.ObjectId.isValid(userId)) {
+      try {
+        fullUser = await User.findById(userId).select('-password');
+      } catch (err) {}
+    }
+
+    if (!fullUser && req.user?.email && mongoose.connection.readyState === 1) {
+      try {
+        fullUser = await User.findOne({ email: req.user.email }).select('-password');
+      } catch (err) {}
+    }
+
+    if (!fullUser) {
+      fullUser = req.user;
+    }
+
+    return res.status(200).json({
+      success: true,
+      user: fullUser
     });
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: 'Error fetching profile.'
+      message: 'Error fetching authenticated user profile.'
     });
   }
 };

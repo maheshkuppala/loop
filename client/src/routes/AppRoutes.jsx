@@ -6,6 +6,7 @@ import PublicLayout from '../layouts/PublicLayout';
 import CustomerLayout from '../layouts/CustomerLayout';
 import AdminLayout from '../layouts/AdminLayout';
 import ProtectedRoute from './ProtectedRoute';
+import PublicOnlyRoute from './PublicOnlyRoute';
 import RouteLoadingFallback from '../components/common/RouteLoadingFallback';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 
@@ -133,11 +134,19 @@ export const AppRoutes = () => {
       />
       <Route
         path="/login"
-        element={<LoginPage />}
+        element={
+          <PublicOnlyRoute>
+            <LoginPage />
+          </PublicOnlyRoute>
+        }
       />
       <Route
         path="/register"
-        element={<RegisterPage />}
+        element={
+          <PublicOnlyRoute>
+            <RegisterPage />
+          </PublicOnlyRoute>
+        }
       />
       <Route
         path="/forgot-password"

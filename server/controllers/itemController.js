@@ -239,14 +239,29 @@ exports.createItem = async (req, res) => {
   }
 };
 
+const { calculateHaversineDistance, resolveCoordinates } = require('../utils/geoUtils');
+
 exports.getItems = async (req, res) => {
   try {
-    const { category, sharingType, condition, search, limit = 20, page = 1 } = req.query;
+    const {
+      category,
+      sharingType,
+      condition,
+      search,
+      lat,
+      lng,
+      city,
+      locality,
+      state,
+      radius = 10,
+      limit = 20,
+      page = 1
+    } = req.query;
 
     const filter = { status: 'active', availability: 'Available' };
 
     if (category && category !== 'all') {
-      filter.category = category;
+      filter.category = category.toLowerCase();
     }
     if (sharingType && sharingType !== 'all') {
       filter.sharingType = sharingType;
@@ -257,26 +272,77 @@ exports.getItems = async (req, res) => {
     if (search && search.trim()) {
       filter.$or = [
         { title: { $regex: search.trim(), $options: 'i' } },
-        { description: { $regex: search.trim(), $options: 'i' } }
+        { description: { $regex: search.trim(), $options: 'i' } },
+        { category: { $regex: search.trim(), $options: 'i' } },
+        { brand: { $regex: search.trim(), $options: 'i' } }
       ];
     }
 
     if (mongoose.connection.readyState === 1) {
-      const skip = (Number(page) - 1) * Number(limit);
-      const items = await Item.find(filter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(Number(limit))
-        .populate('owner', 'name avatar trustScore rating');
+      let items = await Item.find(filter)
+        .populate('owner', 'name avatar trustScore rating')
+        .lean();
 
-      const total = await Item.countDocuments(filter);
+      // Resolve customer location coordinates
+      const custCoords = resolveCoordinates({ lat, lng, city, locality, state });
+      const maxRadius = Number(radius) || 10;
+
+      // Calculate geographic Haversine distance for each item
+      const processedItems = items.map((item) => {
+        let itemLat = 12.9716;
+        let itemLng = 77.5946;
+
+        if (
+          item.locationCoordinates &&
+          Array.isArray(item.locationCoordinates.coordinates) &&
+          item.locationCoordinates.coordinates.length === 2
+        ) {
+          itemLng = Number(item.locationCoordinates.coordinates[0]);
+          itemLat = Number(item.locationCoordinates.coordinates[1]);
+        } else {
+          const itemLoc = resolveCoordinates(item.location || item.city);
+          itemLat = itemLoc.lat;
+          itemLng = itemLoc.lng;
+        }
+
+        const distanceKm = calculateHaversineDistance(custCoords.lat, custCoords.lng, itemLat, itemLng);
+        const itemCity = item.location?.city || item.location?.locality || 'Local Area';
+        const formattedDistance = distanceKm < 1 ? 'Under 1 km away' : `${distanceKm} km away`;
+
+        return {
+          ...item,
+          distanceKm,
+          distanceText: formattedDistance,
+          displayLocation: `${itemCity} · ${formattedDistance}`
+        };
+      });
+
+      // Filter by radius if location is passed or default radius applies
+      let filteredItems = processedItems;
+      if (lat || lng || city || radius) {
+        filteredItems = processedItems.filter((item) => item.distanceKm <= maxRadius);
+      }
+
+      // Sort by proximity (nearest first), then newest
+      filteredItems.sort((a, b) => {
+        if (Math.abs(a.distanceKm - b.distanceKm) > 0.1) {
+          return a.distanceKm - b.distanceKm;
+        }
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      });
+
+      // Paginate
+      const skip = (Number(page) - 1) * Number(limit);
+      const paginatedItems = filteredItems.slice(skip, skip + Number(limit));
 
       return res.status(200).json({
         success: true,
-        items,
-        total,
+        items: paginatedItems,
+        total: filteredItems.length,
         page: Number(page),
-        totalPages: Math.ceil(total / Number(limit))
+        totalPages: Math.ceil(filteredItems.length / Number(limit)) || 1,
+        userLocation: custCoords,
+        searchRadiusKm: maxRadius
       });
     }
 
@@ -289,7 +355,7 @@ exports.getItems = async (req, res) => {
     console.error('Error fetching items:', error);
     return res.status(500).json({
       success: false,
-      message: 'Failed to fetch items.'
+      message: 'Failed to fetch location-relevant items.'
     });
   }
 };
