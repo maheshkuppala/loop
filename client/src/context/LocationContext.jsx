@@ -1,30 +1,24 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import api from '../services/api';
+import LocationConfirmationModal from '../components/common/LocationConfirmationModal';
 
 const LocationContext = createContext(null);
 
 const STORAGE_KEY = 'looop_user_location';
 const RADIUS_KEY = 'looop_search_radius';
 
-const DEFAULT_LOCATION = {
-  city: 'Bengaluru',
-  state: 'Karnataka',
-  locality: 'Indiranagar',
-  country: 'India',
-  latitude: 12.9784,
-  longitude: 77.6408,
-  source: 'DEFAULT'
-};
-
 export const LocationProvider = ({ children }) => {
-  const [location, setLocationState] = useState(DEFAULT_LOCATION);
+  const [location, setLocationState] = useState(null);
+  const [pendingLocation, setPendingLocation] = useState(null);
   const [searchRadiusKm, setSearchRadiusKmState] = useState(10);
-  const [locationStatus, setLocationStatus] = useState('LOCATION_CHECKING'); // 'LOCATION_CHECKING' | 'LOCATION_RESOLVED' | 'LOCATION_MANUAL_SELECTION' | 'LOCATION_DENIED'
+  const [locationStatus, setLocationStatus] = useState('LOCATION_UNKNOWN');
   const [geoError, setGeoError] = useState(null);
   const [isGeoLoading, setIsGeoLoading] = useState(false);
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
 
   useEffect(() => {
     try {
-      // 1. Try restoring previously saved location
+      // 1. Restore saved confirmed location from localStorage
       const savedLoc = localStorage.getItem(STORAGE_KEY);
       const savedRad = localStorage.getItem(RADIUS_KEY);
 
@@ -34,109 +28,172 @@ export const LocationProvider = ({ children }) => {
 
       if (savedLoc) {
         const parsed = JSON.parse(savedLoc);
-        if (parsed && (parsed.city || parsed.latitude)) {
+        if (parsed && (parsed.latitude || parsed.city)) {
           setLocationState(parsed);
-          setLocationStatus('LOCATION_RESOLVED');
+          setLocationStatus(parsed.source === 'GPS' ? 'LOCATION_CONFIRMED' : 'LOCATION_MANUAL');
           return;
         }
       }
 
-      // 2. Try restoring user profile location if available
+      // 2. Restore from user account profile if present
       const storedUserRaw = localStorage.getItem('looop_user');
       if (storedUserRaw) {
         const userObj = JSON.parse(storedUserRaw);
-        if (userObj && userObj.city) {
+        if (userObj && (userObj.city || userObj.locality)) {
           const profileLoc = {
-            city: userObj.city,
-            state: userObj.state || 'Karnataka',
+            city: userObj.city || 'Detected City',
+            state: userObj.state || '',
             locality: userObj.locality || userObj.area || '',
             country: 'India',
-            latitude: userObj.city === 'Guntur' ? 16.3067 : 12.9716,
-            longitude: userObj.city === 'Guntur' ? 80.4365 : 77.5946,
+            latitude: userObj.latitude || 12.9784,
+            longitude: userObj.longitude || 77.6408,
             source: 'PROFILE'
           };
           setLocationState(profileLoc);
-          setLocationStatus('LOCATION_RESOLVED');
+          setLocationStatus('LOCATION_MANUAL');
           localStorage.setItem(STORAGE_KEY, JSON.stringify(profileLoc));
           return;
         }
       }
 
-      // 3. Otherwise prompt for location
-      setLocationStatus('LOCATION_MANUAL_SELECTION');
+      // If no valid stored location, prompt user
+      setLocationStatus('LOCATION_UNKNOWN');
     } catch (err) {
-      console.warn('[LocationContext] Initialization notice:', err);
-      setLocationStatus('LOCATION_MANUAL_SELECTION');
+      console.warn('[LocationContext] Init warning:', err);
+      setLocationStatus('LOCATION_UNKNOWN');
     }
   }, []);
 
-  const saveLocation = (locObj) => {
-    setLocationState(locObj);
-    setLocationStatus('LOCATION_RESOLVED');
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(locObj));
-    } catch (e) {}
-  };
-
-  const requestBrowserLocation = () => {
+  /**
+   * Request fresh high-accuracy device GPS position
+   */
+  const requestFreshGPS = () => {
     if (typeof window === 'undefined' || !navigator.geolocation) {
-      setGeoError('Geolocation is not supported by your browser.');
+      setGeoError('Geolocation service is not supported on this browser/device.');
       setLocationStatus('LOCATION_DENIED');
       return;
     }
 
     setIsGeoLoading(true);
     setGeoError(null);
+    setLocationStatus('LOCATION_REQUESTING_PERMISSION');
 
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setIsGeoLoading(false);
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
+      async (pos) => {
+        try {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          const accuracy = pos.coords.accuracy || 0;
 
-        const gpsLoc = {
-          city: 'Bengaluru',
-          locality: 'Near your GPS location',
-          state: 'Karnataka',
-          country: 'India',
-          latitude: lat,
-          longitude: lng,
-          source: 'GPS'
-        };
+          setLocationStatus('LOCATION_REVERSE_GEOCODING');
 
-        saveLocation(gpsLoc);
+          // Call server reverse geocoding proxy
+          let geoResult = null;
+          try {
+            const res = await api.get(`/location/reverse-geocode?lat=${lat}&lng=${lng}`);
+            if (res.data && res.data.success) {
+              geoResult = res.data.data;
+            }
+          } catch (apiErr) {
+            console.warn('[LocationContext] Reverse geocode API fallback notice:', apiErr.message);
+          }
+
+          const rawLoc = {
+            latitude: lat,
+            longitude: lng,
+            accuracy,
+            city: geoResult?.city || 'Detected Area',
+            state: geoResult?.state || '',
+            locality: geoResult?.locality || geoResult?.city || '',
+            district: geoResult?.district || '',
+            country: geoResult?.country || 'India',
+            postcode: geoResult?.postcode || '',
+            formattedAddress: geoResult?.formattedAddress || `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+            source: 'GPS',
+            timestamp: Date.now()
+          };
+
+          setPendingLocation(rawLoc);
+          setIsGeoLoading(false);
+          setLocationStatus('LOCATION_CONFIRMATION');
+          setShowConfirmationModal(true);
+        } catch (err) {
+          setIsGeoLoading(false);
+          setGeoError('Failed to process location data. Please try again.');
+          setLocationStatus('LOCATION_ERROR');
+        }
       },
       (err) => {
         setIsGeoLoading(false);
-        console.warn('Geolocation permission error:', err.message);
-        setGeoError('Location permission denied or unavailable. Please choose your city manually.');
+        let msg = 'Location permission denied or device GPS unavailable.';
+        if (err.code === 1) msg = 'Location access was denied. Please allow location permissions in your browser.';
+        else if (err.code === 2) msg = 'Position unavailable. Please ensure your device GPS is turned on.';
+        else if (err.code === 3) msg = 'GPS acquisition timed out. Please try again in an open space.';
+        setGeoError(msg);
         setLocationStatus('LOCATION_DENIED');
       },
-      { timeout: 8000, enableHighAccuracy: true }
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
     );
   };
 
-  const setManualLocation = (locData) => {
-    const lat = locData.latitude || (locData.city === 'Guntur' ? 16.3067 : 12.9716);
-    const lng = locData.longitude || (locData.city === 'Guntur' ? 80.4365 : 77.5946);
+  /**
+   * Confirm pending location from modal
+   */
+  const confirmLocation = (locObj) => {
+    const finalLoc = locObj || pendingLocation;
+    if (!finalLoc) return;
 
+    setLocationState(finalLoc);
+    setPendingLocation(null);
+    setShowConfirmationModal(false);
+    setLocationStatus('LOCATION_CONFIRMED');
+
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(finalLoc));
+    } catch (e) {}
+  };
+
+  /**
+   * Set location manually from city / area selector
+   */
+  const setManualLocation = (locData) => {
     const manualLoc = {
-      city: locData.city || 'Bengaluru',
-      state: locData.state || 'Karnataka',
+      city: locData.city || 'Custom Area',
+      state: locData.state || '',
       locality: locData.locality || locData.area || '',
+      district: locData.district || '',
       country: locData.country || 'India',
-      latitude: lat,
-      longitude: lng,
-      source: 'MANUAL'
+      latitude: locData.latitude || null,
+      longitude: locData.longitude || null,
+      accuracy: 0,
+      source: 'MANUAL',
+      timestamp: Date.now()
     };
 
-    saveLocation(manualLoc);
+    setLocationState(manualLoc);
+    setPendingLocation(null);
+    setShowConfirmationModal(false);
+    setLocationStatus('LOCATION_MANUAL');
+
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(manualLoc));
+    } catch (e) {}
   };
 
+  /**
+   * Change location (opens confirmation modal if pending or triggers GPS request)
+   */
   const changeLocation = () => {
-    setLocationStatus('LOCATION_MANUAL_SELECTION');
+    requestFreshGPS();
   };
 
+  /**
+   * Set search radius in KM
+   */
   const setSearchRadius = (radiusKm) => {
     const rad = Number(radiusKm) || 10;
     setSearchRadiusKmState(rad);
@@ -145,20 +202,46 @@ export const LocationProvider = ({ children }) => {
     } catch (e) {}
   };
 
+  const displayLocationText = location
+    ? `${location.locality ? location.locality + ', ' : ''}${location.city || ''}`
+    : 'Select Location';
+
   const value = {
     location,
+    pendingLocation,
     locationStatus,
     searchRadiusKm,
     isGeoLoading,
     geoError,
-    requestBrowserLocation,
+    showConfirmationModal,
+    requestFreshGPS,
+    requestBrowserLocation: requestFreshGPS, // Backwards compatibility alias
+    confirmLocation,
     setManualLocation,
     changeLocation,
     setSearchRadius,
-    displayLocationText: `${location.locality ? location.locality + ', ' : ''}${location.city || 'Bengaluru'}`
+    closeConfirmationModal: () => setShowConfirmationModal(false),
+    displayLocationText
   };
 
-  return <LocationContext.Provider value={value}>{children}</LocationContext.Provider>;
+  return (
+    <LocationContext.Provider value={value}>
+      {children}
+      <LocationConfirmationModal
+        isOpen={showConfirmationModal}
+        pendingLocation={pendingLocation}
+        isDetecting={isGeoLoading}
+        geoError={geoError}
+        onConfirm={confirmLocation}
+        onRetryGPS={requestFreshGPS}
+        onChangeManual={() => {
+          setShowConfirmationModal(false);
+          setLocationStatus('LOCATION_MANUAL');
+        }}
+        onClose={() => setShowConfirmationModal(false)}
+      />
+    </LocationContext.Provider>
+  );
 };
 
 export const useLocationContext = () => {
