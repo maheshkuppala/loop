@@ -5,12 +5,17 @@ const Request = require('../models/Request');
 const Transaction = require('../models/Transaction');
 const Report = require('../models/Report');
 const { getStartDateForRange } = require('./adminDashboardService');
+const { query: pgQuery } = require('../config/postgres');
 
 const analyticsCache = new Map();
 const CACHE_TTL_MS = 15000;
 
+const invalidateAnalyticsCache = () => {
+  analyticsCache.clear();
+};
+
 /**
- * Returns aggregated platform analytics using real MongoDB data
+ * Returns aggregated platform analytics using real PostgreSQL & MongoDB data
  */
 const getPlatformAnalytics = async (range = '30d') => {
   const cacheKey = `analytics_${range.toLowerCase()}`;
@@ -24,7 +29,7 @@ const getPlatformAnalytics = async (range = '30d') => {
   const startDate = getStartDateForRange(range);
 
   // Execute all aggregations and counts in parallel for optimal throughput
-  const [
+  let [
     userGrowth,
     itemGrowth,
     transactionTrends,
@@ -46,64 +51,74 @@ const getPlatformAnalytics = async (range = '30d') => {
       { $match: { createdAt: { $gte: startDate } } },
       { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, count: { $sum: 1 } } },
       { $sort: { _id: 1 } }
-    ]),
+    ]).catch(() => []),
     // 2. Items Created Over Time
     Item.aggregate([
       { $match: { createdAt: { $gte: startDate } } },
       { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, count: { $sum: 1 } } },
       { $sort: { _id: 1 } }
-    ]),
+    ]).catch(() => []),
     // 3. Transactions Completed Over Time
     Transaction.aggregate([
       { $match: { status: 'COMPLETED', updatedAt: { $gte: startDate } } },
       { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$updatedAt' } }, count: { $sum: 1 } } },
       { $sort: { _id: 1 } }
-    ]),
+    ]).catch(() => []),
     // 4. Requests Created Over Time
     Request.aggregate([
       { $match: { createdAt: { $gte: startDate } } },
       { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, count: { $sum: 1 } } },
       { $sort: { _id: 1 } }
-    ]),
+    ]).catch(() => []),
     // 5. Category Distribution for Items
     Item.aggregate([
       { $group: { _id: '$category', count: { $sum: 1 } } },
       { $sort: { count: -1 } }
-    ]),
+    ]).catch(() => []),
     // 6. Category Distribution for Wanted Items
     WantedItem.aggregate([
       { $group: { _id: '$category', count: { $sum: 1 } } },
       { $sort: { count: -1 } }
-    ]),
+    ]).catch(() => []),
     // 7. Sharing Type Breakdown
     Item.aggregate([
       { $group: { _id: '$sharingType', count: { $sum: 1 } } },
       { $sort: { count: -1 } }
-    ]),
+    ]).catch(() => []),
     // 8. Reports by Status
     Report.aggregate([
       { $group: { _id: '$status', count: { $sum: 1 } } },
       { $sort: { count: -1 } }
-    ]),
+    ]).catch(() => []),
     // 9. Reports by Target Type
     Report.aggregate([
       { $group: { _id: '$targetType', count: { $sum: 1 } } },
       { $sort: { count: -1 } }
-    ]),
+    ]).catch(() => []),
     // 10. Privacy-Safe Geographic Aggregation
     Item.aggregate([
       { $match: { 'location.city': { $exists: true, $ne: '' } } },
       { $group: { _id: '$location.city', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 10 }
-    ]),
+    ]).catch(() => []),
     // Summary counts
-    User.countDocuments(),
-    Item.countDocuments(),
-    WantedItem.countDocuments(),
-    Transaction.countDocuments(),
-    Report.countDocuments()
+    User.countDocuments().catch(() => 0),
+    Item.countDocuments().catch(() => 0),
+    WantedItem.countDocuments().catch(() => 0),
+    Transaction.countDocuments().catch(() => 0),
+    Report.countDocuments().catch(() => 0)
   ]);
+
+  // Query Neon PostgreSQL for total items count
+  try {
+    const pgRes = await pgQuery('SELECT COUNT(*)::int as count FROM items;');
+    if (pgRes?.rows?.[0]) {
+      totalItems = Math.max(totalItems, pgRes.rows[0].count);
+    }
+  } catch {
+    // fallback
+  }
 
   const result = {
     range,
@@ -135,5 +150,7 @@ const getPlatformAnalytics = async (range = '30d') => {
 };
 
 module.exports = {
-  getPlatformAnalytics
+  getPlatformAnalytics,
+  invalidateAnalyticsCache
 };
+

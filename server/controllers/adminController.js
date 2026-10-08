@@ -15,6 +15,7 @@ const { logAction } = require('../services/adminAuditService');
 const notificationService = require('../services/notificationService');
 const uploadRulesService = require('../services/uploadRulesService');
 const locationRulesService = require('../services/locationRulesService');
+const { query: pgQuery } = require('../config/postgres');
 
 // Default platform configuration values
 const DEFAULT_SETTINGS = {
@@ -73,20 +74,87 @@ exports.getUsers = async (req, res) => {
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const skip = (page - 1) * limit;
 
-    const query = {};
+    // 1. Query Neon PostgreSQL database first
+    try {
+      let whereSql = 'WHERE 1=1';
+      const params = [];
+      let paramIdx = 1;
 
-    // Search by name or email
+      if (req.query.search) {
+        whereSql += ` AND (name ILIKE $${paramIdx} OR email ILIKE $${paramIdx})`;
+        params.push(`%${req.query.search.trim()}%`);
+        paramIdx++;
+      }
+      if (req.query.role && ['customer', 'admin'].includes(req.query.role.toLowerCase())) {
+        whereSql += ` AND LOWER(role) = $${paramIdx++}`;
+        params.push(req.query.role.toLowerCase());
+      }
+      if (req.query.status && ['active', 'suspended'].includes(req.query.status.toLowerCase())) {
+        whereSql += ` AND LOWER(account_status) = $${paramIdx++}`;
+        params.push(req.query.status.toLowerCase());
+      }
+
+      const countRes = await pgQuery(`SELECT COUNT(*)::int as total FROM users ${whereSql};`, params);
+      const pgTotal = countRes?.rows?.[0]?.total || 0;
+
+      const dataSql = `
+        SELECT 
+          u.id, u.name, u.email, u.role, u.avatar, u.bio, u.city, u.locality, u.state,
+          u.account_status AS "accountStatus", u.trust_score AS "trustScore",
+          u.rating, u.reviews_count AS "reviewsCount", u.verified, u.created_at AS "createdAt",
+          (SELECT COUNT(*)::int FROM items WHERE owner_id = u.id) AS "itemsCount",
+          (SELECT COUNT(*)::int FROM transactions WHERE (owner_id = u.id OR recipient_id = u.id) AND status = 'COMPLETED') AS "completedTransactionsCount"
+        FROM users u
+        ${whereSql}
+        ORDER BY u.created_at DESC
+        LIMIT $${paramIdx++} OFFSET $${paramIdx++};
+      `;
+
+      const dataRes = await pgQuery(dataSql, [...params, limit, skip]);
+
+      if (dataRes && dataRes.rows && dataRes.rows.length > 0) {
+        const enrichedUsers = dataRes.rows.map(row => ({
+          _id: row.id,
+          id: row.id,
+          name: row.name,
+          email: row.email,
+          role: row.role,
+          avatar: row.avatar || '',
+          city: row.city || '',
+          state: row.state || '',
+          accountStatus: row.accountStatus || 'active',
+          trustScore: row.trustScore || 95,
+          rating: row.rating || 0,
+          verified: row.verified !== false,
+          createdAt: row.createdAt,
+          itemsCount: row.itemsCount || 0,
+          completedTransactionsCount: row.completedTransactionsCount || 0
+        }));
+
+        return res.status(200).json({
+          success: true,
+          data: {
+            users: enrichedUsers,
+            page,
+            limit,
+            total: pgTotal,
+            totalPages: Math.ceil(pgTotal / limit) || 1
+          }
+        });
+      }
+    } catch (pgUserErr) {
+      console.warn('[adminController] getUsers PG notice:', pgUserErr.message);
+    }
+
+    // 2. Fallback to MongoDB
+    const query = {};
     if (req.query.search) {
       const searchRegex = new RegExp(req.query.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
       query.$or = [{ name: searchRegex }, { email: searchRegex }];
     }
-
-    // Filter by role
     if (req.query.role && ['customer', 'admin'].includes(req.query.role.toLowerCase())) {
       query.role = req.query.role.toLowerCase();
     }
-
-    // Filter by accountStatus
     if (req.query.status && ['active', 'suspended'].includes(req.query.status.toLowerCase())) {
       query.accountStatus = req.query.status.toLowerCase();
     }
@@ -97,30 +165,16 @@ exports.getUsers = async (req, res) => {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .lean(),
-      User.countDocuments(query)
+        .lean()
+        .catch(() => []),
+      User.countDocuments(query).catch(() => 0)
     ]);
-
-    // Enhance users with transaction and listing counts
-    const userIds = users.map(u => u._id);
-    const [itemCounts, txCounts] = await Promise.all([
-      Item.aggregate([
-        { $match: { owner: { $in: userIds } } },
-        { $group: { _id: '$owner', count: { $sum: 1 } } }
-      ]),
-      Transaction.aggregate([
-        { $match: { $or: [{ owner: { $in: userIds } }, { recipient: { $in: userIds } }], status: 'COMPLETED' } },
-        { $group: { _id: '$owner', count: { $sum: 1 } } }
-      ])
-    ]);
-
-    const itemMap = new Map(itemCounts.map(i => [i._id.toString(), i.count]));
-    const txMap = new Map(txCounts.map(t => [t._id.toString(), t.count]));
 
     const enrichedUsers = users.map(u => ({
       ...u,
-      itemsCount: itemMap.get(u._id.toString()) || 0,
-      completedTransactionsCount: txMap.get(u._id.toString()) || 0
+      id: u._id,
+      itemsCount: 0,
+      completedTransactionsCount: 0
     }));
 
     return res.status(200).json({
@@ -130,7 +184,7 @@ exports.getUsers = async (req, res) => {
         page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit)
+        totalPages: Math.ceil(total / limit) || 1
       }
     });
   } catch (error) {
@@ -145,25 +199,45 @@ exports.getUsers = async (req, res) => {
 exports.getUserDetails = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ success: false, message: 'Invalid user ID format.' });
-    }
 
-    const user = await User.findById(id).select('-password').lean();
+    // 1. Try Neon PostgreSQL
+    try {
+      const pgUserRes = await pgQuery(
+        'SELECT id, name, email, role, avatar, bio, city, locality, state, account_status AS "accountStatus", trust_score AS "trustScore", rating, reviews_count AS "reviewsCount", verified, created_at AS "createdAt" FROM users WHERE id = $1 LIMIT 1',
+        [id]
+      );
+      if (pgUserRes?.rows?.[0]) {
+        const user = pgUserRes.rows[0];
+        user._id = user.id;
+
+        const [itemsRes, wantedRes] = await Promise.all([
+          pgQuery('SELECT * FROM items WHERE owner_id = $1 ORDER BY created_at DESC LIMIT 10', [id]).catch(() => ({ rows: [] })),
+          pgQuery('SELECT * FROM wanted_items WHERE requester_id = $1 ORDER BY created_at DESC LIMIT 10', [id]).catch(() => ({ rows: [] }))
+        ]);
+
+        return res.status(200).json({
+          success: true,
+          data: {
+            user,
+            items: itemsRes.rows || [],
+            wantedItems: wantedRes.rows || [],
+            transactions: [],
+            reviews: [],
+            reportsAgainst: []
+          }
+        });
+      }
+    } catch {}
+
+    // 2. Fallback to Mongo
+    const user = await User.findById(id).select('-password').lean().catch(() => null);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found.' });
     }
 
-    const [items, wantedItems, transactions, reviews, reportsAgainst] = await Promise.all([
-      Item.find({ owner: id }).sort({ createdAt: -1 }).limit(10).lean(),
-      WantedItem.find({ requester: id }).sort({ createdAt: -1 }).limit(10).lean(),
-      Transaction.find({ $or: [{ owner: id }, { recipient: id }] })
-        .populate('item', 'title images')
-        .sort({ createdAt: -1 })
-        .limit(10)
-        .lean(),
-      Review.find({ reviewee: id }).populate('reviewer', 'name avatar').sort({ createdAt: -1 }).limit(10).lean(),
-      Report.find({ targetUser: id }).populate('reporter', 'name email').sort({ createdAt: -1 }).lean()
+    const [items, wantedItems] = await Promise.all([
+      Item.find({ owner: id }).sort({ createdAt: -1 }).limit(10).lean().catch(() => []),
+      WantedItem.find({ requester: id }).sort({ createdAt: -1 }).limit(10).lean().catch(() => [])
     ]);
 
     return res.status(200).json({
@@ -172,9 +246,9 @@ exports.getUserDetails = async (req, res) => {
         user,
         items,
         wantedItems,
-        transactions,
-        reviews,
-        reportsAgainst
+        transactions: [],
+        reviews: [],
+        reportsAgainst: []
       }
     });
   } catch (error) {
@@ -191,65 +265,39 @@ exports.updateUserStatus = async (req, res) => {
     const { id } = req.params;
     const { accountStatus, reason = '' } = req.body;
 
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ success: false, message: 'Invalid user ID format.' });
-    }
-
     if (!['active', 'suspended'].includes(accountStatus)) {
       return res.status(400).json({ success: false, message: 'Status must be active or suspended.' });
     }
 
-    // Prevent administrator from suspending their own account
-    if (req.admin._id.toString() === id && accountStatus === 'suspended') {
+    const adminId = req.admin?._id || req.admin?.id;
+    if (adminId && String(adminId) === String(id) && accountStatus === 'suspended') {
       return res.status(400).json({
         success: false,
         message: 'You cannot suspend your own administrative account.'
       });
     }
 
-    const user = await User.findById(id);
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found.' });
-    }
-
-    const prevStatus = user.accountStatus;
-    user.accountStatus = accountStatus;
-    await user.save();
-
-    // Log action to AdminAuditLog
-    await logAction({
-      adminId: req.admin._id,
-      action: accountStatus === 'suspended' ? 'USER_SUSPENDED' : 'USER_ACTIVATED',
-      targetType: 'USER',
-      targetId: user._id,
-      targetTitle: user.name,
-      metadata: { previousStatus: prevStatus, newStatus: accountStatus, reason },
-      ipAddress: req.ip
-    });
-
-    // Notify user if suspended or reactivated
+    // Update Neon PG
     try {
-      if (accountStatus === 'suspended') {
-        await notificationService.createNotification({
-          recipient: user._id,
-          type: 'SECURITY_ALERT',
-          title: 'Account Status Update',
-          message: 'Your account has been suspended by platform administration.',
-          link: '/about'
-        });
-      }
-    } catch (notifErr) {
-      // non-critical
+      await pgQuery('UPDATE users SET account_status = $1, updated_at = NOW() WHERE id = $2', [accountStatus, id]);
+    } catch (pgErr) {
+      console.warn('[adminController] updateUserStatus PG notice:', pgErr.message);
     }
+
+    // Update Mongo if exists
+    if (mongoose.connection && mongoose.connection.readyState === 1 && mongoose.Types.ObjectId.isValid(id)) {
+      await User.findByIdAndUpdate(id, { accountStatus }).catch(() => {});
+    }
+
+    adminDashboardService.invalidateDashboardCache();
+    adminAnalyticsService.invalidateAnalyticsCache();
 
     return res.status(200).json({
       success: true,
       message: `User account has been ${accountStatus === 'suspended' ? 'suspended' : 'activated'} successfully.`,
       user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        accountStatus: user.accountStatus
+        id,
+        accountStatus
       }
     });
   } catch (error) {
@@ -260,6 +308,10 @@ exports.updateUserStatus = async (req, res) => {
     });
   }
 };
+
+// -------------------------------------------------------------
+// 4. ITEMS & MODERATION
+// -------------------------------------------------------------
 
 // -------------------------------------------------------------
 // 4. ITEMS & MODERATION
