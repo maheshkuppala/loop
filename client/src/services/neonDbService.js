@@ -3,7 +3,7 @@
  * Guarantees every user created (via Register, Google, or OTP) is stored directly in Neon Database.
  */
 
-const NEON_SQL_ENDPOINT = 'https://ep-small-wind-b4hjagr6-pooler.c-6.us-east-2.aws.neon.tech/sql';
+const NEON_SQL_ENDPOINT = 'https://ep-small-wind-b4hjagr6.c-6.us-east-2.aws.neon.tech/sql';
 const DEFAULT_AUTH = ['neondb_owner:', 'npg_', 'PzhnYria0G2e'].join('');
 const NEON_CONN_STRING =
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_NEON_DATABASE_URL) ||

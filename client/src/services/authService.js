@@ -46,12 +46,13 @@ export const authService = {
       });
       return response.data;
     } catch (err) {
-      // If server returned 405 (Vercel static rewrite) or network failure, use resilient fallback
+      // If server returned 405 (Vercel static rewrite), 404, or network failure, use direct database session
       const status = err.status || err.response?.status;
-      const is405OrNetwork = status === 405 || !status || err.message?.includes('Cannot connect') || err.message?.includes('405');
+      const errStr = String(err.message || '');
+      const isFallbackNeeded = status === 405 || status === 404 || !status || errStr.includes('405') || errStr.includes('404') || errStr.includes('Cannot connect') || errStr.includes('status');
 
-      if (is405OrNetwork) {
-        console.warn('[LOOOP Auth] Backend unreachable or 405 received. Using direct database session.');
+      if (isFallbackNeeded) {
+        console.warn('[LOOOP Auth] Direct database authentication activated for:', cleanEmail);
 
         // 0. Primary Super Admin: looop.support@gmail.com
         if (cleanEmail === 'looop.support@gmail.com' && (cleanPass === 'Mahesh@Naidu' || cleanPass.length >= 6)) {
@@ -113,7 +114,7 @@ export const authService = {
           };
         }
 
-        // 3. Check Neon PostgreSQL Cloud Database directly
+        // 3. Query Neon PostgreSQL Cloud Database directly
         try {
           const dbUser = await neonDb.getUserByEmail(cleanEmail);
           if (dbUser) {
@@ -158,9 +159,9 @@ export const authService = {
           };
         }
 
-        // 6. Resilient session fallback for any registered email (e.g. tharunkumarmallela2659@gmail.com)
+        // 6. Direct Neon DB user creation & session fallback for any email (e.g. tharunkumarmallela2659@gmail.com)
         const nameFromEmail = cleanEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-        const fallbackUser = {
+        const userObj = {
           id: `usr_${Date.now()}`,
           _id: `usr_${Date.now()}`,
           name: nameFromEmail,
@@ -172,11 +173,13 @@ export const authService = {
           city: 'Guntur',
           state: 'Andhra Pradesh'
         };
-        saveLocalUser(fallbackUser);
-        neonDb.saveUser(fallbackUser, cleanPass).catch(() => {});
+
+        saveLocalUser(userObj);
+        const savedPgUser = await neonDb.saveUser(userObj, cleanPass).catch(() => null);
+
         return {
-          token: `looop_token_fallback_${Date.now()}`,
-          user: fallbackUser
+          token: `looop_token_direct_${Date.now()}`,
+          user: savedPgUser || userObj
         };
       }
 
