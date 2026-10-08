@@ -360,8 +360,8 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px' }}>
                 {popularCities.map((pop) => {
-                  const popName = pop.name || pop.city;
-                  const isSelected = currentCityName.toLowerCase() === popName.toLowerCase();
+                  const popName = pop.name || pop.city || '';
+                  const isSelected = currentCityName && popName && currentCityName.toLowerCase() === popName.toLowerCase();
                   return (
                     <button
                       key={popName}
