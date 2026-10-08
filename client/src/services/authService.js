@@ -1,6 +1,7 @@
 import api from './api';
 import { mockUsers } from '../data/mockData';
 import neonDb from './neonDbService';
+import looopEmailTemplates from './emailTemplateService';
 
 // Storage key for locally registered accounts
 const LOCAL_USERS_KEY = 'looop_registered_accounts';
@@ -233,20 +234,12 @@ export const authService = {
       sessionStorage.setItem(`looop_otp_${cleanEmail}`, generatedOtp);
 
       try {
+        const emailData = looopEmailTemplates.otpEmail({ name: cleanEmail.split('@')[0], otpCode: generatedOtp, expiry: '10 minutes' });
         const brevoPayload = {
           sender: { name: 'LOOOP Community', email: 'looop.support@gmail.com' },
           to: [{ email: cleanEmail }],
-          subject: `Your LOOOP Verification Code: ${generatedOtp}`,
-          htmlContent: `
-            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 14px;">
-              <h2 style="color: #065f46; text-align: center; margin-top: 0;">LOOOP Verification</h2>
-              <p style="color: #475569; font-size: 15px;">Your one-time login verification code is:</p>
-              <div style="text-align: center; font-size: 36px; font-weight: 800; letter-spacing: 6px; color: #047857; padding: 18px; background: #ecfdf5; border-radius: 10px; margin: 20px 0;">
-                ${generatedOtp}
-              </div>
-              <p style="color: #64748b; font-size: 13px;">This code expires in 5 minutes. If you did not request this, please ignore this email.</p>
-            </div>
-          `
+          subject: emailData.subject,
+          htmlContent: emailData.html
         };
 
         const clientBrevoKey = import.meta.env?.VITE_BREVO_API_KEY;
@@ -264,8 +257,7 @@ export const authService = {
           if (res.ok) {
             return {
               success: true,
-              message: 'Verification code sent to your email via Brevo.',
-              demoCode: generatedOtp
+              message: 'Verification code sent to your email via Brevo.'
             };
           }
         }
@@ -276,64 +268,62 @@ export const authService = {
       return {
         success: true,
         message: 'Verification code generated.',
-        simulated: true,
-        demoCode: generatedOtp
+        simulated: true
       };
     }
   },
 
   /**
-   * Verify 6-digit OTP verification code with direct Neon PostgreSQL persistence
+   * Verify 6-digit OTP verification code
    * @param {string} email
    * @param {string} otp
    */
-  verifyOtp: async (email, otp) => {
+  verifyOtp: async (email, otp, options = {}) => {
     const cleanEmail = (email || '').trim().toLowerCase();
     const cleanOtp = (otp || '').trim();
 
-    const isAdmin =
-      cleanEmail === 'looop.support@gmail.com' ||
-      cleanEmail === 'maheshkuppala321@gmail.com' ||
-      cleanEmail === 'admin@looop.community' ||
-      cleanEmail.includes('admin');
-
-    const userObj = {
-      id: `usr_${Date.now()}`,
-      _id: `usr_${Date.now()}`,
-      name: cleanEmail.split('@')[0],
-      email: cleanEmail,
-      role: isAdmin ? 'admin' : 'customer',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
-      trustScore: 100,
-      rating: 5.0,
-      city: 'Guntur',
-      state: 'Andhra Pradesh'
-    };
-
-    // Save directly into Neon PostgreSQL
-    let pgUser = null;
     try {
-      pgUser = await neonDb.saveUser(userObj, 'OtpVerifiedUser123!');
-    } catch (pgErr) {
-      console.warn('[Neon Sync] OTP user persistence warning:', pgErr.message);
-    }
-
-    const finalUser = pgUser ? { ...userObj, ...pgUser } : userObj;
-    saveLocalUser(finalUser);
-
-    try {
-      const response = await api.post('/auth/otp/verify', { email: cleanEmail, otp: cleanOtp });
+      const response = await api.post('/auth/otp/verify', { 
+        email: cleanEmail, 
+        otp: cleanOtp,
+        isRegistration: !!options.isRegistration 
+      });
       return response.data;
     } catch {
       const saved = sessionStorage.getItem(`looop_otp_${cleanEmail}`);
-      if (cleanOtp === saved || cleanOtp === '123456' || cleanOtp.length === 6) {
+      const isValid = saved ? cleanOtp === saved : false;
+
+      if (!isValid) {
+        throw new Error('Invalid verification code. Please check and try again.');
+      }
+
+      // Check if user already exists in Neon DB or LocalStorage (for login OTP case)
+      let existingUser = null;
+      try {
+        existingUser = await neonDb.getUserByEmail(cleanEmail);
+      } catch (dbErr) {
+        // Ignore
+      }
+
+      if (!existingUser) {
+        const localUsers = getLocalUsers();
+        existingUser = localUsers.find((u) => u.email.toLowerCase() === cleanEmail);
+      }
+
+      if (existingUser) {
         return {
           success: true,
           token: `looop_token_otp_${Date.now()}`,
-          user: finalUser
+          user: existingUser
         };
       }
-      throw new Error('Invalid verification code. Please check and try again.');
+
+      // Pure email verification for registration: DO NOT pre-create user in database!
+      return {
+        success: true,
+        verified: true,
+        message: 'Email address verified successfully.'
+      };
     }
   },
 
@@ -424,8 +414,8 @@ export const authService = {
     const pendingRaw = sessionStorage.getItem('looop_pending_reg');
     const pending = pendingRaw ? JSON.parse(pendingRaw) : { email: cleanEmail };
 
-    // Verify OTP code
-    await authService.verifyOtp(cleanEmail, otpCode);
+    // Verify OTP code (pass isRegistration: true to trigger welcome email after verification)
+    await authService.verifyOtp(cleanEmail, otpCode, { isRegistration: true });
 
     // Perform final account creation & database persistence
     const regResult = await authService.register({
@@ -468,7 +458,7 @@ export const authService = {
       createdAt: new Date().toISOString()
     };
 
-    // 1. ALWAYS persist directly to Neon PostgreSQL cloud database
+    // 1. MUST & SHOULD ALWAYS persist directly into Neon PostgreSQL Cloud Database
     let pgUser = null;
     try {
       pgUser = await neonDb.saveUser(newUser, cleanPass);
@@ -479,46 +469,85 @@ export const authService = {
     const finalUser = pgUser ? { ...newUser, ...pgUser } : newUser;
     saveLocalUser(finalUser);
 
+    // 2. Try secondary API endpoint if active, but guarantee registration success via Neon DB
     try {
       const response = await api.post('/auth/register', userData);
-      return response.data;
-    } catch (err) {
-      // If server returned 405 (Vercel static rewrite) or network failure, return the saved account
-      const status = err.status || err.response?.status;
-      const is405OrNetwork = status === 405 || !status || err.message?.includes('Cannot connect') || err.message?.includes('405');
-
-      if (is405OrNetwork) {
-        console.warn('[LOOOP Auth] Backend returned 405 or was unreachable. Persisted user in Neon PostgreSQL.');
-        return {
-          success: true,
-          message: 'Account registered successfully.',
-          token: `looop_token_session_${Date.now()}`,
-          user: finalUser
-        };
+      if (response && response.data && response.data.token && response.data.user) {
+        return response.data;
       }
-
-      throw err;
+    } catch (apiErr) {
+      console.warn('[LOOOP Auth] API endpoint notice. User successfully persisted in Neon Database:', apiErr.message);
     }
+
+    return {
+      success: true,
+      message: 'Account registered and saved to Neon Database successfully.',
+      token: `looop_token_session_${Date.now()}`,
+      user: finalUser
+    };
   },
 
   /**
-   * Request password reset link
+   * Request password reset link / OTP
    * @param {Object} data - { email }
-   * @returns {Promise<Object>} - Backend confirmation message
    */
   forgotPassword: async (data) => {
+    const cleanEmail = (data.email || '').trim().toLowerCase();
     try {
-      const response = await api.post('/auth/forgot-password', data);
+      const response = await api.post('/auth/forgot-password', { email: cleanEmail });
+      await authService.sendOtp(cleanEmail);
       return response.data;
     } catch {
-      return { success: true, message: 'Password reset link sent if account exists.' };
+      await authService.sendOtp(cleanEmail);
+      return { success: true, message: 'OTP code dispatched to your email.' };
     }
   },
 
   /**
-   * Reset password with secure token
-   * @param {Object} data - { token, password }
-   * @returns {Promise<Object>} - Backend confirmation
+   * Reset password using email, 6-digit OTP code, and new password
+   */
+  resetPasswordWithOtp: async ({ email, otpCode, newPassword }) => {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanPass = newPassword || '';
+    const cleanOtp = (otpCode || '').trim();
+
+    // 1. Verify 6-digit OTP code first
+    await authService.verifyOtp(cleanEmail, cleanOtp);
+
+    // 2. Direct password update in Neon PostgreSQL Cloud Database
+    try {
+      await neonDb.updatePassword(cleanEmail, cleanPass);
+    } catch (pgErr) {
+      console.warn('[Neon Sync] Password update warning:', pgErr.message);
+    }
+
+    // 3. Update Local Storage accounts
+    try {
+      const localUsers = getLocalUsers();
+      const matchIndex = localUsers.findIndex((u) => u.email.toLowerCase() === cleanEmail);
+      if (matchIndex >= 0) {
+        localUsers[matchIndex].password = cleanPass;
+        localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(localUsers));
+      }
+    } catch (localErr) {
+      console.warn('Local user password update notice:', localErr);
+    }
+
+    // 4. Update MongoDB backend if available
+    try {
+      await api.post('/auth/reset-password', { email: cleanEmail, otp: cleanOtp, newPassword: cleanPass });
+    } catch (apiErr) {
+      console.warn('[Backend Sync] Password reset API call notice:', apiErr.message);
+    }
+
+    return {
+      success: true,
+      message: 'Password updated successfully in database.'
+    };
+  },
+
+  /**
+   * Reset password with token
    */
   resetPassword: async (data) => {
     try {
@@ -526,6 +555,40 @@ export const authService = {
       return response.data;
     } catch {
       return { success: true, message: 'Password has been successfully updated.' };
+    }
+  },
+
+  /**
+   * Dispatch a pleasant Welcome Email via Brevo when user signs in
+   */
+  sendLoginWelcomeEmail: async (user) => {
+    if (!user || !user.email) return;
+    const cleanEmail = (user.email || '').trim().toLowerCase();
+    const cleanName = (user.name || user.displayName || cleanEmail.split('@')[0]).trim();
+
+    try {
+      const emailData = looopEmailTemplates.welcomeAccountCreated({ name: cleanName });
+      const brevoPayload = {
+        sender: { name: 'LOOOP Community', email: 'looop.support@gmail.com' },
+        to: [{ email: cleanEmail, name: cleanName }],
+        subject: emailData.subject,
+        htmlContent: emailData.html
+      };
+
+      const clientBrevoKey = import.meta.env?.VITE_BREVO_API_KEY;
+      if (clientBrevoKey) {
+        await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'api-key': clientBrevoKey
+          },
+          body: JSON.stringify(brevoPayload)
+        });
+      }
+    } catch (err) {
+      console.warn('[LOOOP Auth] Welcome email dispatch notice:', err.message);
     }
   },
 
@@ -555,4 +618,5 @@ export const authService = {
 };
 
 export default authService;
+
 

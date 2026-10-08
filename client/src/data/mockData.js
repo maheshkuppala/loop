@@ -137,6 +137,38 @@ export const mockItems = [
     savesCount: 54
   },
   {
+    id: 'wooden-study-table',
+    slug: 'wooden-study-table',
+    title: 'Solid Wooden Study Table with 2 Drawers',
+    description: 'Sturdy solid teak-finish wooden study table with 2 deep storage drawers and cable management slot. Perfect for student study setups, laptop work, and home productivity. In good condition with minimal surface marks. Moving out soon and giving away for community reuse so it finds a second life.',
+    category: 'furniture',
+    subcategory: 'desks',
+    brand: 'Urban Ladder',
+    condition: 'good',
+    sharingType: 'give_away',
+    images: [
+      'https://images.unsplash.com/photo-1518455027359-f3f8164ba6bd?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1533090161767-e6ffed986c88?w=600&auto=format&fit=crop&q=80'
+    ],
+    location: 'Indiranagar 100ft Road, Bengaluru (~1.8 km)',
+    city: 'Bengaluru',
+    availability: 'Immediate community handover',
+    expiry: '2026-12-31',
+    status: 'AVAILABLE',
+    owner: {
+      id: 'usr-104',
+      name: 'Vikram Joshi',
+      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80',
+      trustScore: 96,
+      rating: 4.9,
+      reviewsCount: 28,
+      responseRate: '20 mins'
+    },
+    createdAt: '2026-09-10T11:00:00Z',
+    viewsCount: 420,
+    savesCount: 62
+  },
+  {
     id: 'item-04',
     title: 'SS Kashmir Willow Cricket Bat with Bat Cover & Gloves',
     description: 'Pre-knocked, full-size men\'s bat, well-maintained with toe guard and grip. Ideal for weekend community tournaments. Available to borrow for match weekends.',

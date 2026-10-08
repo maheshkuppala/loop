@@ -25,7 +25,7 @@ import Select from '../../components/common/Select';
 import Textarea from '../../components/common/Textarea';
 import Button from '../../components/common/Button';
 import Badge from '../../components/common/Badge';
-import { PhotoUploadZone } from '../../components/share/PhotoUploadZone';
+import ProductMediaUploader from '../../components/upload/ProductMediaUploader';
 import { LeafletLocationPreview } from '../../components/share/LeafletLocationPreview';
 import { LiveListingPreview } from '../../components/share/LiveListingPreview';
 import { PublishSuccessState } from '../../components/share/PublishSuccessState';
@@ -609,14 +609,13 @@ export const ShareItemPage = () => {
               </p>
             </div>
 
-            <PhotoUploadZone
+            <ProductMediaUploader
               images={images}
               onChange={(newImgs) => {
                 setImages(newImgs);
                 if (touched.images) validateField('images', newImgs);
               }}
-              maxImages={6}
-              error={touched.images ? errors.images : ''}
+              onError={(err) => setErrors((prev) => ({ ...prev, images: err }))}
             />
           </Card>
 

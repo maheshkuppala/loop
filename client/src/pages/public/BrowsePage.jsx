@@ -66,6 +66,7 @@ export const BrowsePage = () => {
 
   // API Data States
   const [items, setItems] = useState([]);
+  const [similarAlternatives, setSimilarAlternatives] = useState([]);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -230,6 +231,22 @@ export const BrowsePage = () => {
   useEffect(() => {
     fetchItems();
   }, [fetchItems]);
+
+  // Fetch similar products when main query returns 0 exact matches
+  useEffect(() => {
+    if (!loading && !error && items.length === 0) {
+      itemService
+        .getSimilarItems(null, {
+          category: categoryParam !== 'all' ? categoryParam : undefined,
+          sharingType: sharingTypeParam !== 'all' ? sharingTypeParam : undefined,
+          limit: 8
+        })
+        .then((res) => {
+          setSimilarAlternatives(Array.isArray(res) ? res : res?.items || []);
+        })
+        .catch(() => setSimilarAlternatives([]));
+    }
+  }, [loading, error, items.length, categoryParam, sharingTypeParam]);
 
   const hasCoordsActive = Boolean(latParam && lonParam);
 
@@ -594,9 +611,10 @@ export const BrowsePage = () => {
               }}
               className="browse-sort-select"
             >
+              <option value="relevant">Most Relevant</option>
               <option value="newest">Newest First</option>
               <option value="nearest">Nearest First</option>
-              <option value="relevant">Most Relevant</option>
+              <option value="available_first">Available First</option>
               <option value="updated">Recently Updated</option>
             </select>
           </div>
@@ -713,15 +731,46 @@ export const BrowsePage = () => {
             </div>
           )}
 
-          {/* Empty State */}
+          {/* Empty State with Similar Products Engine Recommendations */}
           {!loading && !error && items.length === 0 && (
-            <EmptyState
-              icon={PackageOpen}
-              title="No items found nearby"
-              description="Try expanding your search radius, selecting a different city, or changing your filters."
-              actionLabel="Clear All Filters"
-              onAction={handleClearAllFilters}
-            />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+              <EmptyState
+                icon={PackageOpen}
+                title="No exact match found"
+                description={
+                  searchQueryParam
+                    ? `No items directly matched "${searchQueryParam}". Try adjusting your keywords or clearing active filters.`
+                    : "No listings matched your active filter criteria. Try clearing filters or expanding your search."
+                }
+                actionLabel="Clear All Filters"
+                onAction={handleClearAllFilters}
+              />
+
+              {similarAlternatives.length > 0 && (
+                <section style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingTop: '1.5rem', borderTop: '1px solid var(--color-slate-200)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                    <div>
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--color-slate-900)', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Sparkles size={18} color="#059669" />
+                        <span>YOU MAY ALSO REUSE</span>
+                      </h3>
+                      <p style={{ fontSize: '0.85rem', color: 'var(--color-slate-500)', margin: '2px 0 0 0' }}>
+                        Explore alternative useful items shared by community members
+                      </p>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={handleClearAllFilters}>
+                      Clear Filters & View All
+                    </Button>
+                  </div>
+
+                  <div className="browse-items-grid">
+                    {similarAlternatives.map((sItem, idx) => (
+                      <ItemCard key={sItem.id || sItem._id || idx} item={sItem} />
+                    ))}
+                  </div>
+                </section>
+              )}
+            </div>
           )}
 
           {/* Interactive Map View */}
@@ -739,14 +788,7 @@ export const BrowsePage = () => {
           {/* Items Grid View */}
           {!loading && !error && items.length > 0 && viewMode === 'grid' && (
             <>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-                  gap: '1.25rem'
-                }}
-                className="browse-items-grid"
-              >
+              <div className="browse-items-grid">
                 {items.map((item, index) => (
                   <ItemCard
                     key={item.id || item._id || index}
@@ -834,6 +876,33 @@ export const BrowsePage = () => {
         }
         .browse-sort-select:focus {
           border-color: var(--color-primary-500);
+        }
+
+        .browse-items-grid {
+          display: grid;
+          gap: 1.25rem;
+          grid-template-columns: repeat(4, 1fr);
+        }
+
+        @media (min-width: 1536px) {
+          .browse-items-grid {
+            grid-template-columns: repeat(5, 1fr) !important;
+          }
+        }
+        @media (max-width: 1279px) {
+          .browse-items-grid {
+            grid-template-columns: repeat(3, 1fr) !important;
+          }
+        }
+        @media (max-width: 900px) {
+          .browse-items-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+        }
+        @media (max-width: 520px) {
+          .browse-items-grid {
+            grid-template-columns: repeat(1, 1fr) !important;
+          }
         }
 
         @media (max-width: 1024px) {

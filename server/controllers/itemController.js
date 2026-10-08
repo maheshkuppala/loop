@@ -2,6 +2,47 @@ const Item = require('../models/Item');
 const User = require('../models/User');
 const mongoose = require('mongoose');
 const matchingService = require('../services/matchingService');
+const uploadRulesService = require('../services/uploadRulesService');
+
+/**
+ * GET /api/items/upload-rules
+ */
+exports.getUploadRules = async (req, res) => {
+  try {
+    const rules = await uploadRulesService.getUploadRules();
+    return res.status(200).json({ success: true, rules });
+  } catch (error) {
+    console.error('Error fetching upload rules:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch upload rules.' });
+  }
+};
+
+/**
+ * POST /api/items/upload-media
+ */
+exports.uploadMedia = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file was uploaded.' });
+    }
+
+    const publicUrl = `/uploads/${req.file.filename}`;
+    return res.status(200).json({
+      success: true,
+      message: 'File uploaded successfully.',
+      file: {
+        url: publicUrl,
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        size: req.file.size,
+        mimetype: req.file.mimetype
+      }
+    });
+  } catch (error) {
+    console.error('Error uploading media:', error);
+    return res.status(500).json({ success: false, message: 'Failed to process file upload.' });
+  }
+};
 
 /**
  * Item Controller
@@ -9,6 +50,10 @@ const matchingService = require('../services/matchingService');
  */
 exports.createItem = async (req, res) => {
   try {
+    const rules = await uploadRulesService.getUploadRules();
+    const userRole = (req.user?.role || '').toLowerCase();
+    const isAdmin = userRole === 'admin';
+
     const {
       title,
       description,
@@ -22,58 +67,73 @@ exports.createItem = async (req, res) => {
       location,
       coordinates,
       borrowSettings,
-      exchangeDetails
+      exchangeDetails,
+      specifications
     } = req.body;
 
-    // 1. Validation of required basics
-    if (!title || !title.trim()) {
-      return res.status(400).json({
+    // Rules validation
+    if (rules.customerUploadAllowed === false && !isAdmin) {
+      return res.status(403).json({
         success: false,
-        message: 'Item title is required.'
+        message: 'Product listing uploads by customers are currently disabled by platform administration.'
       });
     }
 
-    if (!description || !description.trim()) {
+    if (rules.requiredTitle && (!title || !title.trim())) {
+      return res.status(400).json({ success: false, message: 'Item title is required.' });
+    }
+
+    if (rules.requiredDescription && (!description || !description.trim())) {
+      return res.status(400).json({ success: false, message: 'Item description is required.' });
+    }
+
+    if (rules.requiredCategory && !category) {
+      return res.status(400).json({ success: false, message: 'Please select a category.' });
+    }
+
+    if (rules.requiredCondition && !condition) {
+      return res.status(400).json({ success: false, message: 'Please select the item condition.' });
+    }
+
+    if (!images || !Array.isArray(images) || images.length < rules.minImages) {
       return res.status(400).json({
         success: false,
-        message: 'Item description is required.'
+        message: `Please upload at least ${rules.minImages} photo(s) of the item.`
       });
     }
 
-    if (!category) {
+    if (images.length > rules.maxImages) {
       return res.status(400).json({
         success: false,
-        message: 'Please select a category.'
+        message: `You can upload up to ${rules.maxImages} photos per item according to current settings.`
       });
     }
 
-    if (!condition) {
+    if (rules.requiredPrimaryImage && !images.some(img => typeof img === 'object' && img.isPrimary)) {
+      if (typeof images[0] === 'object') {
+        images[0].isPrimary = true;
+      }
+    }
+
+    if (rules.requiredSpecifications && (!specifications || !Array.isArray(specifications) || specifications.length === 0)) {
       return res.status(400).json({
         success: false,
-        message: 'Please select the item condition.'
+        message: 'Product specifications are required.'
       });
     }
 
-    if (!images || !Array.isArray(images) || images.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please add at least one photo of the item.'
-      });
-    }
-
-    // 2. Format sanitized images array
-    const formattedImages = images.slice(0, 6).map((img, index) => {
+    // Format sanitized images array
+    const formattedImages = images.slice(0, rules.maxImages).map((img, index) => {
       if (typeof img === 'string') {
         return { url: img, isPrimary: index === 0 };
       }
       return {
         url: img.url,
-        isPrimary: img.isPrimary !== undefined ? img.isPrimary : index === 0,
+        isPrimary: img.isPrimary !== undefined ? Boolean(img.isPrimary) : index === 0,
         caption: img.caption || ''
       };
     });
 
-    // 3. Location construction
     const parsedCity = location?.city || (typeof location === 'string' ? location.split(',')[0] : 'Bengaluru');
     const locationObj = {
       city: parsedCity.trim(),
@@ -83,7 +143,6 @@ exports.createItem = async (req, res) => {
       approximateAddress: typeof location === 'string' ? location : (location?.approximateAddress || `${parsedCity}`)
     };
 
-    // 4. Coordinates GeoJSON
     let geoCoords = [77.5946, 12.9716];
     if (coordinates && Array.isArray(coordinates) && coordinates.length === 2) {
       geoCoords = [Number(coordinates[0]), Number(coordinates[1])];
@@ -91,12 +150,19 @@ exports.createItem = async (req, res) => {
       geoCoords = [Number(location.coordinates[0]), Number(location.coordinates[1])];
     }
 
-    // 5. Construct secure item object
-    // Owner is derived STRICTLY from req.user (authenticated JWT), never browser payload
     const userId = req.user?.id || req.user?._id;
     const ownerId = mongoose.Types.ObjectId.isValid(userId)
       ? new mongoose.Types.ObjectId(userId)
       : new mongoose.Types.ObjectId();
+
+    // Determine approval status
+    let approvalStatus = 'APPROVED';
+    let status = 'active';
+
+    if (!isAdmin && rules.customerApprovalRequired) {
+      approvalStatus = 'PENDING';
+      status = 'pending moderation';
+    }
 
     const newItemData = {
       title: title.trim(),
@@ -108,8 +174,11 @@ exports.createItem = async (req, res) => {
       images: formattedImages,
       sharingType: sharingType || 'give_away',
       condition: condition || 'good',
-      availability: 'Available',
-      status: 'active',
+      availability: approvalStatus === 'APPROVED' ? 'Available' : 'Unavailable',
+      status: status,
+      approvalStatus: approvalStatus,
+      rejectionReason: '',
+      specifications: Array.isArray(specifications) ? specifications : [],
       location: locationObj,
       locationCoordinates: {
         type: 'Point',
@@ -152,9 +221,13 @@ exports.createItem = async (req, res) => {
       };
     }
 
+    const message = approvalStatus === 'PENDING'
+      ? 'Your item has been submitted and is pending admin approval before going live.'
+      : 'Your item has been shared with the community!';
+
     return res.status(201).json({
       success: true,
-      message: 'Your item has been shared with the community!',
+      message,
       item: savedItem
     });
   } catch (error) {
@@ -166,14 +239,29 @@ exports.createItem = async (req, res) => {
   }
 };
 
+const { calculateHaversineDistance, resolveCoordinates } = require('../utils/geoUtils');
+
 exports.getItems = async (req, res) => {
   try {
-    const { category, sharingType, condition, search, limit = 20, page = 1 } = req.query;
+    const {
+      category,
+      sharingType,
+      condition,
+      search,
+      lat,
+      lng,
+      city,
+      locality,
+      state,
+      radius = 10,
+      limit = 20,
+      page = 1
+    } = req.query;
 
     const filter = { status: 'active', availability: 'Available' };
 
     if (category && category !== 'all') {
-      filter.category = category;
+      filter.category = category.toLowerCase();
     }
     if (sharingType && sharingType !== 'all') {
       filter.sharingType = sharingType;
@@ -184,26 +272,77 @@ exports.getItems = async (req, res) => {
     if (search && search.trim()) {
       filter.$or = [
         { title: { $regex: search.trim(), $options: 'i' } },
-        { description: { $regex: search.trim(), $options: 'i' } }
+        { description: { $regex: search.trim(), $options: 'i' } },
+        { category: { $regex: search.trim(), $options: 'i' } },
+        { brand: { $regex: search.trim(), $options: 'i' } }
       ];
     }
 
     if (mongoose.connection.readyState === 1) {
-      const skip = (Number(page) - 1) * Number(limit);
-      const items = await Item.find(filter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(Number(limit))
-        .populate('owner', 'name avatar trustScore rating');
+      let items = await Item.find(filter)
+        .populate('owner', 'name avatar trustScore rating')
+        .lean();
 
-      const total = await Item.countDocuments(filter);
+      // Resolve customer location coordinates
+      const custCoords = resolveCoordinates({ lat, lng, city, locality, state });
+      const maxRadius = Number(radius) || 10;
+
+      // Calculate geographic Haversine distance for each item
+      const processedItems = items.map((item) => {
+        let itemLat = 12.9716;
+        let itemLng = 77.5946;
+
+        if (
+          item.locationCoordinates &&
+          Array.isArray(item.locationCoordinates.coordinates) &&
+          item.locationCoordinates.coordinates.length === 2
+        ) {
+          itemLng = Number(item.locationCoordinates.coordinates[0]);
+          itemLat = Number(item.locationCoordinates.coordinates[1]);
+        } else {
+          const itemLoc = resolveCoordinates(item.location || item.city);
+          itemLat = itemLoc.lat;
+          itemLng = itemLoc.lng;
+        }
+
+        const distanceKm = calculateHaversineDistance(custCoords.lat, custCoords.lng, itemLat, itemLng);
+        const itemCity = item.location?.city || item.location?.locality || 'Local Area';
+        const formattedDistance = distanceKm < 1 ? 'Under 1 km away' : `${distanceKm} km away`;
+
+        return {
+          ...item,
+          distanceKm,
+          distanceText: formattedDistance,
+          displayLocation: `${itemCity} · ${formattedDistance}`
+        };
+      });
+
+      // Filter by radius if location is passed or default radius applies
+      let filteredItems = processedItems;
+      if (lat || lng || city || radius) {
+        filteredItems = processedItems.filter((item) => item.distanceKm <= maxRadius);
+      }
+
+      // Sort by proximity (nearest first), then newest
+      filteredItems.sort((a, b) => {
+        if (Math.abs(a.distanceKm - b.distanceKm) > 0.1) {
+          return a.distanceKm - b.distanceKm;
+        }
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      });
+
+      // Paginate
+      const skip = (Number(page) - 1) * Number(limit);
+      const paginatedItems = filteredItems.slice(skip, skip + Number(limit));
 
       return res.status(200).json({
         success: true,
-        items,
-        total,
+        items: paginatedItems,
+        total: filteredItems.length,
         page: Number(page),
-        totalPages: Math.ceil(total / Number(limit))
+        totalPages: Math.ceil(filteredItems.length / Number(limit)) || 1,
+        userLocation: custCoords,
+        searchRadiusKm: maxRadius
       });
     }
 
@@ -216,7 +355,7 @@ exports.getItems = async (req, res) => {
     console.error('Error fetching items:', error);
     return res.status(500).json({
       success: false,
-      message: 'Failed to fetch items.'
+      message: 'Failed to fetch location-relevant items.'
     });
   }
 };
@@ -225,8 +364,23 @@ exports.getItemById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    if (mongoose.connection.readyState === 1 && mongoose.Types.ObjectId.isValid(id)) {
-      const item = await Item.findById(id).populate('owner', 'name avatar trustScore rating responseRate');
+    if (mongoose.connection.readyState === 1) {
+      let item = null;
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        item = await Item.findById(id).populate('owner', 'name avatar trustScore rating responseRate');
+      }
+      if (!item) {
+        const cleanSlug = String(id).trim();
+        const titleRegexPattern = cleanSlug.replace(/-/g, '[ -]');
+        item = await Item.findOne({
+          $or: [
+            { slug: cleanSlug },
+            { id: cleanSlug },
+            { title: new RegExp(`^${titleRegexPattern}$`, 'i') }
+          ]
+        }).populate('owner', 'name avatar trustScore rating responseRate');
+      }
+
       if (!item) {
         return res.status(404).json({
           success: false,
@@ -863,6 +1017,104 @@ exports.getItemMatches = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to retrieve item matches.'
+    });
+  }
+};
+
+/**
+ * GET /api/items/:id/similar or GET /api/items/similar
+ * Returns similar available items based on category, subcategory, brand, sharing type, and condition
+ * Prioritizes AVAILABLE items over reserved/reused ones.
+ */
+exports.getSimilarItems = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { category, subcategory, brand, sharingType, condition, limit = 8 } = req.query;
+    const parsedLimit = Math.min(24, Math.max(1, parseInt(limit, 10) || 8));
+
+    let sourceCategory = category || '';
+    let sourceSubcategory = subcategory || '';
+    let sourceBrand = brand || '';
+    let sourceSharingType = sharingType || '';
+    let sourceCondition = condition || '';
+    let excludeId = null;
+
+    if (id && mongoose.Types.ObjectId.isValid(id)) {
+      excludeId = id;
+      if (mongoose.connection.readyState === 1) {
+        const sourceItem = await Item.findById(id);
+        if (sourceItem) {
+          sourceCategory = sourceCategory || sourceItem.category || '';
+          sourceSubcategory = sourceSubcategory || sourceItem.subcategory || '';
+          sourceBrand = sourceBrand || sourceItem.brand || '';
+          sourceSharingType = sourceSharingType || sourceItem.sharingType || '';
+          sourceCondition = sourceCondition || sourceItem.condition || '';
+        }
+      }
+    }
+
+    const filter = {
+      status: { $ne: 'removed' }
+    };
+    if (excludeId) {
+      filter._id = { $ne: excludeId };
+    }
+    if (sourceCategory && sourceCategory !== 'all') {
+      filter.category = sourceCategory.toLowerCase().trim();
+    }
+
+    let rawItems = [];
+    if (mongoose.connection.readyState === 1) {
+      rawItems = await Item.find(filter)
+        .sort({ createdAt: -1 })
+        .limit(40)
+        .populate('owner', 'name avatar trustScore verified rating reviewsCount');
+    }
+
+    // Score and rank candidates
+    const scoredItems = rawItems.map((item) => {
+      let score = 0;
+      const isAvailable = item.availability === 'Available' || item.status === 'active';
+
+      // Priority 1: AVAILABLE items prioritized FIRST over reserved/reused ones
+      if (isAvailable) score += 1000;
+
+      if (sourceSubcategory && item.subcategory && item.subcategory.toLowerCase() === sourceSubcategory.toLowerCase()) {
+        score += 50;
+      }
+      if (sourceBrand && item.brand && item.brand.toLowerCase() === sourceBrand.toLowerCase()) {
+        score += 40;
+      }
+      if (sourceSharingType && item.sharingType === sourceSharingType) {
+        score += 20;
+      }
+      if (sourceCondition && item.condition === sourceCondition) {
+        score += 10;
+      }
+
+      return { item, score };
+    });
+
+    scoredItems.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return new Date(b.item.createdAt || 0) - new Date(a.item.createdAt || 0);
+    });
+
+    const items = scoredItems.slice(0, parsedLimit).map((s) => ({
+      ...s.item.toObject(),
+      id: s.item._id
+    }));
+
+    return res.status(200).json({
+      success: true,
+      items,
+      total: items.length
+    });
+  } catch (error) {
+    console.error('Error in getSimilarItems:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve similar items.'
     });
   }
 };

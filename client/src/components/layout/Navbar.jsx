@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Search, HelpCircle, Menu, X } from 'lucide-react';
+import { Search, HelpCircle, Menu, X, ArrowRight, User, LogOut } from 'lucide-react';
 import Button from '../common/Button';
 import LooopLogo from '../common/LooopLogo';
+import LocationBadge from '../location/LocationBadge';
+import { useAuth } from '../../context/AuthContext';
 
 export const Navbar = () => {
   const location = useLocation();
+  const { user, isAuthenticated, logout } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -189,23 +192,37 @@ export const Navbar = () => {
           </Link>
         </nav>
 
-        {/* Right Section: Auth Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-          <Link to="/login" style={{ textDecoration: 'none' }}>
-            <Button
-              variant="primary"
-              size="sm"
-              style={{
-                padding: '0.45rem 1.4rem',
-                fontWeight: 700,
-                borderRadius: 'var(--radius-full)',
-                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)',
-                fontSize: '0.925rem'
-              }}
-            >
-              Login
-            </Button>
-          </Link>
+        {/* Right Section: Location Badge & Auth Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <LocationBadge />
+
+          {isAuthenticated ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Link
+                to={user?.role === 'admin' || user?.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard'}
+                style={{ textDecoration: 'none' }}
+              >
+                <Button variant="secondary" size="sm" iconLeft={User}>
+                  {user?.name ? user.name.split(' ')[0] : 'Dashboard'}
+                </Button>
+              </Link>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={logout}
+                title="Log out"
+                style={{ color: '#ef4444', padding: '6px 10px' }}
+              >
+                <LogOut size={16} />
+              </Button>
+            </div>
+          ) : (
+            <Link to="/login" style={{ textDecoration: 'none' }}>
+              <Button variant="primary" size="sm">
+                Login
+              </Button>
+            </Link>
+          )}
 
           {/* Mobile Menu Toggle Button */}
           <button
@@ -302,16 +319,41 @@ export const Navbar = () => {
 
           <hr style={{ borderColor: 'var(--color-slate-100)', margin: '4px 0' }} />
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-            <Link to="/login" onClick={() => setMobileMenuOpen(false)} style={{ textDecoration: 'none' }}>
-              <Button
-                variant="primary"
-                size="sm"
-                style={{ width: '100%', fontWeight: 700, borderRadius: 'var(--radius-full)' }}
-              >
-                Login
-              </Button>
-            </Link>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <LocationBadge />
+            </div>
+
+            {isAuthenticated ? (
+              <>
+                <Link
+                  to={user?.role === 'admin' || user?.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard'}
+                  onClick={() => setMobileMenuOpen(false)}
+                  style={{ textDecoration: 'none' }}
+                >
+                  <Button variant="secondary" size="sm" style={{ width: '100%' }} iconLeft={User}>
+                    {user?.name || 'Dashboard'}
+                  </Button>
+                </Link>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    logout();
+                  }}
+                  style={{ width: '100%', color: '#ef4444' }}
+                >
+                  Log Out
+                </Button>
+              </>
+            ) : (
+              <Link to="/login" onClick={() => setMobileMenuOpen(false)} style={{ textDecoration: 'none' }}>
+                <Button variant="primary" size="sm" style={{ width: '100%' }}>
+                  Login
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
       )}

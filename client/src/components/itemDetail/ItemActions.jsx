@@ -4,11 +4,12 @@ import {
   Heart,
   Share2,
   AlertTriangle,
-  CheckCircle2,
   Lock,
   UserCheck,
   Edit,
-  Sparkles
+  Clock,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import Button from '../common/Button';
 import { useToast } from '../../hooks/useToast';
@@ -27,21 +28,28 @@ export const ItemActions = ({
 
   if (!item) return null;
 
-  // 1. Ownership verification
+  // 1. Ownership & Status verification
   const currentUserId = currentUser?.id || currentUser?._id;
   const itemOwnerId = typeof item.owner === 'object' ? (item.owner?._id || item.owner?.id) : item.owner;
   const isOwner = !!(
     (currentUserId && itemOwnerId && currentUserId.toString() === itemOwnerId.toString()) ||
     (currentUser?.email && item.owner?.email && currentUser.email === item.owner.email)
   );
-  const isAvailable = item.status === 'AVAILABLE' || !item.status;
 
-  // 2. Derive primary button label based on sharing type
+  const isReserved = item.availability === 'Reserved' || item.status === 'RESERVED';
+  const isReused = item.availability === 'Unavailable' || item.status === 'COMPLETED' || item.status === 'REUSED' || item.status === 'removed';
+  const isAvailable = !isReserved && !isReused;
+
+  // 2. Derive primary button label based on sharing type & status
   const getPrimaryLabel = () => {
-    if (!isAvailable) return 'Currently Unavailable';
-    if (item.sharingType === 'borrow') return 'Request to Borrow';
-    if (item.sharingType === 'exchange') return 'Request Exchange';
-    return 'Request Item';
+    if (isReserved) return 'This item is currently reserved';
+    if (isReused) return 'This item has already found a new owner';
+    const type = (item.sharingType || '').toLowerCase();
+    if (type === 'give_away' || type === 'free') return 'REQUEST TO REUSE';
+    if (type === 'borrow') return 'BORROW THIS ITEM';
+    if (type === 'exchange') return 'REQUEST EXCHANGE';
+    if (type === 'low_cost') return 'REQUEST ITEM';
+    return 'REQUEST ITEM';
   };
 
   // 3. Handle Share Action (Web Share API or Clipboard Fallback)
@@ -91,12 +99,15 @@ export const ItemActions = ({
     try {
       await itemService.saveItem(item.id);
       const next = !isSaved;
-      onSaveToggle(next);
-      addToast({
-        title: next ? 'Item Saved' : 'Removed from Saved',
-        message: next ? `"${item.title}" saved to your collection.` : `Removed from saved items.`,
-        variant: next ? 'success' : 'info'
-      });
+      if (onSaveToggle) {
+        onSaveToggle(next);
+      } else {
+        addToast({
+          title: next ? 'Item Saved' : 'Removed from Saved',
+          message: next ? `"${item.title}" saved to your collection.` : `Removed from saved items.`,
+          variant: next ? 'success' : 'info'
+        });
+      }
     } catch {
       addToast({
         title: 'Error',
@@ -110,6 +121,47 @@ export const ItemActions = ({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} className="item-actions-wrapper">
+      {/* Reserved / Reused Banners */}
+      {isReserved && (
+        <div
+          style={{
+            padding: '12px 16px',
+            backgroundColor: '#fffbeb',
+            border: '1.5px solid #fde68a',
+            borderRadius: 'var(--radius-lg)',
+            color: '#92400e',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            fontSize: '0.9rem',
+            fontWeight: 700
+          }}
+        >
+          <Clock size={18} color="#b45309" style={{ flexShrink: 0 }} />
+          <span>This item is currently reserved for an ongoing handover.</span>
+        </div>
+      )}
+
+      {isReused && (
+        <div
+          style={{
+            padding: '12px 16px',
+            backgroundColor: '#f1f5f9',
+            border: '1.5px solid #cbd5e1',
+            borderRadius: 'var(--radius-lg)',
+            color: '#475569',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            fontSize: '0.9rem',
+            fontWeight: 700
+          }}
+        >
+          <CheckCircle2 size={18} color="#059669" style={{ flexShrink: 0 }} />
+          <span>This item has already found a new owner in the community.</span>
+        </div>
+      )}
+
       {/* 1. Main Action Buttons Row */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
         {isOwner ? (
@@ -147,7 +199,7 @@ export const ItemActions = ({
             </Button>
           </div>
         ) : (
-          // Standard Borrower/Recipient Primary Action
+          // Standard Borrower/Recipient Primary Action Button
           <Button
             variant="primary"
             size="lg"
@@ -157,7 +209,9 @@ export const ItemActions = ({
               flex: '1 1 240px',
               fontSize: '1rem',
               fontWeight: 800,
-              boxShadow: '0 6px 16px rgba(16, 185, 129, 0.25)'
+              boxShadow: isAvailable ? '0 6px 16px rgba(16, 185, 129, 0.25)' : 'none',
+              backgroundColor: !isAvailable ? '#94a3b8' : undefined,
+              borderColor: !isAvailable ? '#94a3b8' : undefined
             }}
             iconLeft={Send}
           >
@@ -175,7 +229,7 @@ export const ItemActions = ({
           aria-label={isSaved ? 'Remove from saved' : 'Save item'}
           style={{
             minWidth: '110px',
-            color: isSaved ? 'var(--color-danger)' : 'var(--color-slate-700)',
+            color: isSaved ? '#ef4444' : 'var(--color-slate-700)',
             borderColor: isSaved ? '#fecaca' : 'var(--color-slate-300)',
             backgroundColor: isSaved ? '#fef2f2' : '#ffffff'
           }}
