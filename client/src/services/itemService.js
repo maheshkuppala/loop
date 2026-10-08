@@ -1,5 +1,6 @@
 import api from './api';
 import { mockItems, mockCategories } from '../data/mockData';
+import { recordImpactAction } from '../utils/communityImpactTracker';
 
 /**
  * Item Service
@@ -261,8 +262,10 @@ export const itemService = {
           ...serverItem
         };
         mockItems.unshift(normalized);
+        recordImpactAction({ category: itemData.category, quantity: 1, type: itemData.sharingType || 'share' });
         return response.data;
       }
+      recordImpactAction({ category: itemData.category, quantity: 1, type: itemData.sharingType || 'share' });
       return response.data;
     } catch (err) {
       // In development fallback, create real structured item object
@@ -310,6 +313,7 @@ export const itemService = {
       };
 
       mockItems.unshift(newItem);
+      recordImpactAction({ category: itemData.category, quantity: 1, type: itemData.sharingType || 'share' });
 
       return {
         success: true,

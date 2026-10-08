@@ -620,12 +620,12 @@ export const mockAdminStats = {
 };
 
 export const mockCommunityImpact = {
-  itemsReused: '1,275+',
-  peopleHelped: '850+',
-  booksShared: '420+',
-  electronicsShared: '310+',
-  clothesShared: '190+',
-  co2SavedKg: '3,840 kg'
+  itemsReused: '0',
+  peopleHelped: '0',
+  booksShared: '0',
+  electronicsShared: '0',
+  clothesShared: '0',
+  co2SavedKg: '0 kg'
 };
 
 export const mockTransactions = [
