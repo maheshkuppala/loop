@@ -1,8 +1,7 @@
-const axios = require('axios');
-
 /**
  * LOOOP Server-Side Google Maps Controller
  * Interacts with Google Routes API & Directions API securely using GOOGLE_MAPS_SERVER_API_KEY.
+ * Uses native fetch (built into Node 18+) to eliminate external dependencies.
  * Prevents key leakage to the frontend while enforcing coordinate validation & rate limits.
  */
 
@@ -74,18 +73,24 @@ exports.computeRoute = async (req, res) => {
       TRANSIT: 'transit'
     };
 
-    // Call Google Directions API / Routes API
-    const googleRes = await axios.get('https://maps.googleapis.com/maps/api/directions/json', {
-      params: {
-        origin: `${origin.latitude},${origin.longitude}`,
-        destination: `${destination.latitude},${destination.longitude}`,
-        mode: modeMap[mode] || 'driving',
-        key: apiKey
-      },
-      timeout: 8000
-    });
+    // Call Google Directions API / Routes API using native fetch
+    const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&mode=${modeMap[mode] || 'driving'}&key=${apiKey}`;
 
-    const data = googleRes.data;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    const googleRes = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (!googleRes.ok) {
+      return res.status(400).json({
+        success: false,
+        routeAvailable: false,
+        message: `Google API HTTP Error: ${googleRes.status}`
+      });
+    }
+
+    const data = await googleRes.json();
 
     if (data.status === 'OK' && data.routes && data.routes.length > 0) {
       const route = data.routes[0];
