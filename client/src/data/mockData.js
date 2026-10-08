@@ -75,8 +75,20 @@ export const mockItems = [
     createdAt: new Date().toISOString(),
     viewsCount: 1,
     savesCount: 0
-  }
-];
+  },
+  {
+    id: 'itm_002',
+    title: 'Modern Ergonomic Chair',
+    description: 'Comfortable mesh desk chair with adjustable lumbar support.',
+    category: 'furniture',
+    condition: 'good',
+    sharingType: 'borrow',
+    images: ['https://images.unsplash.com/photo-1580481072645-022f9a6d83d0?w=800&auto=format&fit=crop&q=80'],
+    location: 'Gachibowli, Hyderabad',
+    city: 'Hyderabad',
+    availability: 'Available',
+    status: 'AVAILABLE',
+    owner: {
       id: 'usr-109',
       name: 'Deepa Menon',
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
