@@ -187,9 +187,9 @@ export const GoogleBrowseMap = ({
   if (error) {
     return (
       <GoogleMapsFallback
-        message={error}
+        items={items}
         height={height}
-        onRetry={() => window.location.reload()}
+        interactive={true}
       />
     );
   }

@@ -95,7 +95,7 @@ export const GoogleItemLocationView = ({
   if (error) {
     return (
       <GoogleMapsFallback
-        message="Location preview unavailable"
+        coordinates={coordinates}
         locality={locality}
         city={city}
         height={height}

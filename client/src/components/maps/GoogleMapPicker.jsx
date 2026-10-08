@@ -253,11 +253,12 @@ export const GoogleMapPicker = ({
   if (error) {
     return (
       <GoogleMapsFallback
-        message={error}
+        coordinates={coordinates}
         locality={locality}
         city={city}
         height={height}
-        onRetry={() => window.location.reload()}
+        interactive={true}
+        onChange={onChange}
       />
     );
   }
