@@ -1,6 +1,6 @@
 import React from 'react';
 
-export const LooopRouteLoader = ({ message = 'Loading page...' }) => {
+export const LooopRouteLoader = ({ message = 'Loading...' }) => {
   return (
     <div
       style={{
@@ -8,48 +8,53 @@ export const LooopRouteLoader = ({ message = 'Loading page...' }) => {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: '60vh',
+        minHeight: '260px',
         width: '100%',
-        padding: '3rem 1.5rem',
+        padding: '2rem 1.5rem',
         textAlign: 'center'
       }}
       role="status"
       aria-live="polite"
       aria-busy="true"
     >
-      {/* Top Progress Line */}
+      {/* Sleek top progress indicator */}
       <div className="looop-route-progress" />
 
-      {/* Small LOOOP branding */}
-      <div style={{ marginBottom: '1.5rem' }}>
-        <div style={{
-          fontFamily: 'var(--font-brand, Outfit, sans-serif)',
-          fontSize: '1.5rem',
-          fontWeight: 900,
-          color: '#16A34A',
-          letterSpacing: '-0.035em',
-          textShadow: '0 1px 0 #15803D, 0 2px 4px rgba(22, 163, 74, 0.1)'
-        }}>
-          LOOOP
-        </div>
+      {/* Pleasant Loader Card */}
+      <div
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '10px',
+          padding: '10px 20px',
+          borderRadius: '30px',
+          backgroundColor: 'rgba(16, 185, 129, 0.08)',
+          border: '1px solid rgba(16, 185, 129, 0.2)',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
+        }}
+      >
+        <span
+          style={{
+            width: '16px',
+            height: '16px',
+            borderRadius: '50%',
+            border: '2.5px solid #10b981',
+            borderTopColor: 'transparent',
+            display: 'inline-block',
+            animation: 'looop-ring-rotate 0.8s linear infinite'
+          }}
+        />
+        <span
+          style={{
+            fontSize: '0.875rem',
+            fontWeight: 700,
+            color: '#059669',
+            letterSpacing: '0.01em'
+          }}
+        >
+          {message}
+        </span>
       </div>
-
-      {/* Loading dots */}
-      <div className="looop-loading-dots">
-        <div className="looop-loading-dot" />
-        <div className="looop-loading-dot" />
-        <div className="looop-loading-dot" />
-      </div>
-
-      {/* Status text */}
-      <p style={{
-        fontSize: '0.925rem',
-        fontWeight: 600,
-        color: 'var(--color-slate-500, #64748b)',
-        margin: '1rem 0 0'
-      }}>
-        {message}
-      </p>
     </div>
   );
 };

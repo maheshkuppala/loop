@@ -64,14 +64,24 @@ export const AdminTable = ({
           </thead>
           <tbody style={{ divideY: '1px solid #334155' }}>
             {isLoading ? (
-              <tr>
-                <td colSpan={columns.length} style={{ padding: '48px', textAlign: 'center' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                    <Spinner size="md" />
-                    <span style={{ color: '#94a3b8', fontSize: '0.875rem' }}>Loading platform records...</span>
-                  </div>
-                </td>
-              </tr>
+              Array.from({ length: 4 }).map((_, rIdx) => (
+                <tr key={rIdx} style={{ borderBottom: '1px solid #2d3748' }}>
+                  {columns.map((col, cIdx) => (
+                    <td key={cIdx} style={{ padding: '14px 16px' }}>
+                      <div
+                        style={{
+                          height: '16px',
+                          borderRadius: '6px',
+                          backgroundColor: '#334155',
+                          opacity: 0.5,
+                          animation: 'pulse 1.5s ease-in-out infinite',
+                          width: cIdx === 0 ? '65%' : cIdx === 1 ? '85%' : '50%'
+                        }}
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))
             ) : data.length === 0 ? (
               <tr>
                 <td colSpan={columns.length} style={{ padding: '48px', textAlign: 'center' }}>
