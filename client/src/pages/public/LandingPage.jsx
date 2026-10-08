@@ -35,13 +35,31 @@ import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
 import Badge from '../../components/common/Badge';
 import Avatar from '../../components/common/Avatar';
-import { mockItems, mockCommunityImpact, mockCategories } from '../../data/mockData';
+import { itemService } from '../../services/itemService';
+import { mockCommunityImpact, mockCategories } from '../../data/mockData';
 
 export const LandingPage = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [realItems, setRealItems] = useState([]);
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchItems = async () => {
+      try {
+        const res = await itemService.getItems({ limit: 12 });
+        if (isMounted && res?.items) {
+          setRealItems(res.items);
+        }
+      } catch (err) {
+        console.warn('Failed to load items for homepage:', err);
+      }
+    };
+    fetchItems();
+    return () => { isMounted = false; };
+  }, []);
 
   const isLoggedIn = !!(user && (isAuthenticated || user.id || user.email));
 
@@ -54,8 +72,8 @@ export const LandingPage = () => {
   };
 
   const filteredItems = selectedCategory === 'all'
-    ? mockItems.slice(0, 6)
-    : mockItems.filter(item => item.category === selectedCategory).slice(0, 6);
+    ? realItems.slice(0, 6)
+    : realItems.filter(item => item.category === selectedCategory || item.category?.toLowerCase() === selectedCategory.toLowerCase()).slice(0, 6);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', overflowX: 'hidden' }}>

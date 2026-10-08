@@ -4,6 +4,7 @@ const Item = require('../models/Item');
 const Transaction = require('../models/Transaction');
 const Review = require('../models/Review');
 const WantedItem = require('../models/WantedItem');
+const { query: pgQuery } = require('../config/postgres');
 
 /**
  * Sanitizer utility to prevent script injection in text fields
@@ -83,27 +84,106 @@ const toPublicUser = (user) => {
 exports.getMe = async (req, res) => {
   try {
     const userId = req.user?.id || req.user?._id;
-    if (!userId) {
+    const userEmail = req.user?.email;
+
+    if (!userId && !userEmail) {
       return res.status(401).json({ success: false, message: 'Authentication required.' });
     }
 
-    let user;
+    let user = null;
+    let safeUser = null;
+
+    // 1. Check Neon PostgreSQL first
+    try {
+      const pgUserRes = await pgQuery(
+        `SELECT id, name, email, role, avatar, bio, city, locality, state,
+                account_status AS "accountStatus", trust_score AS "trustScore",
+                rating, reviews_count AS "reviewsCount", verified, created_at AS "createdAt"
+         FROM users
+         WHERE id = $1 OR email = $2 LIMIT 1;`,
+        [userId || '', userEmail || '']
+      );
+
+      if (pgUserRes?.rows?.[0]) {
+        const pgUser = pgUserRes.rows[0];
+        const targetId = pgUser.id;
+
+        // Fetch real Neon PG counts concurrently
+        const [
+          activeItemsRes,
+          itemsSharedRes,
+          completedTxRes,
+          wantedRes,
+          reviewsRes,
+          reviewAggRes
+        ] = await Promise.all([
+          pgQuery("SELECT COUNT(*)::int as count FROM items WHERE owner_id = $1 AND (availability = 'Available' OR status = 'active');", [targetId]),
+          pgQuery("SELECT COUNT(*)::int as count FROM items WHERE owner_id = $1;", [targetId]),
+          pgQuery("SELECT COUNT(*)::int as count FROM transactions WHERE (owner_id = $1 OR recipient_id = $1) AND status = 'COMPLETED';", [targetId]),
+          pgQuery("SELECT COUNT(*)::int as count FROM wanted_items WHERE user_id = $1;", [targetId]),
+          pgQuery("SELECT COUNT(*)::int as count FROM reviews WHERE reviewee_id = $1;", [targetId]),
+          pgQuery("SELECT COALESCE(ROUND(AVG(rating)::numeric, 1), 0)::float as avg_rating, COUNT(*)::int as count FROM reviews WHERE reviewee_id = $1;", [targetId])
+        ]);
+
+        const activeItemsCount = activeItemsRes?.rows?.[0]?.count || 0;
+        const itemsSharedCount = itemsSharedRes?.rows?.[0]?.count || 0;
+        const completedTransactionsCount = completedTxRes?.rows?.[0]?.count || 0;
+        const wantedCount = wantedRes?.rows?.[0]?.count || 0;
+        const reviewsReceivedCount = reviewsRes?.rows?.[0]?.count || 0;
+        const averageRating = reviewAggRes?.rows?.[0]?.avg_rating || pgUser.rating || 0;
+
+        safeUser = {
+          _id: pgUser.id,
+          id: pgUser.id,
+          name: pgUser.name,
+          email: pgUser.email,
+          role: pgUser.role || 'customer',
+          avatar: pgUser.avatar || '',
+          bio: pgUser.bio || '',
+          city: pgUser.city || '',
+          locality: pgUser.locality || '',
+          state: pgUser.state || '',
+          accountStatus: pgUser.accountStatus || 'active',
+          trustScore: pgUser.trustScore || 95,
+          rating: averageRating,
+          reviewsCount: reviewsReceivedCount,
+          verified: pgUser.verified !== false,
+          createdAt: pgUser.createdAt
+        };
+
+        const completion = calculateProfileCompletion(safeUser);
+
+        return res.status(200).json({
+          success: true,
+          user: safeUser,
+          stats: {
+            activeItems: activeItemsCount,
+            itemsShared: itemsSharedCount,
+            completedTransactions: completedTransactionsCount,
+            wantedRequests: wantedCount,
+            reviewsReceived: reviewsReceivedCount,
+            averageRating
+          },
+          profileCompletion: completion
+        });
+      }
+    } catch (pgErr) {
+      console.warn('[userController] getMe PG notice:', pgErr.message);
+    }
+
+    // 2. Fallback to MongoDB
     if (mongoose.Types.ObjectId.isValid(userId)) {
       user = await User.findById(userId).select('-password');
     }
-
-    if (!user) {
-      // If dev mock token with valid non-db id or fallback
-      user = await User.findOne({ email: req.user.email }).select('-password');
+    if (!user && userEmail) {
+      user = await User.findOne({ email: userEmail }).select('-password');
     }
 
     if (!user) {
       return res.status(404).json({ success: false, message: 'User profile not found.' });
     }
 
-    // Compute real MongoDB metrics
     const userObjectId = user._id;
-
     const [
       activeItemsCount,
       itemsSharedCount,
@@ -135,17 +215,7 @@ exports.getMe = async (req, res) => {
     const averageRating = reviewAgg.length > 0 ? Math.round(reviewAgg[0].averageRating * 10) / 10 : 0;
     const completion = calculateProfileCompletion(user);
 
-    // Synchronize rating in User document if different
-    if (user.rating !== averageRating || user.reviewsCount !== reviewsReceivedCount) {
-      await User.findByIdAndUpdate(userObjectId, {
-        rating: averageRating,
-        reviewsCount: reviewsReceivedCount
-      });
-      user.rating = averageRating;
-      user.reviewsCount = reviewsReceivedCount;
-    }
-
-    const safeUser = user.toObject();
+    safeUser = user.toObject();
     delete safeUser.password;
 
     return res.status(200).json({
@@ -177,17 +247,10 @@ exports.getMe = async (req, res) => {
 exports.updateMe = async (req, res) => {
   try {
     const userId = req.user?.id || req.user?._id;
-    if (!userId) {
+    const userEmail = req.user?.email;
+
+    if (!userId && !userEmail) {
       return res.status(401).json({ success: false, message: 'Authentication required.' });
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ success: false, message: 'Invalid user ID format.' });
-    }
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'User profile not found.' });
     }
 
     const {
@@ -201,65 +264,97 @@ exports.updateMe = async (req, res) => {
       avatar
     } = req.body;
 
-    // Field-level validations and sanitization
-    if (name !== undefined) {
-      const cleanName = sanitizeText(name);
-      if (!cleanName || cleanName.length < 2) {
-        return res.status(400).json({ success: false, message: 'Name must be at least 2 characters.' });
+    const cleanName = name !== undefined ? sanitizeText(name) : undefined;
+    const cleanBio = bio !== undefined ? sanitizeText(bio) : undefined;
+    const cleanCity = city !== undefined ? sanitizeText(city).slice(0, 80) : undefined;
+    const cleanLocality = locality !== undefined ? sanitizeText(locality).slice(0, 100) : undefined;
+    const cleanState = state !== undefined ? sanitizeText(state).slice(0, 80) : undefined;
+    const cleanAvatar = avatar !== undefined && typeof avatar === 'string' ? avatar.trim() : undefined;
+
+    // 1. Update Neon PostgreSQL Database
+    let updatedPgUser = null;
+    try {
+      const updateRes = await pgQuery(
+        `UPDATE users
+         SET name = COALESCE($1, name),
+             bio = COALESCE($2, bio),
+             city = COALESCE($3, city),
+             locality = COALESCE($4, locality),
+             state = COALESCE($5, state),
+             avatar = COALESCE($6, avatar)
+         WHERE id = $7 OR email = $8
+         RETURNING id, name, email, role, avatar, bio, city, locality, state,
+                   account_status AS "accountStatus", trust_score AS "trustScore",
+                   rating, reviews_count AS "reviewsCount", verified, created_at AS "createdAt";`,
+        [cleanName, cleanBio, cleanCity, cleanLocality, cleanState, cleanAvatar, userId || '', userEmail || '']
+      );
+
+      if (updateRes?.rows?.[0]) {
+        updatedPgUser = updateRes.rows[0];
       }
-      if (cleanName.length > 80) {
-        return res.status(400).json({ success: false, message: 'Name cannot exceed 80 characters.' });
+    } catch (pgErr) {
+      console.warn('[userController] updateMe PG notice:', pgErr.message);
+    }
+
+    // 2. Also Update Mongo User if exists
+    let mongoUser = null;
+    if (mongoose.Types.ObjectId.isValid(userId)) {
+      mongoUser = await User.findById(userId);
+    }
+    if (!mongoUser && userEmail) {
+      mongoUser = await User.findOne({ email: userEmail });
+    }
+
+    if (mongoUser) {
+      if (cleanName) mongoUser.name = cleanName;
+      if (cleanBio) mongoUser.bio = cleanBio;
+      if (cleanCity) mongoUser.city = cleanCity;
+      if (cleanLocality) mongoUser.locality = cleanLocality;
+      if (cleanState) mongoUser.state = cleanState;
+      if (cleanAvatar) mongoUser.avatar = cleanAvatar;
+      if (interests && Array.isArray(interests)) {
+        mongoUser.interests = interests.map(i => sanitizeText(i)).filter(i => i.length > 0).slice(0, 15);
       }
-      user.name = cleanName;
-    }
-
-    if (bio !== undefined) {
-      const cleanBio = sanitizeText(bio);
-      if (cleanBio.length > 500) {
-        return res.status(400).json({ success: false, message: 'Bio cannot exceed 500 characters.' });
+      if (profileVisibility && ['public', 'community'].includes(profileVisibility)) {
+        mongoUser.profileVisibility = profileVisibility;
       }
-      user.bio = cleanBio;
+      await mongoUser.save();
     }
 
-    if (city !== undefined) {
-      user.city = sanitizeText(city).slice(0, 80);
+    const returnedUser = updatedPgUser
+      ? {
+          _id: updatedPgUser.id,
+          id: updatedPgUser.id,
+          name: updatedPgUser.name,
+          email: updatedPgUser.email,
+          role: updatedPgUser.role || 'customer',
+          avatar: updatedPgUser.avatar || '',
+          bio: updatedPgUser.bio || '',
+          city: updatedPgUser.city || '',
+          locality: updatedPgUser.locality || '',
+          state: updatedPgUser.state || '',
+          accountStatus: updatedPgUser.accountStatus || 'active',
+          trustScore: updatedPgUser.trustScore || 95,
+          rating: updatedPgUser.rating || 0,
+          verified: updatedPgUser.verified !== false,
+          createdAt: updatedPgUser.createdAt
+        }
+      : mongoUser
+      ? mongoUser.toObject()
+      : null;
+
+    if (!returnedUser) {
+      return res.status(404).json({ success: false, message: 'User profile not found.' });
     }
 
-    if (locality !== undefined) {
-      user.locality = sanitizeText(locality).slice(0, 100);
-    }
+    if (returnedUser.password) delete returnedUser.password;
 
-    if (state !== undefined) {
-      user.state = sanitizeText(state).slice(0, 80);
-    }
-
-    if (avatar !== undefined && typeof avatar === 'string') {
-      user.avatar = avatar.trim();
-    }
-
-    if (interests !== undefined && Array.isArray(interests)) {
-      user.interests = interests
-        .map((i) => sanitizeText(i))
-        .filter((i) => i.length > 0 && i.length <= 40)
-        .slice(0, 15);
-    }
-
-    if (profileVisibility !== undefined) {
-      if (['public', 'community'].includes(profileVisibility)) {
-        user.profileVisibility = profileVisibility;
-      }
-    }
-
-    await user.save();
-
-    const completion = calculateProfileCompletion(user);
-    const safeUser = user.toObject();
-    delete safeUser.password;
+    const completion = calculateProfileCompletion(returnedUser);
 
     return res.status(200).json({
       success: true,
       message: 'Profile updated successfully.',
-      user: safeUser,
+      user: returnedUser,
       profileCompletion: completion
     });
   } catch (error) {
@@ -279,6 +374,82 @@ exports.getPublicProfile = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // 1. Query Neon PostgreSQL database
+    try {
+      const pgUserRes = await pgQuery(
+        `SELECT id, name, email, role, avatar, bio, city, locality, state,
+                account_status AS "accountStatus", trust_score AS "trustScore",
+                rating, reviews_count AS "reviewsCount", verified, created_at AS "createdAt"
+         FROM users WHERE id = $1 LIMIT 1;`,
+        [id]
+      );
+
+      if (pgUserRes?.rows?.[0]) {
+        const u = pgUserRes.rows[0];
+        const [itemsRes, completedTxRes, itemsCountRes, reviewsRes] = await Promise.all([
+          pgQuery(
+            `SELECT id, title, images, category, condition, sharing_type AS "sharingType", city, locality, state, created_at AS "createdAt"
+             FROM items WHERE owner_id = $1 AND (availability = 'Available' OR status = 'active') ORDER BY created_at DESC LIMIT 8;`,
+            [id]
+          ),
+          pgQuery("SELECT COUNT(*)::int as count FROM transactions WHERE (owner_id = $1 OR recipient_id = $1) AND status = 'COMPLETED';", [id]),
+          pgQuery("SELECT COUNT(*)::int as count FROM items WHERE owner_id = $1;", [id]),
+          pgQuery("SELECT COALESCE(ROUND(AVG(rating)::numeric, 1), 0)::float as avg_rating, COUNT(*)::int as count FROM reviews WHERE reviewee_id = $1;", [id])
+        ]);
+
+        const publicItems = itemsRes?.rows || [];
+        const completedTx = completedTxRes?.rows?.[0]?.count || 0;
+        const totalItemsCount = itemsCountRes?.rows?.[0]?.count || 0;
+        const avgRating = reviewsRes?.rows?.[0]?.avg_rating || u.rating || 0;
+        const totalRev = reviewsRes?.rows?.[0]?.count || u.reviewsCount || 0;
+
+        return res.status(200).json({
+          success: true,
+          isRestricted: false,
+          user: {
+            id: u.id,
+            _id: u.id,
+            name: u.name,
+            avatar: u.avatar || '',
+            bio: u.bio || '',
+            city: u.city || '',
+            state: u.state || '',
+            memberSince: u.createdAt,
+            createdAt: u.createdAt,
+            verified: u.verified !== false,
+            rating: avgRating,
+            reviewsCount: totalRev
+          },
+          stats: {
+            completedTransactions: completedTx,
+            activeItems: publicItems.length,
+            itemsShared: totalItemsCount,
+            totalReviews: totalRev,
+            averageRating: avgRating
+          },
+          reviewSummary: {
+            averageRating: avgRating,
+            totalReviews: totalRev,
+            distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 }
+          },
+          publicItems: publicItems.map(item => ({
+            id: item.id,
+            _id: item.id,
+            title: item.title,
+            images: item.images || [],
+            category: item.category,
+            condition: item.condition,
+            sharingType: item.sharingType,
+            location: { city: item.city, locality: item.locality, state: item.state },
+            createdAt: item.createdAt
+          }))
+        });
+      }
+    } catch (pgErr) {
+      console.warn('[userController] getPublicProfile PG notice:', pgErr.message);
+    }
+
+    // 2. Fallback to MongoDB
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(404).json({ success: false, message: 'User not found.' });
     }
@@ -288,82 +459,21 @@ exports.getPublicProfile = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found.' });
     }
 
-    // Privacy Enforcement:
-    // If profile visibility is 'community', check if requester is logged in
-    const isOwner = req.user && (req.user.id?.toString() === id || req.user._id?.toString() === id);
-    if (user.profileVisibility === 'community' && !req.user && !isOwner) {
-      return res.status(200).json({
-        success: true,
-        isRestricted: true,
-        message: 'This member has set their profile visibility to community members only.',
-        user: {
-          id: user._id,
-          _id: user._id,
-          name: user.name,
-          avatar: user.avatar,
-          profileVisibility: 'community'
-        }
-      });
-    }
-
     const userObjectId = user._id;
-
-    // Fetch real metrics in parallel from MongoDB
-    const [
-      activeItems,
-      completedTransactionsCount,
-      itemsSharedCount,
-      reviewAgg,
-      reviewDistribution
-    ] = await Promise.all([
-      Item.find({ owner: userObjectId, status: 'AVAILABLE' })
-        .select('title images category condition sharingType location createdAt')
-        .sort({ createdAt: -1 })
-        .limit(8),
-      Transaction.countDocuments({
-        $or: [{ owner: userObjectId }, { recipient: userObjectId }],
-        status: 'COMPLETED'
-      }),
-      Item.countDocuments({ owner: userObjectId }),
-      Review.aggregate([
-        { $match: { reviewee: userObjectId } },
-        {
-          $group: {
-            _id: null,
-            averageRating: { $avg: '$rating' },
-            total: { $sum: 1 }
-          }
-        }
-      ]),
-      Review.aggregate([
-        { $match: { reviewee: userObjectId } },
-        {
-          $group: {
-            _id: '$rating',
-            count: { $sum: 1 }
-          }
-        }
-      ])
+    const [activeItems, completedTransactionsCount, itemsSharedCount, reviewAgg] = await Promise.all([
+      Item.find({ owner: userObjectId, status: 'AVAILABLE' }).limit(8).catch(() => []),
+      Transaction.countDocuments({ $or: [{ owner: userObjectId }, { recipient: userObjectId }], status: 'COMPLETED' }).catch(() => 0),
+      Item.countDocuments({ owner: userObjectId }).catch(() => 0),
+      Review.aggregate([{ $match: { reviewee: userObjectId } }, { $group: { _id: null, averageRating: { $avg: '$rating' }, total: { $sum: 1 } } }]).catch(() => [])
     ]);
 
     const averageRating = reviewAgg.length > 0 ? Math.round(reviewAgg[0].averageRating * 10) / 10 : 0;
     const totalReviews = reviewAgg.length > 0 ? reviewAgg[0].total : 0;
 
-    const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-    reviewDistribution.forEach((d) => {
-      if (distribution[d._id] !== undefined) {
-        distribution[d._id] = d.count;
-      }
-    });
-
-    const publicUser = toPublicUser(user);
-    publicUser.rating = averageRating;
-    publicUser.reviewsCount = totalReviews;
-
     return res.status(200).json({
       success: true,
       isRestricted: false,
-      user: publicUser,
+      user: toPublicUser(user),
       stats: {
         completedTransactions: completedTransactionsCount,
         activeItems: activeItems.length,
@@ -371,12 +481,8 @@ exports.getPublicProfile = async (req, res) => {
         totalReviews,
         averageRating
       },
-      reviewSummary: {
-        averageRating,
-        totalReviews,
-        distribution
-      },
-      publicItems: activeItems.map((item) => ({
+      reviewSummary: { averageRating, totalReviews, distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } },
+      publicItems: activeItems.map(item => ({
         id: item._id,
         _id: item._id,
         title: item.title,

@@ -36,13 +36,8 @@ export const itemService = {
         images: (item.images || []).map((img) => (typeof img === 'string' ? img : img.url || ''))
       }));
 
-      // Merge with mockItems to ensure items from requests & community stories are always included
-      const existingTitles = new Set(normalizedApi.map((i) => (i.title || '').toLowerCase().trim()));
-      const supplementaryMock = mockItems.filter(
-        (m) => !existingTitles.has((m.title || '').toLowerCase().trim())
-      );
-
-      allItems = [...normalizedApi, ...supplementaryMock];
+      // Use strictly real backend database items
+      allItems = normalizedApi;
     } catch {
       allItems = [...mockItems];
     }

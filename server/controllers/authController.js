@@ -5,6 +5,8 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const { getJwtSecret } = require('../utils/jwtConfig');
 const { query: pgQuery } = require('../config/postgres');
+const { invalidateDashboardCache } = require('../services/adminDashboardService');
+const { invalidateAnalyticsCache } = require('../services/adminAnalyticsService');
 
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
@@ -237,21 +239,9 @@ exports.register = async (req, res) => {
       cleanEmail.includes('admin');
     const roleToAssign = isAdmin ? 'admin' : 'customer';
 
-    const userId = `usr_${Date.now()}`;
+    let assignedId = `usr_${Date.now()}`;
 
-    // Insert into PG
-    try {
-      await pgQuery(
-        `INSERT INTO users (id, name, email, password, role, account_status, verified, trust_score)
-         VALUES ($1, $2, $3, $4, $5, 'active', true, 100)
-         ON CONFLICT (email) DO UPDATE SET password = $4, role = $5`,
-        [userId, cleanName, cleanEmail, hashedPassword, roleToAssign]
-      );
-    } catch (pgErr) {
-      console.warn('PostgreSQL insert warning:', pgErr.message);
-    }
-
-    // Insert into Mongo if active
+    // 1. Insert into Mongo if active
     let mongoUser = null;
     if (mongoose.connection && mongoose.connection.readyState === 1) {
       try {
@@ -262,12 +252,31 @@ exports.register = async (req, res) => {
           role: roleToAssign,
           trustScore: 100
         });
+        if (mongoUser?._id) {
+          assignedId = String(mongoUser._id);
+        }
       } catch (mErr) {
         console.warn('MongoDB insert warning:', mErr.message);
       }
     }
 
-    const assignedId = mongoUser?._id ? String(mongoUser._id) : userId;
+    // 2. Immediately upload user to Neon PostgreSQL database
+    try {
+      await pgQuery(
+        `INSERT INTO users (id, name, email, password, role, account_status, verified, trust_score, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, 'active', true, 100, NOW(), NOW())
+         ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name, password = EXCLUDED.password, role = EXCLUDED.role, updated_at = NOW();`,
+        [assignedId, cleanName, cleanEmail, hashedPassword, roleToAssign]
+      );
+      console.log(`[Neon PostgreSQL] User registered and saved to database with ID: ${assignedId}`);
+    } catch (pgErr) {
+      console.error('[Neon PostgreSQL] Registration save error:', pgErr.message);
+    }
+
+    // 3. Immediately clear dashboard and analytics caches so numbers increment right away
+    invalidateDashboardCache();
+    invalidateAnalyticsCache();
+
     const token = generateToken(assignedId, roleToAssign);
 
     // Dispatch Welcome Email asynchronously
