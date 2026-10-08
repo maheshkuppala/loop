@@ -22,6 +22,8 @@ router.patch('/users/:id/status', adminController.updateUserStatus);
 router.get('/items', adminController.getItems);
 router.get('/items/:id', adminController.getItemDetails);
 router.patch('/items/:id/moderation', adminController.moderateItem);
+router.patch('/items/:id/approve', adminController.approveItem);
+router.patch('/items/:id/reject', adminController.rejectItem);
 
 // 5. Wanted Items Oversight
 router.get('/wanted', adminController.getWantedItems);
@@ -49,6 +51,8 @@ router.patch('/categories/:id/status', adminController.toggleCategoryStatus);
 // 10. Platform Settings
 router.get('/settings', adminController.getSettings);
 router.put('/settings', adminController.updateSettings);
+router.get('/upload-rules', adminController.getUploadRules);
+router.put('/upload-rules', adminController.updateUploadRules);
 router.get('/points-settings', adminController.getPointsSettings);
 router.put('/points-settings', adminController.updatePointsSettings);
 

@@ -65,6 +65,16 @@ export const adminService = {
     return res.data;
   },
 
+  approveItem: async (id) => {
+    const res = await api.patch(`/admin/items/${id}/approve`);
+    return res.data;
+  },
+
+  rejectItem: async (id, reason) => {
+    const res = await api.patch(`/admin/items/${id}/reject`, { reason });
+    return res.data;
+  },
+
   // 5. Wanted Items
   getWantedItems: async (params = {}) => {
     const query = new URLSearchParams();

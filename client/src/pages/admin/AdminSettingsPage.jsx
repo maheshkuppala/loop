@@ -3,6 +3,7 @@ import { Settings, Save, ShieldAlert, Sliders, CheckCircle2 } from 'lucide-react
 import adminService from '../../services/adminService';
 import Spinner from '../../components/common/Spinner';
 import AdminImpactFactorsSection from '../../components/admin/AdminImpactFactorsSection';
+import AdminUploadRulesSettings from '../../components/admin/AdminUploadRulesSettings';
 
 export const AdminSettingsPage = () => {
   const [settings, setSettings] = useState({
@@ -266,6 +267,9 @@ export const AdminSettingsPage = () => {
           </div>
         </form>
       )}
+
+      {/* Product Upload Rules Governance */}
+      <AdminUploadRulesSettings />
 
       {/* Environmental Impact Factors Governance */}
       <AdminImpactFactorsSection />

@@ -13,6 +13,7 @@ const adminDashboardService = require('../services/adminDashboardService');
 const adminAnalyticsService = require('../services/adminAnalyticsService');
 const { logAction } = require('../services/adminAuditService');
 const notificationService = require('../services/notificationService');
+const uploadRulesService = require('../services/uploadRulesService');
 
 // Default platform configuration values
 const DEFAULT_SETTINGS = {
@@ -469,6 +470,142 @@ exports.moderateItem = async (req, res) => {
     });
   }
 };
+
+exports.approveItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid item ID format.' });
+    }
+
+    const item = await Item.findById(id);
+    if (!item) {
+      return res.status(404).json({ success: false, message: 'Item not found.' });
+    }
+
+    item.approvalStatus = 'APPROVED';
+    item.status = 'active';
+    item.availability = 'Available';
+    item.rejectionReason = '';
+    await item.save();
+
+    await logAction({
+      adminId: req.admin._id,
+      action: 'ITEM_APPROVED',
+      targetType: 'ITEM',
+      targetId: item._id,
+      targetTitle: item.title,
+      ipAddress: req.ip
+    });
+
+    try {
+      await notificationService.createNotification({
+        recipient: item.owner,
+        type: 'ITEM_UPDATED',
+        title: 'Listing Approved!',
+        message: `Your listing "${item.title}" has been approved by admin and is now live!`,
+        link: `/items/${item._id}`
+      });
+    } catch (notifErr) {
+      // non-critical
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Item has been approved and published to the marketplace.',
+      item
+    });
+  } catch (error) {
+    console.error('Error approving item:', error);
+    return res.status(500).json({ success: false, message: 'Failed to approve item.' });
+  }
+};
+
+exports.rejectItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason = '' } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid item ID format.' });
+    }
+
+    const item = await Item.findById(id);
+    if (!item) {
+      return res.status(404).json({ success: false, message: 'Item not found.' });
+    }
+
+    item.approvalStatus = 'REJECTED';
+    item.status = 'rejected';
+    item.availability = 'Unavailable';
+    item.rejectionReason = reason || 'Item does not meet platform reuse criteria.';
+    await item.save();
+
+    await logAction({
+      adminId: req.admin._id,
+      action: 'ITEM_REJECTED',
+      targetType: 'ITEM',
+      targetId: item._id,
+      targetTitle: item.title,
+      metadata: { reason },
+      ipAddress: req.ip
+    });
+
+    try {
+      await notificationService.createNotification({
+        recipient: item.owner,
+        type: 'ITEM_UPDATED',
+        title: 'Listing Needs Revision',
+        message: `Your listing "${item.title}" was not approved. Reason: ${item.rejectionReason}`,
+        link: '/my-items'
+      });
+    } catch (notifErr) {
+      // non-critical
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Item rejected.',
+      item
+    });
+  } catch (error) {
+    console.error('Error rejecting item:', error);
+    return res.status(500).json({ success: false, message: 'Failed to reject item.' });
+  }
+};
+
+exports.getUploadRules = async (req, res) => {
+  try {
+    const rules = await uploadRulesService.getUploadRules();
+    return res.status(200).json({ success: true, rules });
+  } catch (error) {
+    console.error('Error getting upload rules:', error);
+    return res.status(500).json({ success: false, message: 'Failed to get upload rules.' });
+  }
+};
+
+exports.updateUploadRules = async (req, res) => {
+  try {
+    const adminId = req.admin?._id || req.user?._id;
+    const rules = await uploadRulesService.updateUploadRules(req.body, adminId);
+    await logAction({
+      adminId,
+      action: 'UPLOAD_RULES_UPDATED',
+      targetType: 'SETTINGS',
+      metadata: rules,
+      ipAddress: req.ip
+    });
+    return res.status(200).json({
+      success: true,
+      message: 'Product upload rules updated successfully.',
+      rules
+    });
+  } catch (error) {
+    console.error('Error updating upload rules:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update upload rules.' });
+  }
+};
+
 
 // -------------------------------------------------------------
 // 5. WANTED ITEMS MONITORING

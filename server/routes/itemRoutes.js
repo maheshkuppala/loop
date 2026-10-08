@@ -3,6 +3,12 @@ const router = express.Router();
 const itemController = require('../controllers/itemController');
 const auth = require('../middleware/auth');
 
+const uploadMiddleware = require('../middleware/uploadMiddleware');
+
+// Upload rules and media routes
+router.get('/upload-rules', itemController.getUploadRules);
+router.post('/upload-media', auth, uploadMiddleware.single('file'), itemController.uploadMedia);
+
 // Protected personal user listing endpoints (scoped to authenticated user)
 router.get('/my/summary', auth, itemController.getMyItemsSummary);
 router.get('/my', auth, itemController.getMyItems);
