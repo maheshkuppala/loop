@@ -8,12 +8,7 @@ import OfflineBanner from './components/common/OfflineBanner';
 import AppRoutes from './routes/AppRoutes';
 import LooopAppLoader from './components/common/LooopAppLoader';
 
-export const App = ({ onReady }) => {
-  useEffect(() => {
-    // Signal that React app has mounted, remove pre-React loader
-    if (onReady) onReady();
-  }, [onReady]);
-
+export const App = () => {
   return (
     <AuthProvider>
       <SocketProvider>
@@ -21,9 +16,7 @@ export const App = ({ onReady }) => {
           <BrowserRouter>
             <OfflineBanner />
             <NotificationProvider>
-              <LooopAppLoader>
-                <AppRoutes />
-              </LooopAppLoader>
+              <AppRoutes />
             </NotificationProvider>
           </BrowserRouter>
         </ToastProvider>
