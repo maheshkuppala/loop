@@ -309,8 +309,8 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
       locality: item.locality || cityName,
       state: item.state || '',
       country: 'India',
-      latitude: item.latitude || 16.3067,
-      longitude: item.longitude || 80.4365,
+      latitude: Number(item.latitude) || 16.3067,
+      longitude: Number(item.longitude) || 80.4365,
       source: 'MANUAL'
     });
     if (onClose) onClose();
@@ -347,7 +347,7 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
 
   if (!isOpen) return null;
 
-  const currentCityName = location?.city || location?.name || '';
+  const currentCityName = String(location?.city || location?.name || '');
 
   return (
     <div
@@ -632,8 +632,8 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px' }}>
                 {popularCities.map((pop) => {
-                  const popName = pop.name || pop.city || '';
-                  const isSelected = currentCityName && popName && currentCityName.toLowerCase() === popName.toLowerCase();
+                  const popName = String(pop.name || pop.city || '');
+                  const isSelected = Boolean(currentCityName && popName && currentCityName.toLowerCase() === popName.toLowerCase());
                   return (
                     <button
                       key={popName}

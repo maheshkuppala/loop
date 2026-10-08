@@ -2,10 +2,29 @@ import React from 'react';
 import { Compass, Lock } from 'lucide-react';
 import GoogleItemLocationView from '../maps/GoogleItemLocationView';
 
-export const ApproximateLocationCard = ({ location = 'Indiranagar, Bengaluru', coordinates = [12.9716, 77.5946] }) => {
-  const parts = typeof location === 'string' ? location.split(',') : ['Indiranagar', 'Bengaluru'];
-  const locality = parts[0]?.trim() || 'Indiranagar';
-  const city = parts[1]?.trim() || 'Bengaluru';
+export const ApproximateLocationCard = ({
+  location = 'Indiranagar, Bengaluru',
+  coordinates = [12.9716, 77.5946]
+}) => {
+  let locality = 'Indiranagar';
+  let city = 'Bengaluru';
+  let finalCoords = [12.9716, 77.5946];
+
+  if (typeof location === 'string') {
+    const parts = location.split(',');
+    locality = parts[0]?.trim() || 'Indiranagar';
+    city = parts[1]?.trim() || 'Bengaluru';
+  } else if (location && typeof location === 'object') {
+    locality = location.locality || location.name || location.area || 'Indiranagar';
+    city = location.city || location.state || 'Bengaluru';
+    if (location.latitude != null && location.longitude != null) {
+      finalCoords = [Number(location.latitude), Number(location.longitude)];
+    }
+  }
+
+  if (Array.isArray(coordinates) && coordinates.length === 2 && !isNaN(Number(coordinates[0])) && !isNaN(Number(coordinates[1]))) {
+    finalCoords = [Number(coordinates[0]), Number(coordinates[1])];
+  }
 
   return (
     <div
@@ -37,7 +56,7 @@ export const ApproximateLocationCard = ({ location = 'Indiranagar, Bengaluru', c
       <GoogleItemLocationView
         locality={locality}
         city={city}
-        coordinates={coordinates}
+        coordinates={finalCoords}
         height="180px"
       />
 

@@ -4,13 +4,19 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { MapContainer, TileLayer, Marker, Circle, useMapEvents, Popup } from 'react-leaflet';
 
-// Fix Leaflet marker icons in Vite bundlers
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
-});
+// Fix Leaflet marker icons safely in Vite bundlers
+try {
+  if (typeof window !== 'undefined' && L && L.Icon && L.Icon.Default && L.Icon.Default.prototype) {
+    delete L.Icon.Default.prototype._getIconUrl;
+    L.Icon.Default.mergeOptions({
+      iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+      iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+      shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
+    });
+  }
+} catch (err) {
+  console.warn('[Leaflet Init] Icon setup notice:', err);
+}
 
 const MapEventsHandler = ({ onLocationSelect }) => {
   useMapEvents({
@@ -37,18 +43,25 @@ export const GoogleMapsFallback = ({
   onChange,
   height = '320px'
 }) => {
-  const [position, setPosition] = useState([
-    Number(coordinates[0]) || 12.9716,
-    Number(coordinates[1]) || 77.5946
-  ]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
+  const parsePos = (coords) => {
+    if (Array.isArray(coords) && coords.length >= 2) {
+      const lat = Number(coords[0]);
+      const lng = Number(coords[1]);
+      if (!isNaN(lat) && !isNaN(lng)) return [lat, lng];
+    }
+    if (coords && typeof coords === 'object') {
+      const lat = Number(coords.lat || coords.latitude);
+      const lng = Number(coords.lng || coords.longitude);
+      if (!isNaN(lat) && !isNaN(lng)) return [lat, lng];
+    }
+    return [12.9716, 77.5946];
+  };
+
+  const [position, setPosition] = useState(parsePos(coordinates));
 
   useEffect(() => {
-    if (coordinates && coordinates.length === 2 && !isNaN(coordinates[0])) {
-      setPosition([Number(coordinates[0]), Number(coordinates[1])]);
-    }
-  }, [coordinates[0], coordinates[1]]);
+    setPosition(parsePos(coordinates));
+  }, [coordinates]);
 
   const handleMapClick = (lat, lng) => {
     if (!interactive) return;

@@ -52,7 +52,10 @@ export const itemService = {
         const inTitle = item.title?.toLowerCase().includes(query);
         const inDesc = item.description?.toLowerCase().includes(query);
         const inCat = item.category?.toLowerCase().includes(query);
-        const inLoc = item.location?.toLowerCase().includes(query);
+        const locStr = typeof item.location === 'string'
+          ? item.location
+          : (item.location?.city || item.location?.locality || item.city || item.locality || '');
+        const inLoc = locStr.toLowerCase().includes(query);
         return inTitle || inDesc || inCat || inLoc;
       });
     }
