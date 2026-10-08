@@ -28,6 +28,43 @@ const LOCALITIES_DATA = [
   { name: 'Gachibowli', type: 'LOCALITY', city: 'Hyderabad', state: 'Telangana', latitude: 17.4401, longitude: 78.3489 }
 ];
 
+const CITY_ALIASES = {
+  hyd: 'Hyderabad',
+  hyder: 'Hyderabad',
+  hydera: 'Hyderabad',
+  hyderabad: 'Hyderabad',
+  gunt: 'Guntur',
+  guntu: 'Guntur',
+  guntur: 'Guntur',
+  vij: 'Vijayawada',
+  vija: 'Vijayawada',
+  vijaya: 'Vijayawada',
+  vijayawada: 'Vijayawada',
+  beng: 'Bengaluru',
+  bengal: 'Bengaluru',
+  bang: 'Bengaluru',
+  bangal: 'Bengaluru',
+  bangalore: 'Bengaluru',
+  bengaluru: 'Bengaluru',
+  vizag: 'Visakhapatnam',
+  visak: 'Visakhapatnam',
+  visakha: 'Visakhapatnam',
+  visakhapatnam: 'Visakhapatnam',
+  chen: 'Chennai',
+  chenn: 'Chennai',
+  chennai: 'Chennai',
+  mum: 'Mumbai',
+  mumb: 'Mumbai',
+  mumbai: 'Mumbai',
+  del: 'Delhi',
+  delh: 'Delhi',
+  delhi: 'Delhi',
+  pune: 'Pune',
+  tiru: 'Tirupati',
+  tirup: 'Tirupati',
+  tirupati: 'Tirupati'
+};
+
 let hasSeeded = false;
 
 /**
@@ -77,21 +114,32 @@ async function searchLocations(queryStr) {
     return await getPopularLocations();
   }
 
+  const aliasTarget = CITY_ALIASES[rawQuery.toLowerCase()];
   const cleanQuery = rawQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const searchTerms = [cleanQuery];
+  if (aliasTarget) {
+    searchTerms.push(aliasTarget.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  }
+
+  const orConditions = [];
+  searchTerms.forEach(term => {
+    const termRegex = new RegExp(term, 'i');
+    orConditions.push(
+      { name: termRegex },
+      { city: termRegex },
+      { state: termRegex },
+      { district: termRegex }
+    );
+  });
+
   const exactRegex = new RegExp(`^${cleanQuery}$`, 'i');
   const startsWithRegex = new RegExp(`^${cleanQuery}`, 'i');
-  const containsRegex = new RegExp(cleanQuery, 'i');
 
   try {
     // 1. Search local DB locations
     const dbMatches = await Location.find({
       isActive: true,
-      $or: [
-        { name: containsRegex },
-        { city: containsRegex },
-        { state: containsRegex },
-        { district: containsRegex }
-      ]
+      $or: orConditions
     }).lean();
 
     // Rank DB matches
