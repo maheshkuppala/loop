@@ -1,12 +1,3 @@
-import { Loader } from '@googlemaps/js-api-loader';
-
-/**
- * Centralized Google Maps Loader & Utility Service for LOOOP
- * Ensures API key is read exclusively from import.meta.env.VITE_GOOGLE_MAPS_API_KEY.
- * Handles loading, singleton instance management, auth failure detection, and privacy rounding.
- */
-
-let loaderInstance = null;
 let googleMapsPromise = null;
 let loadStatus = 'unloaded'; // 'unloaded' | 'loading' | 'loaded' | 'error'
 let loadError = null;
@@ -35,7 +26,11 @@ export const subscribeGoogleMapsError = (callback) => {
 };
 
 export const loadGoogleMaps = () => {
-  if (loadStatus === 'loaded' && window.google?.maps) {
+  if (typeof window === 'undefined') {
+    return Promise.reject(new Error('Google Maps can only be loaded in browser environment.'));
+  }
+
+  if (loadStatus === 'loaded' && window.google?.maps?.places) {
     return Promise.resolve(window.google.maps);
   }
 
@@ -52,28 +47,60 @@ export const loadGoogleMaps = () => {
 
   loadStatus = 'loading';
 
-  if (!loaderInstance) {
-    loaderInstance = new Loader({
-      apiKey,
-      version: 'weekly',
-      libraries: ['places', 'geometry']
-    });
-  }
-
-  googleMapsPromise = loaderInstance
-    .load()
-    .then(() => {
+  googleMapsPromise = new Promise((resolve, reject) => {
+    if (window.google?.maps?.places) {
       loadStatus = 'loaded';
       loadError = null;
-      return window.google.maps;
-    })
-    .catch((err) => {
+      return resolve(window.google.maps);
+    }
+
+    const existingScript = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
+    if (existingScript) {
+      existingScript.addEventListener('load', () => {
+        if (window.google?.maps) {
+          loadStatus = 'loaded';
+          loadError = null;
+          resolve(window.google.maps);
+        } else {
+          loadStatus = 'error';
+          loadError = 'Google Maps script loaded but window.google.maps is undefined.';
+          googleMapsPromise = null;
+          reject(new Error(loadError));
+        }
+      });
+      existingScript.addEventListener('error', (err) => {
+        loadStatus = 'error';
+        loadError = 'Failed to load Google Maps script.';
+        googleMapsPromise = null;
+        reject(err);
+      });
+      return;
+    }
+
+    const callbackName = '__looop_google_maps_init_' + Math.random().toString(36).substring(2, 9);
+    window[callbackName] = () => {
+      delete window[callbackName];
+      loadStatus = 'loaded';
+      loadError = null;
+      resolve(window.google.maps);
+    };
+
+    const script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry&v=weekly&callback=${callbackName}`;
+    script.async = true;
+    script.defer = true;
+
+    script.onerror = (err) => {
+      delete window[callbackName];
       loadStatus = 'error';
-      loadError = err?.message || 'Failed to load Google Maps SDK';
-      console.error('[LOOOP Google Maps Loader Error]', err);
+      loadError = 'Failed to load Google Maps script from Google CDN.';
       googleMapsPromise = null;
-      throw err;
-    });
+      reject(new Error(loadError));
+    };
+
+    document.head.appendChild(script);
+  });
 
   return googleMapsPromise;
 };
