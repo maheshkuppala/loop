@@ -1,6 +1,17 @@
 import React from 'react';
 import { MapPin, CheckCircle2, RefreshCw, Edit3, AlertTriangle, Navigation } from 'lucide-react';
 import Spinner from './Spinner';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+import { MapContainer, TileLayer, Marker, Circle } from 'react-leaflet';
+
+// Fix Leaflet marker icons in Vite
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
+});
 
 export const LocationConfirmationModal = ({
   isOpen,
@@ -29,6 +40,9 @@ export const LocationConfirmationModal = ({
     : (pendingLocation?.locality && pendingLocation.locality !== 'Detected Area' ? pendingLocation.locality : 'Guntur');
 
   const displayState = pendingLocation?.state || 'Andhra Pradesh';
+
+  const lat = pendingLocation?.latitude || 16.3067;
+  const lng = pendingLocation?.longitude || 80.4365;
 
   return (
     <div style={{
@@ -110,48 +124,34 @@ export const LocationConfirmationModal = ({
             </div>
           ) : (
             <>
-              {/* Instant Lightweight Vector Map Visual (0ms Latency - No External Iframe) */}
+              {/* OpenStreetMap Leaflet Canvas Map View */}
               <div style={{
-                height: '130px',
+                height: '180px',
                 borderRadius: '12px',
-                background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
                 border: '1px solid #334155',
                 position: 'relative',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
                 overflow: 'hidden'
               }}>
-                <div style={{
-                  position: 'absolute',
-                  inset: 0,
-                  backgroundImage: 'radial-gradient(#334155 1.5px, transparent 1.5px)',
-                  backgroundSize: '16px 16px',
-                  opacity: 0.5
-                }} />
-
-                <div style={{
-                  position: 'relative',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 2
-                }}>
-                  <div style={{
-                    width: '42px',
-                    height: '42px',
-                    borderRadius: '50%',
-                    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-                    border: '2px solid #10b981',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#10b981',
-                    boxShadow: '0 0 20px rgba(16, 185, 129, 0.35)'
-                  }}>
-                    <MapPin size={22} />
-                  </div>
-                </div>
+                <MapContainer
+                  center={[lat, lng]}
+                  zoom={14}
+                  scrollWheelZoom={false}
+                  zoomControl={false}
+                  style={{ height: '100%', width: '100%' }}
+                >
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  <Marker position={[lat, lng]} />
+                  {pendingLocation?.accuracy && (
+                    <Circle
+                      center={[lat, lng]}
+                      radius={pendingLocation.accuracy}
+                      pathOptions={{ color: '#10b981', fillColor: '#10b981', fillOpacity: 0.15 }}
+                    />
+                  )}
+                </MapContainer>
 
                 <div style={{
                   position: 'absolute',
@@ -164,24 +164,10 @@ export const LocationConfirmationModal = ({
                   borderRadius: '20px',
                   fontSize: '0.72rem',
                   fontWeight: 700,
-                  zIndex: 3
+                  zIndex: 999
                 }}>
                   {accuracyBadge.label}
                 </div>
-
-                {pendingLocation?.latitude && pendingLocation?.longitude && (
-                  <div style={{
-                    position: 'absolute',
-                    bottom: '8px',
-                    left: '12px',
-                    fontSize: '0.72rem',
-                    color: '#94a3b8',
-                    fontWeight: 600,
-                    zIndex: 3
-                  }}>
-                    GPS: {pendingLocation.latitude.toFixed(4)}, {pendingLocation.longitude.toFixed(4)}
-                  </div>
-                )}
               </div>
 
               {/* Detected Location Card */}
