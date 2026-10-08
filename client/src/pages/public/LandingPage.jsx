@@ -116,7 +116,7 @@ export const LandingPage = () => {
         flexDirection: 'column',
         width: '100%',
         overflowX: 'hidden',
-        backgroundColor: '#f6faf7',
+        backgroundColor: 'var(--color-bg-main, #f8fafc)',
         color: '#0f172a',
         position: 'relative'
       }}
@@ -144,7 +144,7 @@ export const LandingPage = () => {
           paddingTop: '4rem',
           paddingBottom: '6rem',
           overflow: 'hidden',
-          background: 'radial-gradient(ellipse 100% 80% at 50% -20%, rgba(16, 185, 129, 0.18), rgba(240, 253, 250, 0.8) 50%, #f6faf7 100%)'
+          background: 'radial-gradient(ellipse 100% 80% at 50% -20%, rgba(16, 185, 129, 0.14), rgba(248, 250, 252, 0.6) 50%, var(--color-bg-main, #f8fafc) 100%)'
         }}
         aria-label="Hero Section"
       >
@@ -462,8 +462,8 @@ export const LandingPage = () => {
       <section
         style={{
           padding: '6rem 0',
-          backgroundColor: '#f0f7f3',
-          borderTop: '1px solid rgba(16, 185, 129, 0.15)',
+          backgroundColor: 'var(--color-bg-main, #f8fafc)',
+          borderTop: '1px solid rgba(226, 232, 240, 0.8)',
           position: 'relative'
         }}
         aria-label="3D Category Showcase"
@@ -584,7 +584,8 @@ export const LandingPage = () => {
       <section
         style={{
           padding: '6.5rem 0',
-          backgroundColor: '#f6faf7',
+          backgroundColor: 'var(--color-bg-main, #f8fafc)',
+          borderTop: '1px solid rgba(226, 232, 240, 0.8)',
           position: 'relative'
         }}
         aria-label="How LOOOP Works"
@@ -713,8 +714,8 @@ export const LandingPage = () => {
       <section
         style={{
           padding: '6rem 0',
-          backgroundColor: '#ffffff',
-          borderTop: '1px solid rgba(16, 185, 129, 0.12)'
+          backgroundColor: 'var(--color-bg-main, #f8fafc)',
+          borderTop: '1px solid rgba(226, 232, 240, 0.8)'
         }}
       >
         <div className="container">
@@ -946,7 +947,7 @@ export const LandingPage = () => {
       {/* =========================================================================
           6. FEATURED CATALOG ITEMS SECTION
           ========================================================================= */}
-      <section style={{ padding: '6rem 0', backgroundColor: '#ffffff' }}>
+      <section style={{ padding: '6rem 0', backgroundColor: 'var(--color-bg-main, #f8fafc)', borderTop: '1px solid rgba(226, 232, 240, 0.8)' }}>
         <div className="container">
           <div
             style={{
@@ -1048,7 +1049,8 @@ export const LandingPage = () => {
       <section
         style={{
           padding: '6.5rem 0',
-          backgroundColor: '#f6faf7',
+          backgroundColor: 'var(--color-bg-main, #f8fafc)',
+          borderTop: '1px solid rgba(226, 232, 240, 0.8)',
           position: 'relative',
           overflow: 'hidden'
         }}
