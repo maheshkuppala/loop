@@ -4,6 +4,7 @@ import adminService from '../../services/adminService';
 import Spinner from '../../components/common/Spinner';
 import AdminImpactFactorsSection from '../../components/admin/AdminImpactFactorsSection';
 import AdminUploadRulesSettings from '../../components/admin/AdminUploadRulesSettings';
+import AdminLocationRulesSettings from '../../components/admin/AdminLocationRulesSettings';
 
 export const AdminSettingsPage = () => {
   const [settings, setSettings] = useState({
@@ -270,6 +271,9 @@ export const AdminSettingsPage = () => {
 
       {/* Product Upload Rules Governance */}
       <AdminUploadRulesSettings />
+
+      {/* Location Governance & GPS Rules */}
+      <AdminLocationRulesSettings />
 
       {/* Environmental Impact Factors Governance */}
       <AdminImpactFactorsSection />

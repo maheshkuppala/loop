@@ -1,44 +1,43 @@
 import React, { useState } from 'react';
-import { MapPin, SlidersHorizontal } from 'lucide-react';
+import { MapPin, ChevronDown } from 'lucide-react';
 import { useLocationContext } from '../../context/LocationContext';
-import LocationSelectorModal from './LocationSelectorModal';
+import BookMyShowLocationModal from './BookMyShowLocationModal';
 
 export const LocationBadge = () => {
-  const { location, searchRadiusKm, displayLocationText } = useLocationContext();
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const { location, isLocationModalOpen, openLocationModal, closeLocationModal, displayLocationText } = useLocationContext();
 
   return (
     <>
       <button
         type="button"
-        onClick={() => setIsModalOpen(true)}
+        onClick={openLocationModal}
         style={{
           display: 'inline-flex',
           alignItems: 'center',
           gap: '6px',
-          padding: '6px 12px',
+          padding: '6px 14px',
           borderRadius: '20px',
           backgroundColor: '#ecfdf5',
-          border: '1px solid #a7f3d0',
+          border: '1.5px solid #a7f3d0',
           color: '#047857',
-          fontSize: '0.825rem',
+          fontSize: '0.85rem',
           fontWeight: 700,
           cursor: 'pointer',
           transition: 'all 0.2s ease',
           boxShadow: '0 1px 3px rgba(16, 185, 129, 0.1)',
           whiteSpace: 'nowrap'
         }}
-        title="Click to change your location or search radius"
+        title="Click to select or change your location"
       >
-        <MapPin size={14} color="#059669" />
-        <span>{displayLocationText}</span>
-        <span style={{ color: '#059669', opacity: 0.7 }}>· {searchRadiusKm} km</span>
-        <SlidersHorizontal size={12} style={{ marginLeft: '2px', opacity: 0.6 }} />
+        <MapPin size={15} color="#059669" />
+        <span>{displayLocationText || 'Select Location'}</span>
+        <ChevronDown size={14} style={{ color: '#059669', opacity: 0.8 }} />
       </button>
 
-      {isModalOpen && (
-        <LocationSelectorModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
-      )}
+      <BookMyShowLocationModal
+        isOpen={isLocationModalOpen}
+        onClose={closeLocationModal}
+      />
     </>
   );
 };

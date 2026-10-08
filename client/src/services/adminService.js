@@ -186,6 +186,16 @@ export const adminService = {
     return res.data;
   },
 
+  getLocationRules: async () => {
+    const res = await api.get('/admin/location-rules');
+    return res.data;
+  },
+
+  updateLocationRules: async (data) => {
+    const res = await api.put('/admin/location-rules', data);
+    return res.data;
+  },
+
   getPointsLedger: async (params = {}) => {
     const query = new URLSearchParams();
     if (params.page) query.append('page', params.page);
