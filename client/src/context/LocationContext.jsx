@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 import LocationConfirmationModal from '../components/common/LocationConfirmationModal';
 
@@ -8,7 +8,7 @@ const STORAGE_KEY = 'looop_user_location';
 const RADIUS_KEY = 'looop_search_radius';
 
 /**
- * Fast offline Indian city coordinate resolver
+ * Fast offline Indian city coordinate resolver (0ms latency)
  */
 function resolveCityFromCoordinates(lat, lng) {
   if (!lat || !lng) return 'Guntur';
@@ -45,6 +45,8 @@ export const LocationProvider = ({ children }) => {
   const [isGeoLoading, setIsGeoLoading] = useState(false);
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+
+  const activeRequestSeqId = useRef(0);
 
   useEffect(() => {
     try {
@@ -106,89 +108,98 @@ export const LocationProvider = ({ children }) => {
   }, []);
 
   /**
-   * Request fresh high-accuracy device GPS position
+   * Request fresh device position with immediate UI feedback and fast options
    */
   const requestFreshGPS = () => {
+    if (isGeoLoading) return; // Prevent duplicate concurrent requests
+
     if (typeof window === 'undefined' || !navigator.geolocation) {
       setGeoError('Geolocation service is not supported on this browser/device.');
       setLocationStatus('LOCATION_DENIED');
       return;
     }
 
+    // Increment request sequence ID to prevent race conditions
+    activeRequestSeqId.current += 1;
+    const currentSeqId = activeRequestSeqId.current;
+
+    // 1. Immediate UI state transition (0ms)
     setIsGeoLoading(true);
     setGeoError(null);
     setLocationStatus('LOCATION_REQUESTING_PERMISSION');
 
+    // 2. Request browser location immediately with low-latency options
     navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          const accuracy = pos.coords.accuracy || 0;
+      (pos) => {
+        // Race condition check: ignore if user initiated a newer request/selection
+        if (currentSeqId !== activeRequestSeqId.current) return;
 
-          setLocationStatus('LOCATION_REVERSE_GEOCODING');
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const accuracy = pos.coords.accuracy || 0;
 
-          const fallbackCity = resolveCityFromCoordinates(lat, lng);
-          const fallbackState = resolveStateFromCoordinates(lat, lng);
+        // 3. Instant city resolution via bounding boxes (0ms)
+        const city = resolveCityFromCoordinates(lat, lng);
+        const state = resolveStateFromCoordinates(lat, lng);
 
-          // Call server reverse geocoding proxy
-          let geoResult = null;
-          try {
-            const res = await api.get(`/location/reverse-geocode?lat=${lat}&lng=${lng}`);
-            if (res.data && res.data.success) {
-              geoResult = res.data.data;
+        const rawLoc = {
+          latitude: lat,
+          longitude: lng,
+          accuracy,
+          name: city,
+          city: city,
+          state: state,
+          locality: city,
+          district: state,
+          country: 'India',
+          formattedAddress: `${city}, ${state}`,
+          source: 'GPS',
+          timestamp: Date.now()
+        };
+
+        // 4. Update pending state instantly
+        setPendingLocation(rawLoc);
+        setIsGeoLoading(false);
+        setLocationStatus('LOCATION_CONFIRMATION');
+        setShowConfirmationModal(true);
+
+        // 5. Asynchronous background reverse geocoding (non-blocking)
+        api.get(`/location/reverse-geocode?lat=${lat}&lng=${lng}`)
+          .then((res) => {
+            if (currentSeqId !== activeRequestSeqId.current) return;
+            if (res.data?.success && res.data.data) {
+              const geo = res.data.data;
+              setPendingLocation((prev) => {
+                if (!prev) return prev;
+                return {
+                  ...prev,
+                  locality: geo.locality && geo.locality !== 'Detected Area' ? geo.locality : prev.city,
+                  state: geo.state || prev.state,
+                  formattedAddress: geo.formattedAddress || prev.formattedAddress
+                };
+              });
             }
-          } catch (apiErr) {
-            console.warn('[LocationContext] Reverse geocode API notice:', apiErr.message);
-          }
-
-          let city = geoResult?.city;
-          if (!city || city === 'Detected Area' || city === 'Current Location') {
-            city = fallbackCity;
-          }
-
-          let state = geoResult?.state || fallbackState;
-          let locality = geoResult?.locality && geoResult.locality !== 'Detected Area' ? geoResult.locality : city;
-
-          const rawLoc = {
-            latitude: lat,
-            longitude: lng,
-            accuracy,
-            name: city,
-            city: city,
-            state: state,
-            locality: locality,
-            district: geoResult?.district || state,
-            country: geoResult?.country || 'India',
-            postcode: geoResult?.postcode || '',
-            formattedAddress: `${locality}, ${city}, ${state}`,
-            source: 'GPS',
-            timestamp: Date.now()
-          };
-
-          setPendingLocation(rawLoc);
-          setIsGeoLoading(false);
-          setLocationStatus('LOCATION_CONFIRMATION');
-          setShowConfirmationModal(true);
-        } catch (err) {
-          setIsGeoLoading(false);
-          setGeoError('Failed to process location data. Please try again.');
-          setLocationStatus('LOCATION_ERROR');
-        }
+          })
+          .catch((err) => {
+            console.warn('[LocationContext] Background geocode notice:', err.message);
+          });
       },
       (err) => {
+        if (currentSeqId !== activeRequestSeqId.current) return;
+
         setIsGeoLoading(false);
-        let msg = 'Location permission denied or device GPS unavailable.';
-        if (err.code === 1) msg = 'Location access was denied. Please allow location permissions in your browser.';
-        else if (err.code === 2) msg = 'Position unavailable. Please ensure your device GPS is turned on.';
-        else if (err.code === 3) msg = 'GPS acquisition timed out. Please try again in an open space.';
+        let msg = 'Unable to detect your location quickly. Please search manually.';
+        if (err.code === 1) msg = 'Location permission was denied. Please search for your city manually.';
+        else if (err.code === 2) msg = 'Position unavailable. Please search for your city manually.';
+        else if (err.code === 3) msg = 'Location detection took too long. Please search for your city manually.';
+
         setGeoError(msg);
         setLocationStatus('LOCATION_DENIED');
       },
       {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
+        enableHighAccuracy: false, // Fast, low-latency city level detection
+        timeout: 8000,            // Never hang indefinitely
+        maximumAge: 300000         // Reuse recent 5-min browser location if available
       }
     );
   };
@@ -199,6 +210,8 @@ export const LocationProvider = ({ children }) => {
   const confirmLocation = (locObj) => {
     const rawLoc = locObj || pendingLocation;
     if (!rawLoc) return;
+
+    activeRequestSeqId.current += 1; // Invalidate any pending GPS callbacks
 
     let city = rawLoc.city;
     if (!city || city === 'Detected Area' || city === 'Current Location') {
@@ -234,6 +247,8 @@ export const LocationProvider = ({ children }) => {
    * Set location manually from BookMyShow location selector
    */
   const setManualLocation = (locData) => {
+    activeRequestSeqId.current += 1; // Invalidate any pending GPS callbacks
+
     let cityName = locData.city || locData.name;
     if (!cityName || cityName === 'Detected Area' || cityName === 'Custom Area') {
       cityName = resolveCityFromCoordinates(locData.latitude, locData.longitude);

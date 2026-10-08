@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, MapPin, Navigation, X, Building2, AlertCircle } from 'lucide-react';
+import { Search, MapPin, Navigation, X, Building2, AlertCircle, RefreshCw } from 'lucide-react';
 import { useLocationContext } from '../../context/LocationContext';
 import api from '../../services/api';
 
@@ -95,7 +95,8 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
   };
 
   const handleDetectGPS = () => {
-    if (onClose) onClose();
+    if (isGeoLoading) return;
+    // Call browser GPS immediately; modal stays open until coordinates arrive
     requestFreshGPS();
   };
 
@@ -245,7 +246,7 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
             )}
           </div>
 
-          {/* Detect Location Action */}
+          {/* Immediate Feedback Detect Location Button */}
           {!searchQuery && (
             <button
               type="button"
@@ -255,22 +256,31 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
                 width: '100%',
                 padding: '13px 16px',
                 borderRadius: '14px',
-                backgroundColor: '#ecfdf5',
-                border: '1.5px solid #a7f3d0',
-                color: '#047857',
+                backgroundColor: isGeoLoading ? '#f1f5f9' : '#ecfdf5',
+                border: isGeoLoading ? '1.5px solid #cbd5e1' : '1.5px solid #a7f3d0',
+                color: isGeoLoading ? '#64748b' : '#047857',
                 fontWeight: 700,
                 fontSize: '0.95rem',
-                cursor: 'pointer',
+                cursor: isGeoLoading ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '10px',
                 transition: 'all 0.2s ease',
-                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.08)'
+                boxShadow: isGeoLoading ? 'none' : '0 2px 8px rgba(16, 185, 129, 0.08)'
               }}
             >
-              <Navigation size={18} color="#059669" />
-              <span>{isGeoLoading ? 'Detecting your GPS location...' : 'Detect my location'}</span>
+              {isGeoLoading ? (
+                <>
+                  <RefreshCw size={18} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} />
+                  <span>Detecting location...</span>
+                </>
+              ) : (
+                <>
+                  <Navigation size={18} color="#059669" />
+                  <span>Detect my location</span>
+                </>
+              )}
             </button>
           )}
 
@@ -389,6 +399,12 @@ export const BookMyShowLocationModal = ({ isOpen, onClose }) => {
           )}
         </div>
       </div>
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 };
