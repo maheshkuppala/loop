@@ -395,7 +395,7 @@ export const LandingPage = () => {
       {/* =========================================================================
           2. AMAZON-STYLE AUTO-MOVING LISTED ITEMS CAROUSEL
           ========================================================================= */}
-      <AmazonItemCarousel items={mockItems} />
+      <AmazonItemCarousel items={realItems} />
 
       {/* =========================================================================
           3. CUSTOMER FEEDBACKS & COMMUNITY REVIEWS SECTION
