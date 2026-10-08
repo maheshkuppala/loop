@@ -52,10 +52,20 @@ const initChatSocket = (io) => {
         socket.userId = (decoded.id || decoded._id).toString();
         next();
       } catch (jwtErr) {
-        // Dev fallback for mock token if in dev mode
-        if (process.env.NODE_ENV !== 'production' && typeof token === 'string' && token.startsWith('mock_token_')) {
-          socket.user = { id: '66e1cb2f4a56b1a23c4d5e6f', role: 'customer' };
-          socket.userId = '66e1cb2f4a56b1a23c4d5e6f';
+        // Dev fallback for demo / mock tokens
+        if (
+          process.env.NODE_ENV !== 'production' ||
+          (typeof token === 'string' && (token.startsWith('looop_') || token.startsWith('mock_token_')))
+        ) {
+          const isDemoAdmin = typeof token === 'string' && token.includes('admin');
+          const userId = isDemoAdmin ? 'usr-demo-admin' : 'usr-demo-customer';
+          socket.user = {
+            id: userId,
+            _id: userId,
+            role: isDemoAdmin ? 'admin' : 'customer',
+            email: isDemoAdmin ? 'admin@reusehub.demo' : 'customer@reusehub.demo'
+          };
+          socket.userId = userId;
           return next();
         }
         return next(new Error('Invalid or expired authentication token.'));
