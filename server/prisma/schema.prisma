@@ -321,8 +321,8 @@ model Message {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  @@index([conversationId, createdAt(sort: Asc)])
-  @@index([conversationId, createdAt(sort: Desc)])
+  @@index([conversationId, createdAt(sort: Asc)], map: "Message_conversationId_createdAt_asc_idx")
+  @@index([conversationId, createdAt(sort: Desc)], map: "Message_conversationId_createdAt_desc_idx")
 }
 
 model Review {
