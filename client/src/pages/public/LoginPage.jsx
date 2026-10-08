@@ -78,7 +78,7 @@ export const LoginPage = () => {
         message: 'Logged in as System Admin (admin@reusehub.demo)',
         variant: 'success'
       });
-      navigate('/admin/dashboard');
+      window.location.href = '/admin/dashboard';
     } catch (err) {
       const fallbackUser = {
         _id: 'usr-demo-admin',
@@ -95,7 +95,7 @@ export const LoginPage = () => {
         message: 'Logged in as System Admin (admin@reusehub.demo)',
         variant: 'success'
       });
-      navigate('/admin/dashboard');
+      window.location.href = '/admin/dashboard';
     } finally {
       setIsSubmitting(false);
     }
@@ -117,7 +117,7 @@ export const LoginPage = () => {
         message: 'Logged in as Demo Customer (customer@reusehub.demo)',
         variant: 'success'
       });
-      navigate('/dashboard');
+      window.location.href = '/dashboard';
     } catch (err) {
       const fallbackUser = {
         _id: 'usr-demo-customer',
@@ -135,7 +135,7 @@ export const LoginPage = () => {
         message: 'Logged in as Demo Customer (customer@reusehub.demo)',
         variant: 'success'
       });
-      navigate('/dashboard');
+      window.location.href = '/dashboard';
     } finally {
       setIsSubmitting(false);
     }
@@ -188,13 +188,15 @@ export const LoginPage = () => {
       sessionStorage.removeItem('looop_auth_redirect');
     } catch {}
 
+    let destUrl = '/';
     if (targetRedirect && targetRedirect !== '/login' && targetRedirect !== '/register') {
-      navigate(targetRedirect);
+      destUrl = targetRedirect;
     } else if (userData.role === 'ADMIN' || userData.role === 'admin') {
-      navigate('/admin/dashboard');
+      destUrl = '/admin/dashboard';
     } else {
-      navigate('/');
+      destUrl = '/dashboard';
     }
+    window.location.href = destUrl;
   };
 
   // Password Form Validation
