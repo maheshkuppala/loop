@@ -155,7 +155,7 @@ export const adminService = {
     return res.data;
   },
 
-  // 10. Platform Settings
+  // 10. Platform Settings & Points Rules
   getSettings: async () => {
     const res = await api.get('/admin/settings');
     return res.data;
@@ -163,6 +163,36 @@ export const adminService = {
 
   updateSettings: async (data) => {
     const res = await api.put('/admin/settings', data);
+    return res.data;
+  },
+
+  getPointsSettings: async () => {
+    const res = await api.get('/admin/points-settings');
+    return res.data;
+  },
+
+  updatePointsSettings: async (data) => {
+    const res = await api.put('/admin/points-settings', data);
+    return res.data;
+  },
+
+  getPointsLedger: async (params = {}) => {
+    const query = new URLSearchParams();
+    if (params.page) query.append('page', params.page);
+    if (params.limit) query.append('limit', params.limit);
+    if (params.userId) query.append('userId', params.userId);
+
+    try {
+      const res = await api.get(`/points/admin/ledger?${query.toString()}`);
+      return res.data;
+    } catch {
+      const res = await api.get(`/points/history?${query.toString()}`);
+      return res.data;
+    }
+  },
+
+  awardUserPoints: async (data) => {
+    const res = await api.post('/points/manual-award', data);
     return res.data;
   },
 
