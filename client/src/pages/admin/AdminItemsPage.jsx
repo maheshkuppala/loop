@@ -16,6 +16,7 @@ import AdminTable from '../../components/admin/AdminTable';
 import AdminPagination from '../../components/admin/AdminPagination';
 import AdminSearch from '../../components/admin/AdminSearch';
 import AdminFilterBar from '../../components/admin/AdminFilterBar';
+import AdminStatCard from '../../components/admin/AdminStatCard';
 import StatusBadge from '../../components/admin/StatusBadge';
 import ConfirmDialog from '../../components/admin/ConfirmDialog';
 import Avatar from '../../components/common/Avatar';
@@ -32,6 +33,7 @@ export const AdminItemsPage = () => {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [sharingTypeFilter, setSharingTypeFilter] = useState('');
+  const [stats, setStats] = useState({ totalItems: 0, availableItems: 0, pendingItems: 0, unavailableItems: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [notification, setNotification] = useState(null);
 
@@ -62,6 +64,9 @@ export const AdminItemsPage = () => {
           setItems(res.data.items || []);
           setTotal(res.data.total || 0);
           setTotalPages(res.data.totalPages || 1);
+          if (res.data.stats) {
+            setStats(res.data.stats);
+          }
         }
       } else {
         const res = await adminService.getWantedItems({
@@ -444,6 +449,42 @@ export const AdminItemsPage = () => {
             Wanted Requests
           </button>
         </div>
+      </div>
+
+      {/* Summary Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+        <AdminStatCard
+          title="Total Items"
+          value={stats.totalItems}
+          subtitle="All items in PostgreSQL database"
+          icon={Package}
+          color="#38bdf8"
+          isLoading={isLoading}
+        />
+        <AdminStatCard
+          title="Available Items"
+          value={stats.availableItems}
+          subtitle="Published & live for sharing"
+          icon={CheckCircle}
+          color="#34d399"
+          isLoading={isLoading}
+        />
+        <AdminStatCard
+          title="Pending / Review"
+          value={stats.pendingItems}
+          subtitle="Items awaiting moderation"
+          icon={HelpCircle}
+          color="#fbbf24"
+          isLoading={isLoading}
+        />
+        <AdminStatCard
+          title="Unavailable / Offline"
+          value={stats.unavailableItems}
+          subtitle="Suspended, removed, or completed"
+          icon={EyeOff}
+          color="#f87171"
+          isLoading={isLoading}
+        />
       </div>
 
       {notification && (

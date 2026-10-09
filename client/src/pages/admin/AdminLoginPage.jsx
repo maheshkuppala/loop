@@ -37,8 +37,8 @@ export const AdminLoginPage = () => {
   const [step, setStep] = useState('credentials');
 
   // Form State
-  const [email, setEmail] = useState('looop.support@gmail.com');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('admin@looop.demo');
+  const [password, setPassword] = useState('Demo@Admin123');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -582,6 +582,65 @@ export const AdminLoginPage = () => {
           ) : (
             /* STEP 1: Credentials Form */
             <form onSubmit={handleCredentialsSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%' }}>
+              {(import.meta.env.DEV || import.meta.env.VITE_SHOW_DEMO === 'true') && (
+                <div
+                  style={{
+                    padding: '10px 12px',
+                    backgroundColor: 'rgba(52, 211, 153, 0.15)',
+                    border: '1px solid rgba(52, 211, 153, 0.3)',
+                    borderRadius: '12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px'
+                  }}
+                >
+                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#a7f3d0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>🔑</span> Demo credentials
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmail('admin@looop.demo');
+                        setPassword('Demo@Admin123');
+                        setErrors({});
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        backgroundColor: '#059669',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Use admin demo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmail('customer@looop.demo');
+                        setPassword('Demo@User123');
+                        setErrors({});
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Use customer demo
+                    </button>
+                  </div>
+                </div>
+              )}
               {/* Admin Email Input */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <label htmlFor="admin-email" style={{ fontSize: '0.825rem', fontWeight: 600, color: '#a7f3d0' }}>
