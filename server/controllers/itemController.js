@@ -201,6 +201,11 @@ exports.createItem = async (req, res) => {
     const lng = Number(geoCoords[0]);
     const lat = Number(geoCoords[1]);
 
+    const isAutoApproved = rules.autoApproveListings !== false;
+    const status = isAutoApproved ? 'active' : 'pending moderation';
+    const approvalStatus = isAutoApproved ? 'APPROVED' : 'PENDING';
+    const availability = isAutoApproved ? 'Available' : 'Unavailable';
+
     const newItemData = {
       title: title.trim(),
       description: description.trim(),
@@ -211,7 +216,7 @@ exports.createItem = async (req, res) => {
       images: formattedImages,
       sharingType: sharingType || 'give_away',
       condition: condition || 'good',
-      availability: approvalStatus === 'APPROVED' ? 'Available' : 'Unavailable',
+      availability: availability,
       status: status,
       approvalStatus: approvalStatus,
       rejectionReason: '',
@@ -264,8 +269,8 @@ exports.createItem = async (req, res) => {
           JSON.stringify(formattedImages),
           sharingType || 'give_away',
           condition || 'good',
-          'Available',
-          'active',
+          availability,
+          status,
           locationObj.city,
           locationObj.district,
           locationObj.state,

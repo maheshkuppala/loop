@@ -24,21 +24,42 @@ const DEFAULT_UPLOAD_RULES = {
 
 exports.DEFAULT_UPLOAD_RULES = DEFAULT_UPLOAD_RULES;
 
+const { query: pgQuery } = require('../config/postgres');
+
 /**
  * Get product upload rules dynamically from DB or default
  */
 exports.getUploadRules = async () => {
+  // 1. Try Neon PostgreSQL first
   try {
-    const settingDoc = await AdminSetting.findOne({ key: 'product_upload_rules' }).lean();
-    if (settingDoc && settingDoc.value) {
+    const pgRes = await pgQuery('SELECT value FROM admin_settings WHERE key = $1 LIMIT 1', ['product_upload_rules']);
+    if (pgRes?.rows?.[0]?.value) {
+      const val = typeof pgRes.rows[0].value === 'string' ? JSON.parse(pgRes.rows[0].value) : pgRes.rows[0].value;
       return {
         ...DEFAULT_UPLOAD_RULES,
-        ...settingDoc.value
+        ...val
       };
     }
-  } catch (err) {
-    console.error('[UploadRulesService] Error fetching upload rules:', err.message);
+  } catch (pgErr) {
+    // non-critical
   }
+
+  // 2. Try Mongoose if active
+  const mongoose = require('mongoose');
+  if (mongoose.connection && mongoose.connection.readyState === 1) {
+    try {
+      const settingDoc = await AdminSetting.findOne({ key: 'product_upload_rules' }).lean();
+      if (settingDoc && settingDoc.value) {
+        return {
+          ...DEFAULT_UPLOAD_RULES,
+          ...settingDoc.value
+        };
+      }
+    } catch (err) {
+      console.error('[UploadRulesService] Mongo error:', err.message);
+    }
+  }
+
   return { ...DEFAULT_UPLOAD_RULES };
 };
 
