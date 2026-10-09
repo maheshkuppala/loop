@@ -7,6 +7,7 @@ import {
   EyeOff,
   ArrowRight,
   ArrowLeft,
+  ShieldCheck,
   AlertCircle,
   KeyRound,
   Send,
