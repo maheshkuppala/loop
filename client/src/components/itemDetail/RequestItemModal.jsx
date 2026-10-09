@@ -16,7 +16,7 @@ import {
 import Modal from '../common/Modal';
 import Button from '../common/Button';
 import Badge from '../common/Badge';
-import { formatSharingType, formatCondition } from '../../utils/formatters';
+import { formatSharingType, formatCondition, formatLocation } from '../../utils/formatters';
 import { useAuth } from '../../context/AuthContext';
 import { itemService } from '../../services/itemService';
 
@@ -275,7 +275,7 @@ export const RequestItemModal = ({
                   <span>•</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
                     <MapPin size={12} color="var(--color-primary-600)" />
-                    {item.location.locality || item.location.city || item.location}
+                    {formatLocation(item.location)}
                   </span>
                 </>
               )}

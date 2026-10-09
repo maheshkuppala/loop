@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Sparkles, MapPin } from 'lucide-react';
 import Button from '../common/Button';
 import Badge from '../common/Badge';
+import { formatLocation } from '../../utils/formatters';
 
 export const AmazonItemCarousel = ({ items = [] }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -196,7 +197,7 @@ export const AmazonItemCarousel = ({ items = [] }) => {
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '0.85rem', borderTop: '1px solid var(--color-slate-100)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', color: 'var(--color-slate-500)', fontWeight: 500 }}>
                           <MapPin size={14} color="var(--color-primary-600)" />
-                          <span>{item.location || 'Local Neighborhood'}</span>
+                          <span>{formatLocation(item.location, 'Local Neighborhood')}</span>
                         </div>
                         <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-primary-600)' }}>
                           View →

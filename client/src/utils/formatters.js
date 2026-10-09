@@ -51,3 +51,23 @@ export const truncateText = (text, maxLength = 80) => {
   if (!text || text.length <= maxLength) return text;
   return `${text.slice(0, maxLength).trim()}...`;
 };
+
+/**
+ * Format a location (string or object) safely into a display string.
+ */
+export const formatLocation = (location, defaultText = 'Local Area') => {
+  if (!location) return defaultText;
+  if (typeof location === 'string') return location;
+  if (typeof location === 'object') {
+    if (location.approximateAddress) return location.approximateAddress;
+    const parts = [location.locality, location.city || location.district || location.state].filter(Boolean);
+    if (parts.length > 0) return parts.join(', ');
+    if (location.city) return location.city;
+    if (location.locality) return location.locality;
+    if (location.district) return location.district;
+    if (location.state) return location.state;
+    return defaultText;
+  }
+  return String(location);
+};
+

@@ -23,6 +23,7 @@ import Badge from '../../components/common/Badge';
 import Avatar from '../../components/common/Avatar';
 import Spinner from '../../components/common/Spinner';
 import { useAuth } from '../../context/AuthContext';
+import { formatLocation } from '../../utils/formatters';
 import { useToast } from '../../hooks/useToast';
 import { wantedService } from '../../services/wantedService';
 import { mockWantedItems } from '../../data/mockData';
@@ -286,7 +287,7 @@ export const WantedItemDetailPage = () => {
                   Location
                 </div>
                 <div style={{ fontSize: '0.925rem', fontWeight: 700, color: 'var(--color-slate-800)', marginTop: '2px' }}>
-                  {wantedItem.location?.locality ? `${wantedItem.location.locality}, ` : ''}{wantedItem.location?.city || wantedItem.location || 'Bengaluru'}
+                  {formatLocation(wantedItem.location, 'Bengaluru')}
                 </div>
               </div>
             </div>
