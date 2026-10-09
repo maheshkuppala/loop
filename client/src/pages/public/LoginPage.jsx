@@ -7,7 +7,6 @@ import {
   EyeOff,
   ArrowRight,
   ArrowLeft,
-  ShieldCheck,
   AlertCircle,
   KeyRound,
   Send,
@@ -58,88 +57,6 @@ export const LoginPage = () => {
   // Validation & Error states
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState('');
-
-  // Demo Access Flag (Strictly enabled for development/demo mode)
-  const isDemoEnabled = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_LOGIN !== 'false';
-
-  const handleDemoAdminLogin = async () => {
-    setIsSubmitting(true);
-    setServerError('');
-    try {
-      const res = await authService.login({
-        email: 'admin@reusehub.demo',
-        password: 'Admin@12345'
-      });
-      const user = res.user || { name: 'System Admin', email: 'admin@reusehub.demo', role: 'ADMIN' };
-      const token = res.token || `looop_demo_admin_token_${Date.now()}`;
-      login(user, token);
-      addToast({
-        title: 'Demo Admin Authenticated',
-        message: 'Logged in as System Admin (admin@reusehub.demo)',
-        variant: 'success'
-      });
-      window.location.href = '/admin/dashboard';
-    } catch (err) {
-      const fallbackUser = {
-        _id: 'usr-demo-admin',
-        id: 'usr-demo-admin',
-        name: 'System Admin (Demo)',
-        email: 'admin@reusehub.demo',
-        role: 'ADMIN',
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80'
-      };
-      const fallbackToken = `looop_demo_admin_token_${Date.now()}`;
-      login(fallbackUser, fallbackToken);
-      addToast({
-        title: 'Demo Admin Authenticated',
-        message: 'Logged in as System Admin (admin@reusehub.demo)',
-        variant: 'success'
-      });
-      window.location.href = '/admin/dashboard';
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleDemoCustomerLogin = async () => {
-    setIsSubmitting(true);
-    setServerError('');
-    try {
-      const res = await authService.login({
-        email: 'customer@reusehub.demo',
-        password: 'Customer@12345'
-      });
-      const user = res.user || { name: 'Demo Customer', email: 'customer@reusehub.demo', role: 'CUSTOMER' };
-      const token = res.token || `looop_demo_customer_token_${Date.now()}`;
-      login(user, token);
-      addToast({
-        title: 'Demo Customer Authenticated',
-        message: 'Logged in as Demo Customer (customer@reusehub.demo)',
-        variant: 'success'
-      });
-      window.location.href = '/dashboard';
-    } catch (err) {
-      const fallbackUser = {
-        _id: 'usr-demo-customer',
-        id: 'usr-demo-customer',
-        name: 'Demo Customer',
-        email: 'customer@reusehub.demo',
-        role: 'CUSTOMER',
-        points: 250,
-        avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=120&auto=format&fit=crop&q=80'
-      };
-      const fallbackToken = `looop_demo_customer_token_${Date.now()}`;
-      login(fallbackUser, fallbackToken);
-      addToast({
-        title: 'Demo Customer Authenticated',
-        message: 'Logged in as Demo Customer (customer@reusehub.demo)',
-        variant: 'success'
-      });
-      window.location.href = '/dashboard';
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   // Auto pre-fill email if passed in URL query param
   useEffect(() => {
@@ -489,105 +406,7 @@ export const LoginPage = () => {
             </p>
           </div>
 
-          {/* Quick Demo Access Area (Development / Demo mode only) */}
-          {isDemoEnabled && (
-            <div
-              style={{
-                marginBottom: '1.25rem',
-                padding: '12px 14px',
-                borderRadius: '16px',
-                backgroundColor: '#f0fdf4',
-                border: '1.5px dashed #16a34a',
-                boxSizing: 'border-box'
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: '10px'
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: '0.75rem',
-                    fontWeight: 800,
-                    color: '#15803d',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  <ShieldCheck size={14} /> DEMO ACCESS
-                </span>
-                <span
-                  style={{
-                    fontSize: '0.675rem',
-                    fontWeight: 700,
-                    color: '#166534',
-                    backgroundColor: '#dcfce7',
-                    padding: '2px 6px',
-                    borderRadius: '10px'
-                  }}
-                >
-                  1-Click Login
-                </span>
-              </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={handleDemoAdminLogin}
-                  disabled={isSubmitting}
-                  style={{
-                    padding: '10px 8px',
-                    borderRadius: '10px',
-                    backgroundColor: '#0f172a',
-                    color: '#38bdf8',
-                    border: '1px solid #1e293b',
-                    fontWeight: 700,
-                    fontSize: '0.78rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '4px',
-                    transition: 'all 0.2s ease',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
-                  }}
-                >
-                  <span>OPEN ADMIN PORTAL</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleDemoCustomerLogin}
-                  disabled={isSubmitting}
-                  style={{
-                    padding: '10px 8px',
-                    borderRadius: '10px',
-                    backgroundColor: '#047857',
-                    color: '#ffffff',
-                    border: 'none',
-                    fontWeight: 700,
-                    fontSize: '0.78rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '4px',
-                    transition: 'all 0.2s ease',
-                    boxShadow: '0 2px 6px rgba(4, 120, 87, 0.25)'
-                  }}
-                >
-                  <span>OPEN CUSTOMER PORTAL</span>
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* Server Error Alert */}
           {serverError && (
