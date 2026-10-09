@@ -211,9 +211,9 @@ exports.createItem = async (req, res) => {
       images: formattedImages,
       sharingType: sharingType || 'give_away',
       condition: condition || 'good',
-      availability: approvalStatus === 'APPROVED' ? 'Available' : 'Unavailable',
-      status: status,
-      approvalStatus: approvalStatus,
+      availability: req.body.availability || 'Available',
+      status: req.body.status || 'active',
+      approvalStatus: req.body.approvalStatus || 'APPROVED',
       rejectionReason: '',
       specifications: Array.isArray(specifications) ? specifications : [],
       location: locationObj,
@@ -879,8 +879,9 @@ exports.discoverItems = async (req, res) => {
         params.push(condition.toLowerCase().trim());
       }
       if (city && city.trim() && city.toLowerCase() !== 'all') {
-        whereClause += ` AND LOWER(i.city) = $${paramIdx++}`;
-        params.push(city.toLowerCase().trim());
+        whereClause += ` AND (LOWER(i.city) ILIKE $${paramIdx} OR LOWER(i.locality) ILIKE $${paramIdx})`;
+        params.push(`%${city.toLowerCase().trim()}%`);
+        paramIdx++;
       }
       if (search && search.trim()) {
         whereClause += ` AND (i.title ILIKE $${paramIdx} OR i.description ILIKE $${paramIdx} OR i.locality ILIKE $${paramIdx} OR i.city ILIKE $${paramIdx})`;
@@ -888,7 +889,10 @@ exports.discoverItems = async (req, res) => {
         paramIdx++;
       }
 
-      if (hasValidCoords && parsedRadius) {
+      // Only restrict by geospatial radius if:
+      // 1. Valid coordinates are passed
+      // 2. Sort is 'nearest' OR explicitly requesting location radius without conflicting city filter
+      if (hasValidCoords && parsedRadius && (sort === 'nearest' || !city || city.toLowerCase() === 'all')) {
         whereClause += ` AND (
           6371 * 2 * ASIN(SQRT(
             POWER(SIN(RADIANS(($1::double precision - i.latitude) / 2)), 2) +
@@ -904,7 +908,7 @@ exports.discoverItems = async (req, res) => {
       const pgTotal = countRes?.rows?.[0]?.total || 0;
 
       let orderSql = "ORDER BY i.created_at DESC";
-      if (sort === 'nearest' || hasValidCoords) {
+      if (sort === 'nearest') {
         orderSql = "ORDER BY distance_km ASC, i.created_at DESC";
       } else if (sort === 'updated') {
         orderSql = "ORDER BY i.updated_at DESC";
@@ -1010,15 +1014,31 @@ exports.discoverItems = async (req, res) => {
         baseFilter.condition = condition.toLowerCase().trim();
       }
 
+      if (city && city.trim() && city.toLowerCase() !== 'all') {
+        const sanitizedCity = city.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const cityRegex = new RegExp(sanitizedCity, 'i');
+        baseFilter.$or = [
+          { 'location.city': cityRegex },
+          { 'location.locality': cityRegex }
+        ];
+      }
+
       if (search && search.trim()) {
         const sanitizedSearch = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const searchRegex = new RegExp(sanitizedSearch, 'i');
-        baseFilter.$or = [
+        const searchOr = [
           { title: searchRegex },
           { description: searchRegex },
           { 'location.locality': searchRegex },
           { 'location.city': searchRegex }
         ];
+
+        if (baseFilter.$or) {
+          baseFilter.$and = [{ $or: baseFilter.$or }, { $or: searchOr }];
+          delete baseFilter.$or;
+        } else {
+          baseFilter.$or = searchOr;
+        }
       }
 
       const rawItems = await Item.find(baseFilter)

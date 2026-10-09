@@ -401,7 +401,10 @@ export const ItemDetailPage = () => {
           <OwnerProfileCard owner={item.owner} />
 
           {/* Approximate Location & Privacy Card */}
-          <ApproximateLocationCard location={item.location} />
+          <ApproximateLocationCard
+            location={item.location}
+            coordinates={item.locationCoordinates?.coordinates || item.coordinates}
+          />
         </div>
       </div>
 
