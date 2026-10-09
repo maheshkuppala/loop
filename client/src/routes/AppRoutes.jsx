@@ -6,6 +6,7 @@ import PublicLayout from '../layouts/PublicLayout';
 import CustomerLayout from '../layouts/CustomerLayout';
 import AdminLayout from '../layouts/AdminLayout';
 import ProtectedRoute from './ProtectedRoute';
+import PublicOnlyRoute from './PublicOnlyRoute';
 import RouteLoadingFallback from '../components/common/RouteLoadingFallback';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 
@@ -38,18 +39,25 @@ const SavedItemsPage = lazy(() => import('../pages/customer/SavedItemsPage'));
 const ProfilePage = lazy(() => import('../pages/customer/ProfilePage'));
 const ReviewsPage = lazy(() => import('../pages/customer/ReviewsPage'));
 const ImpactPage = lazy(() => import('../pages/customer/ImpactPage'));
+const PointsDashboardPage = lazy(() => import('../pages/customer/PointsDashboardPage'));
 
 // 3. Lazy-loaded Admin Pages
+const AdminLoginPage = lazy(() => import('../pages/admin/AdminLoginPage'));
 const AdminDashboard = lazy(() => import('../pages/admin/AdminDashboard'));
 const AdminUsersPage = lazy(() => import('../pages/admin/AdminUsersPage'));
 const AdminItemsPage = lazy(() => import('../pages/admin/AdminItemsPage'));
 const AdminRequestsPage = lazy(() => import('../pages/admin/AdminRequestsPage'));
+const AdminReuseRequestsPage = lazy(() => import('../pages/admin/AdminReuseRequestsPage'));
+const AdminBorrowRequestsPage = lazy(() => import('../pages/admin/AdminBorrowRequestsPage'));
 const AdminReportsPage = lazy(() => import('../pages/admin/AdminReportsPage'));
 const AdminTransactionsPage = lazy(() => import('../pages/admin/AdminTransactionsPage'));
 const AdminCategoriesPage = lazy(() => import('../pages/admin/AdminCategoriesPage'));
 const AdminAnalyticsPage = lazy(() => import('../pages/admin/AdminAnalyticsPage'));
 const AdminSettingsPage = lazy(() => import('../pages/admin/AdminSettingsPage'));
 const AdminAuditLogsPage = lazy(() => import('../pages/admin/AdminAuditLogsPage'));
+const AdminPointsPage = lazy(() => import('../pages/admin/AdminPointsPage'));
+const AdminMessagesPage = lazy(() => import('../pages/admin/AdminMessagesPage'));
+const AdminNotificationsPage = lazy(() => import('../pages/admin/AdminNotificationsPage'));
 
 // 4. Common Pages
 const NotFound = lazy(() => import('../pages/NotFound'));
@@ -85,6 +93,22 @@ export const AppRoutes = () => {
         }
       />
       <Route
+        path="/product/:id"
+        element={
+          <PublicLayout>
+            <ItemDetailPage />
+          </PublicLayout>
+        }
+      />
+      <Route
+        path="/products/:id"
+        element={
+          <PublicLayout>
+            <ItemDetailPage />
+          </PublicLayout>
+        }
+      />
+      <Route
         path="/users/:id"
         element={
           <PublicLayout>
@@ -110,11 +134,19 @@ export const AppRoutes = () => {
       />
       <Route
         path="/login"
-        element={<LoginPage />}
+        element={
+          <PublicOnlyRoute>
+            <LoginPage />
+          </PublicOnlyRoute>
+        }
       />
       <Route
         path="/register"
-        element={<RegisterPage />}
+        element={
+          <PublicOnlyRoute>
+            <RegisterPage />
+          </PublicOnlyRoute>
+        }
       />
       <Route
         path="/forgot-password"
@@ -254,6 +286,17 @@ export const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+      {/* Points & Rewards Dashboard Route */}
+      <Route
+        path="/points"
+        element={
+          <ProtectedRoute>
+            <CustomerLayout>
+              <PointsDashboardPage />
+            </CustomerLayout>
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/customer/messages"
         element={
@@ -349,7 +392,8 @@ export const AppRoutes = () => {
       />
       <Route path="/customer/profile" element={<Navigate to="/profile" replace />} />
 
-      {/* 3. ADMIN PORTAL ROUTES (PROTECTED ADMIN) */}
+      {/* 3. ADMIN PORTAL ROUTES */}
+      <Route path="/admin/login" element={<AdminLoginPage />} />
       <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
       <Route
         path="/admin/dashboard"
@@ -362,11 +406,11 @@ export const AppRoutes = () => {
         }
       />
       <Route
-        path="/admin/users"
+        path="/admin/products"
         element={
           <ProtectedRoute requiredRole="ADMIN">
             <AdminLayout>
-              <AdminUsersPage />
+              <AdminItemsPage />
             </AdminLayout>
           </ProtectedRoute>
         }
@@ -382,11 +426,71 @@ export const AppRoutes = () => {
         }
       />
       <Route
+        path="/admin/users"
+        element={
+          <ProtectedRoute requiredRole="ADMIN">
+            <AdminLayout>
+              <AdminUsersPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/reuse-requests"
+        element={
+          <ProtectedRoute requiredRole="ADMIN">
+            <AdminLayout>
+              <AdminReuseRequestsPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/borrow-requests"
+        element={
+          <ProtectedRoute requiredRole="ADMIN">
+            <AdminLayout>
+              <AdminBorrowRequestsPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/admin/requests"
         element={
           <ProtectedRoute requiredRole="ADMIN">
             <AdminLayout>
               <AdminRequestsPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/points"
+        element={
+          <ProtectedRoute requiredRole="ADMIN">
+            <AdminLayout>
+              <AdminPointsPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/messages"
+        element={
+          <ProtectedRoute requiredRole="ADMIN">
+            <AdminLayout>
+              <AdminMessagesPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/notifications"
+        element={
+          <ProtectedRoute requiredRole="ADMIN">
+            <AdminLayout>
+              <AdminNotificationsPage />
             </AdminLayout>
           </ProtectedRoute>
         }

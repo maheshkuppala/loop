@@ -3,7 +3,7 @@
  * Guarantees every user created (via Register, Google, or OTP) is stored directly in Neon Database.
  */
 
-const NEON_SQL_ENDPOINT = 'https://ep-small-wind-b4hjagr6-pooler.c-6.us-east-2.aws.neon.tech/sql';
+const NEON_SQL_ENDPOINT = 'https://ep-small-wind-b4hjagr6.c-6.us-east-2.aws.neon.tech/sql';
 const DEFAULT_AUTH = ['neondb_owner:', 'npg_', 'PzhnYria0G2e'].join('');
 const NEON_CONN_STRING =
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_NEON_DATABASE_URL) ||
@@ -41,11 +41,19 @@ export const neonDb = {
   /**
    * Save or update user account in Neon PostgreSQL users table with ALL details
    */
-  saveUser: async (user, passwordInput = 'DefaultSecret123!') => {
+  saveUser: async (user, passwordInput = 'DefaultSecret123!', failOnDuplicate = false) => {
     if (!user || !user.email) return null;
 
     const cleanEmail = user.email.toLowerCase().trim();
     const cleanName = (user.name || cleanEmail.split('@')[0]).trim();
+
+    if (failOnDuplicate) {
+      const existing = await neonDb.getUserByEmail(cleanEmail);
+      if (existing) {
+        throw new Error(`An account with email ${cleanEmail} is already registered in the database.`);
+      }
+    }
+
     const isAdmin =
       cleanEmail === 'looop.support@gmail.com' ||
       cleanEmail === 'maheshkuppala321@gmail.com' ||
@@ -108,7 +116,27 @@ export const neonDb = {
     const sql = 'SELECT id, name, email, role, avatar, bio, city, locality, state, account_status, trust_score, rating, reviews_count, verified, created_at FROM users WHERE LOWER(email) = $1 LIMIT 1;';
     const res = await neonDb.query(sql, [cleanEmail]);
     return res.rows && res.rows.length > 0 ? res.rows[0] : null;
+  },
+
+  /**
+   * Direct password update in Neon PostgreSQL for Forgot Password recovery
+   */
+  updatePassword: async (email, newPassword) => {
+    if (!email || !newPassword) return false;
+    const cleanEmail = email.toLowerCase().trim();
+    const sql = 'UPDATE users SET password = $1, updated_at = CURRENT_TIMESTAMP WHERE LOWER(email) = $2 RETURNING id, email;';
+    try {
+      const res = await neonDb.query(sql, [newPassword, cleanEmail]);
+      if (res.rows && res.rows.length > 0) {
+        console.log(`[Neon DB Password Reset] Updated password in PostgreSQL for ${cleanEmail}`);
+        return true;
+      }
+    } catch (err) {
+      console.warn('[Neon DB Password Reset Error]', err.message);
+    }
+    return false;
   }
 };
 
 export default neonDb;
+

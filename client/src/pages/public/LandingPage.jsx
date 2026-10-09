@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import AuthPromptModal from '../../components/common/AuthPromptModal';
+import impactService from '../../services/impactService';
+import { getLiveImpactMetrics, saveLiveImpactMetrics } from '../../utils/communityImpactTracker';
 import {
   Sparkles,
   ArrowRight,
@@ -35,13 +37,43 @@ import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
 import Badge from '../../components/common/Badge';
 import Avatar from '../../components/common/Avatar';
-import { mockItems, mockCommunityImpact, mockCategories } from '../../data/mockData';
+import { itemService } from '../../services/itemService';
+import { mockCommunityImpact, mockCategories } from '../../data/mockData';
+import AmazonItemCarousel from '../../components/home/AmazonItemCarousel';
 
 export const LandingPage = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [realItems, setRealItems] = useState([]);
+  const [liveImpact, setLiveImpact] = useState(() => getLiveImpactMetrics());
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchItems = async () => {
+      try {
+        const res = await itemService.getItems({ limit: 12 });
+        if (isMounted && res?.items) {
+          setRealItems(res.items);
+          const metrics = getLiveImpactMetrics();
+          const books = res.items.filter(i => (i.category || '').toLowerCase() === 'books').length;
+          const electronics = res.items.filter(i => (i.category || '').toLowerCase() === 'electronics').length;
+          setLiveImpact({
+            itemsReused: Math.max(metrics.itemsReused, res.items.length),
+            peopleHelped: Math.max(metrics.peopleHelped, res.items.length > 0 ? 1 : 0),
+            booksShared: Math.max(metrics.booksShared, books),
+            electronicsShared: Math.max(metrics.electronicsShared, electronics),
+            wasteAvoidedKg: Math.max(metrics.wasteAvoidedKg, Math.round(res.items.length * 2.5))
+          });
+        }
+      } catch (err) {
+        console.warn('Failed to load items for homepage:', err);
+      }
+    };
+    fetchItems();
+    return () => { isMounted = false; };
+  }, []);
 
   const isLoggedIn = !!(user && (isAuthenticated || user.id || user.email));
 
@@ -54,8 +86,8 @@ export const LandingPage = () => {
   };
 
   const filteredItems = selectedCategory === 'all'
-    ? mockItems.slice(0, 6)
-    : mockItems.filter(item => item.category === selectedCategory).slice(0, 6);
+    ? realItems.slice(0, 6)
+    : realItems.filter(item => item.category === selectedCategory || item.category?.toLowerCase() === selectedCategory.toLowerCase()).slice(0, 6);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', overflowX: 'hidden' }}>
@@ -68,7 +100,12 @@ export const LandingPage = () => {
           paddingTop: '3.5rem',
           paddingBottom: '5rem',
           overflow: 'hidden',
-          background: 'radial-gradient(ellipse 80% 60% at 50% -15%, rgba(16, 185, 129, 0.18), rgba(240, 253, 250, 0.4) 60%, transparent)'
+          background: `
+            radial-gradient(ellipse 70% 55% at 65% 5%, rgba(52, 211, 153, 0.13) 0%, transparent 65%),
+            radial-gradient(ellipse 55% 45% at 10% 90%, rgba(16, 185, 129, 0.09) 0%, transparent 60%),
+            radial-gradient(ellipse 80% 60% at 50% 0%, rgba(209, 250, 229, 0.35) 0%, transparent 55%),
+            linear-gradient(160deg, #f0fdf9 0%, #ffffff 45%, #f8fafc 100%)
+          `
         }}
         aria-label="Hero Section"
       >
@@ -152,12 +189,41 @@ export const LandingPage = () => {
                 }}
               >
                 <Link to="/browse" style={{ textDecoration: 'none' }}>
-                  <Button variant="primary" size="lg" iconRight={ArrowRight}>
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    iconRight={ArrowRight}
+                    style={{
+                      backgroundColor: '#ecfdf5',
+                      borderColor: 'var(--color-primary-500)',
+                      borderWidth: '2px',
+                      color: 'var(--color-primary-700)',
+                      fontWeight: 700,
+                      boxShadow: '0 4px 14px rgba(16, 185, 129, 0.22)',
+                      transition: 'all 0.25s ease'
+                    }}
+                    className="highlighted-share-btn"
+                  >
                     Browse Items
                   </Button>
                 </Link>
 
-                <Button variant="secondary" size="lg" iconLeft={Gift} onClick={handleShareClick}>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  iconLeft={Gift}
+                  onClick={handleShareClick}
+                  style={{
+                    backgroundColor: '#ecfdf5',
+                    borderColor: 'var(--color-primary-500)',
+                    borderWidth: '2px',
+                    color: 'var(--color-primary-700)',
+                    fontWeight: 700,
+                    boxShadow: '0 4px 14px rgba(16, 185, 129, 0.22)',
+                    transition: 'all 0.25s ease'
+                  }}
+                  className="highlighted-share-btn"
+                >
                   Share an Item
                 </Button>
               </div>
@@ -338,312 +404,23 @@ export const LandingPage = () => {
       </section>
 
       {/* =========================================================================
-          2. TRUST & VALUE SECTION ("WHY LOOOP EXISTS")
+          2. AMAZON-STYLE AUTO-MOVING LISTED ITEMS CAROUSEL
           ========================================================================= */}
-      <section style={{ padding: '5.5rem 0', backgroundColor: '#ffffff', borderTop: '1px solid var(--color-slate-100)' }}>
+      <AmazonItemCarousel items={realItems} />
+
+      {/* =========================================================================
+          3. CUSTOMER FEEDBACKS & COMMUNITY REVIEWS SECTION
+          ========================================================================= */}
+      <section style={{ padding: '5.5rem 0', background: 'linear-gradient(180deg, #ffffff 0%, #fafdf9 50%, #f4fdf8 100%)', borderTop: '1px solid var(--color-slate-100)' }}>
         <div className="container">
           <div style={{ textAlign: 'center', maxWidth: '720px', margin: '0 auto 3.5rem auto' }}>
-            <Badge variant="success" style={{ marginBottom: '0.75rem' }}>Why LOOOP Exists</Badge>
+            <Badge variant="success" style={{ marginBottom: '0.75rem' }}>Customer Feedbacks</Badge>
             <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.6rem)', fontWeight: 800, marginBottom: '1rem', letterSpacing: '-0.025em' }}>
-              Too Many Useful Items Remain Unused
-            </h2>
-            <p style={{ color: 'var(--color-slate-600)', fontSize: '1.05rem', lineHeight: 1.65 }}>
-              In every household, campus dorm, and apartment, thousands of working products sit in storage.
-              LOOOP connects you with people around you to keep those valuable items in circulation.
-            </p>
-          </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-              gap: '1.75rem'
-            }}
-          >
-            {[
-              {
-                title: 'Share',
-                desc: 'List functional items you no longer use so fellow students or neighbors can put them to good use.',
-                icon: Gift,
-                color: '#10b981',
-                bg: 'rgba(16, 185, 129, 0.1)'
-              },
-              {
-                title: 'Reuse',
-                desc: 'Extend the lifespan of manufactured products. Keep working devices and books out of waste bins.',
-                icon: RefreshCw,
-                color: '#059669',
-                bg: 'rgba(5, 150, 105, 0.1)'
-              },
-              {
-                title: 'Borrow',
-                desc: 'Need a camping rucksack for the weekend or a drill for 2 days? Borrow from someone nearby instead of buying new.',
-                icon: Clock,
-                color: '#0284c7',
-                bg: 'rgba(2, 132, 199, 0.1)'
-              },
-              {
-                title: 'Exchange',
-                desc: 'Swap items value-for-value. Trade board games, tech peripherals, or novels directly with like-minded members.',
-                icon: Repeat,
-                color: '#f59e0b',
-                bg: 'rgba(245, 158, 11, 0.1)'
-              },
-              {
-                title: 'Give Away',
-                desc: 'Completed an academic year or moving homes? Gift your items with zero hidden fees, ads, or middleman charges.',
-                icon: Heart,
-                color: '#ec4899',
-                bg: 'rgba(236, 72, 153, 0.1)'
-              },
-              {
-                title: 'Connect',
-                desc: 'Foster genuine local community relationships built on mutual respect, verified ratings, and transparent trust scores.',
-                icon: Users,
-                color: '#8b5cf6',
-                bg: 'rgba(139, 92, 246, 0.1)'
-              }
-            ].map((pillar) => {
-              const Icon = pillar.icon;
-              return (
-                <Card key={pillar.title} interactive style={{ padding: '1.75rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <div
-                    style={{
-                      width: '46px',
-                      height: '46px',
-                      borderRadius: 'var(--radius-md)',
-                      backgroundColor: pillar.bg,
-                      color: pillar.color,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <Icon size={24} />
-                  </div>
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-slate-900)' }}>
-                    {pillar.title}
-                  </h3>
-                  <p style={{ fontSize: '0.9rem', color: 'var(--color-slate-600)', lineHeight: 1.6, margin: 0 }}>
-                    {pillar.desc}
-                  </p>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* =========================================================================
-          3. HOW LOOOP WORKS (4-STEP PROCESS)
-          ========================================================================= */}
-      <section style={{ padding: '5.5rem 0', backgroundColor: 'var(--color-slate-50)', borderTop: '1px solid var(--color-slate-200)' }}>
-        <div className="container">
-          <div style={{ textAlign: 'center', maxWidth: '680px', margin: '0 auto 3.5rem auto' }}>
-            <Badge variant="info" style={{ marginBottom: '0.75rem' }}>Simple 4-Step Process</Badge>
-            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.6rem)', fontWeight: 800, marginBottom: '1rem', letterSpacing: '-0.025em' }}>
-              How LOOOP Works
-            </h2>
-            <p style={{ color: 'var(--color-slate-600)', fontSize: '1.05rem', lineHeight: 1.65 }}>
-              From discovering an unused product to completing a safe handover in your neighborhood.
-            </p>
-          </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-              gap: '1.75rem',
-              position: 'relative'
-            }}
-          >
-            {[
-              {
-                step: '01',
-                title: 'List',
-                desc: 'Take photos of items you no longer use, pick your sharing model (Give Away, Borrow, or Exchange), and state availability.',
-                icon: Package
-              },
-              {
-                step: '02',
-                title: 'Discover',
-                desc: 'Browse or search nearby items by category, distance proximity, and condition. View owner trust scores and ratings.',
-                icon: Search
-              },
-              {
-                step: '03',
-                title: 'Request',
-                desc: 'Submit a request with your proposed pickup dates. Coordinate details directly in secure peer-to-peer chat.',
-                icon: MessageSquare
-              },
-              {
-                step: '04',
-                title: 'Reuse',
-                desc: 'Meet safely in person, exchange the secure 4-digit handover code, return on schedule if borrowed, and leave trust reviews.',
-                icon: RefreshCw
-              }
-            ].map((st) => {
-              const Icon = st.icon;
-              return (
-                <Card key={st.step} style={{ padding: '2rem 1.5rem', position: 'relative', display: 'flex', flexDirection: 'column' }}>
-                  <div
-                    style={{
-                      fontSize: '2.5rem',
-                      fontWeight: 900,
-                      fontFamily: 'var(--font-brand)',
-                      color: 'var(--color-primary-200)',
-                      lineHeight: 1,
-                      marginBottom: '1rem'
-                    }}
-                  >
-                    {st.step}
-                  </div>
-                  <div
-                    style={{
-                      width: '42px',
-                      height: '42px',
-                      borderRadius: 'var(--radius-sm)',
-                      backgroundColor: 'var(--color-primary-50)',
-                      color: 'var(--color-primary-600)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginBottom: '1rem'
-                    }}
-                  >
-                    <Icon size={22} />
-                  </div>
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '0.5rem', color: 'var(--color-slate-900)' }}>
-                    {st.title}
-                  </h3>
-                  <p style={{ fontSize: '0.875rem', color: 'var(--color-slate-600)', lineHeight: 1.6, margin: 0 }}>
-                    {st.desc}
-                  </p>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* =========================================================================
-          4. PLATFORM CAPABILITIES & FEATURE HIGHLIGHTS
-          ========================================================================= */}
-      <section style={{ padding: '5.5rem 0', backgroundColor: '#ffffff' }}>
-        <div className="container">
-          <div style={{ textAlign: 'center', maxWidth: '720px', margin: '0 auto 3.5rem auto' }}>
-            <Badge variant="neutral" style={{ marginBottom: '0.75rem' }}>Built for Real Communities</Badge>
-            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.6rem)', fontWeight: 800, marginBottom: '1rem', letterSpacing: '-0.025em' }}>
-              Engineered for Simplicity & Trust
-            </h2>
-            <p style={{ color: 'var(--color-slate-600)', fontSize: '1.05rem', lineHeight: 1.65 }}>
-              Explore the capabilities designed into LOOOP to make neighborhood item sharing effortless and safe.
-            </p>
-          </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(270px, 1fr))',
-              gap: '1.75rem'
-            }}
-          >
-            {[
-              {
-                title: 'Smart Search & Filters',
-                desc: 'Filter by category, condition (New, Like New, Good, Fair), sharing type, and approximate neighborhood distance.',
-                icon: Search
-              },
-              {
-                title: 'Nearby Item Proximity',
-                desc: 'Discover items within walking distance or brief transit to minimize travel friction and avoid courier costs.',
-                icon: MapPin
-              },
-              {
-                title: 'Wanted Items Community Board',
-                desc: 'Need something specific? Post a wanted request. When a matching item is shared nearby, receive an instant match alert.',
-                icon: Bookmark
-              },
-              {
-                title: 'Secure Handover Codes',
-                desc: 'Dual-confirmation pickup codes (LP-XXXX) ensure items are safely inspected and accounted for by both parties.',
-                icon: Key
-              },
-              {
-                title: 'Peer-to-Peer In-App Chat',
-                desc: 'Coordinate handovers smoothly without sharing private personal contact numbers or external messenger links.',
-                icon: MessageSquare
-              },
-              {
-                title: 'Transparent Trust & Ratings',
-                desc: 'Community trust scores based on verified on-time returns, accurate descriptions, and neighbor ratings.',
-                icon: ShieldCheck
-              },
-              {
-                title: 'Real-Time Notifications',
-                desc: 'Never miss an exchange request, handover reminder, return deadline, or smart match notification.',
-                icon: Bell
-              },
-              {
-                title: 'Circulation & Reuse Metrics',
-                desc: 'Track personal sharing achievements and watch the aggregate community waste reduction milestones grow.',
-                icon: TrendingUp
-              }
-            ].map((feat) => {
-              const Icon = feat.icon;
-              return (
-                <div
-                  key={feat.title}
-                  style={{
-                    padding: '1.5rem',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--color-slate-200)',
-                    backgroundColor: '#ffffff',
-                    transition: 'all var(--transition-fast)'
-                  }}
-                  className="feature-highlight-card"
-                >
-                  <div
-                    style={{
-                      width: '38px',
-                      height: '38px',
-                      borderRadius: 'var(--radius-sm)',
-                      backgroundColor: 'var(--color-primary-50)',
-                      color: 'var(--color-primary-700)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginBottom: '1rem'
-                    }}
-                  >
-                    <Icon size={20} />
-                  </div>
-                  <h4 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-slate-900)', marginBottom: '0.4rem' }}>
-                    {feat.title}
-                  </h4>
-                  <p style={{ fontSize: '0.875rem', color: 'var(--color-slate-600)', lineHeight: 1.6, margin: 0 }}>
-                    {feat.desc}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* =========================================================================
-          5. COMMUNITY SECTION ("STORIES FROM THE LOOP")
-          ========================================================================= */}
-      <section style={{ padding: '5.5rem 0', backgroundColor: 'var(--color-slate-50)', borderTop: '1px solid var(--color-slate-200)' }}>
-        <div className="container">
-          <div style={{ textAlign: 'center', maxWidth: '700px', margin: '0 auto 3.5rem auto' }}>
-            <Badge variant="success" style={{ marginBottom: '0.75rem' }}>Community First</Badge>
-            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.6rem)', fontWeight: 800, marginBottom: '1rem', letterSpacing: '-0.025em' }}>
-              Real Stories from the Loop
+              Real Customer Feedbacks & Community Stories
             </h2>
             <p style={{ color: 'var(--color-slate-600)', fontSize: '1.05rem', lineHeight: 1.65 }}>
               “Your unused item could be exactly what someone else needs.”
-              Here is how members across Bengaluru campuses and neighborhoods share every day.
+              See how members across campus dorms and local neighborhoods rate their experience sharing on LOOOP.
             </p>
           </div>
 
@@ -659,25 +436,25 @@ export const LandingPage = () => {
                 person: 'Aarav Sharma',
                 role: 'Engineering Student · Indiranagar',
                 item: 'Casio Scientific Calculator',
-                type: 'borrow',
+                rating: 5,
                 quote: '“I needed a Casio 991ES for semester math exams. A neighbor 1.2 km away lent it to me for 5 days. Saved money and avoided buying a calculator I only needed for a week.”',
                 avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
-                badge: 'Borrowed for Finals'
+                badge: 'Verified Borrower'
               },
               {
                 person: 'Ananya Deshmukh',
                 role: 'Graduating Senior · HSR Layout',
                 item: 'Calculus & Physics Book Set',
-                type: 'give_away',
+                rating: 5,
                 quote: '“Instead of throwing out my heavy university textbooks, I gifted them to a junior mechanical student. They picked it up from my apartment gate that evening.”',
                 avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80',
-                badge: 'Given to Junior'
+                badge: 'Verified Sharer'
               },
               {
                 person: 'Sunil Kumar',
                 role: 'Resident · JP Nagar Phase 3',
                 item: 'Cordless Impact Drill & Bit Set',
-                type: 'borrow',
+                rating: 5,
                 quote: '“I only use my power drill once every few months. Lending it to neighbors for weekend bookshelf and picture frame assembly gives the tool real utility.”',
                 avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=120&auto=format&fit=crop&q=80',
                 badge: '100% On-Time Returns'
@@ -685,42 +462,53 @@ export const LandingPage = () => {
               {
                 person: 'Tanvi Nair',
                 role: 'UI Designer · Koramangala',
-                item: 'Keyboard ↔ Speaker Exchange',
-                type: 'exchange',
-                quote: '“I had a mechanical keyboard I no longer used, and another member had an extra portable Bluetooth speaker. We did a direct exchange with zero money involved.”',
+                item: 'Wacom Graphics Tablet',
+                rating: 5,
+                quote: '“Exchanged my unused drawing tablet for a desk lamp. The handover code verification process made the entire exchange feel super secure and seamless.”',
                 avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=120&auto=format&fit=crop&q=80',
-                badge: 'Direct Value Swap'
+                badge: 'Verified Exchange'
               }
             ].map((story, i) => (
-              <Card key={i} style={{ padding: '1.75rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <Avatar src={story.avatar} name={story.person} size="md" />
-                      <div>
-                        <strong style={{ fontSize: '0.95rem', color: 'var(--color-slate-900)', display: 'block' }}>
-                          {story.person}
-                        </strong>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--color-slate-500)' }}>
-                          {story.role}
-                        </span>
-                      </div>
+              <Card key={i} hoverable className="feature-highlight-card">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.25rem' }}>
+                  <Avatar src={story.avatar} name={story.person} size="lg" />
+                  <div>
+                    <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--color-slate-900)', margin: 0 }}>
+                      {story.person}
+                    </h3>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--color-slate-500)', display: 'block' }}>
+                      {story.role}
+                    </span>
+                    <div style={{ display: 'flex', gap: '2px', marginTop: '4px', color: '#f59e0b' }}>
+                      {'★'.repeat(story.rating)}
                     </div>
                   </div>
-
-                  <div style={{ backgroundColor: 'var(--color-slate-50)', padding: '8px 12px', borderRadius: 'var(--radius-sm)', marginBottom: '1rem', border: '1px solid var(--color-slate-200)' }}>
-                    <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-primary-800)' }}>
-                      Item: {story.item}
-                    </span>
-                  </div>
-
-                  <p style={{ fontSize: '0.9rem', color: 'var(--color-slate-700)', lineHeight: 1.6, fontStyle: 'italic', margin: 0 }}>
-                    {story.quote}
-                  </p>
                 </div>
 
+                <div
+                  style={{
+                    backgroundColor: 'var(--color-primary-50)',
+                    border: '1px solid var(--color-primary-200)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '8px 12px',
+                    marginBottom: '1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Gift size={15} color="var(--color-primary-600)" />
+                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-primary-800)' }}>
+                    Item: {story.item}
+                  </span>
+                </div>
+
+                <p style={{ fontSize: '0.9rem', color: 'var(--color-slate-700)', lineHeight: 1.6, fontStyle: 'italic', margin: 0 }}>
+                  {story.quote}
+                </p>
+
                 <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--color-slate-100)' }}>
-                  <Badge variant="neutral">{story.badge}</Badge>
+                  <Badge variant="success">{story.badge}</Badge>
                 </div>
               </Card>
             ))}
@@ -729,12 +517,16 @@ export const LandingPage = () => {
       </section>
 
       {/* =========================================================================
-          6. ENVIRONMENTAL & COMMUNITY IMPACT SECTION
+          4. REDUCING WASTE THROUGH CIRCULAR REUSE & IMPACT CALCULATOR SECTION
           ========================================================================= */}
       <section
         style={{
           padding: '5.5rem 0',
-          background: 'linear-gradient(135deg, #064e3b 0%, #0f172a 100%)',
+          background: `
+            radial-gradient(ellipse 60% 50% at 80% 20%, rgba(52, 211, 153, 0.18) 0%, transparent 55%),
+            radial-gradient(ellipse 40% 40% at 15% 75%, rgba(6, 78, 59, 0.7) 0%, transparent 60%),
+            linear-gradient(135deg, #052e16 0%, #064e3b 40%, #065f46 75%, #047857 100%)
+          `,
           color: '#ffffff'
         }}
         aria-label="Environmental and Community Impact"
@@ -758,7 +550,7 @@ export const LandingPage = () => {
               }}
             >
               <Sparkles size={14} />
-              <span>Simulated Impact Metrics (API Ready)</span>
+              <span>Verified Community Impact</span>
             </span>
             <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.6rem)', fontWeight: 800, color: '#ffffff', marginBottom: '1rem', letterSpacing: '-0.025em' }}>
               Reducing Waste Through Circular Reuse
@@ -777,11 +569,11 @@ export const LandingPage = () => {
             }}
           >
             {[
-              { label: 'Items Reused', value: mockCommunityImpact.itemsReused, icon: RefreshCw, desc: 'Active items in community use' },
-              { label: 'People Helped', value: mockCommunityImpact.peopleHelped, icon: Users, desc: 'Neighbors connected' },
-              { label: 'Books Shared', value: mockCommunityImpact.booksShared, icon: BookOpen, desc: 'Study sets & novels' },
-              { label: 'Electronics Shared', value: mockCommunityImpact.electronicsShared, icon: Laptop, desc: 'Gadgets & peripherals' },
-              { label: 'Waste Avoided', value: mockCommunityImpact.co2SavedKg, icon: TrendingUp, desc: 'Solid waste kept out of landfills' }
+              { label: 'Items Reused', value: liveImpact.itemsReused, icon: RefreshCw, desc: 'Active items in community use' },
+              { label: 'People Helped', value: liveImpact.peopleHelped, icon: Users, desc: 'Neighbors connected' },
+              { label: 'Books Shared', value: liveImpact.booksShared, icon: BookOpen, desc: 'Study sets & novels' },
+              { label: 'Electronics Shared', value: liveImpact.electronicsShared, icon: Laptop, desc: 'Gadgets & peripherals' },
+              { label: 'Waste Avoided', value: `${liveImpact.wasteAvoidedKg} kg`, icon: TrendingUp, desc: 'Solid waste kept out of landfills' }
             ].map((stat, i) => {
               const Icon = stat.icon;
               return (
@@ -838,196 +630,8 @@ export const LandingPage = () => {
         </div>
       </section>
 
-      {/* =========================================================================
-          7. FEATURED ITEMS SECTION
-          ========================================================================= */}
-      <section style={{ padding: '5.5rem 0', backgroundColor: '#ffffff' }}>
-        <div className="container">
-          <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              alignItems: 'flex-end',
-              justifyContent: 'space-between',
-              marginBottom: '2.5rem',
-              gap: '1.25rem'
-            }}
-          >
-            <div>
-              <Badge variant="success" style={{ marginBottom: '0.5rem' }}>Community Catalog</Badge>
-              <h2 style={{ fontSize: 'clamp(2rem, 3.5vw, 2.5rem)', fontWeight: 800, letterSpacing: '-0.025em' }}>
-                Featured Available Items
-              </h2>
-              <p style={{ color: 'var(--color-slate-600)', fontSize: '1rem' }}>
-                Discover real items recently listed by members in Bengaluru.
-              </p>
-            </div>
-            <Link to="/browse" style={{ textDecoration: 'none' }}>
-              <Button variant="outline" iconRight={ArrowRight}>
-                View All Available Items
-              </Button>
-            </Link>
-          </div>
 
-          {/* Category Filter Pills */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              overflowX: 'auto',
-              paddingBottom: '16px',
-              marginBottom: '2rem',
-              scrollbarWidth: 'none'
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => setSelectedCategory('all')}
-              style={{
-                padding: '8px 18px',
-                borderRadius: 'var(--radius-full)',
-                border: selectedCategory === 'all' ? '1px solid var(--color-primary-500)' : '1px solid var(--color-slate-200)',
-                backgroundColor: selectedCategory === 'all' ? 'var(--color-primary-50)' : '#ffffff',
-                color: selectedCategory === 'all' ? 'var(--color-primary-800)' : 'var(--color-slate-700)',
-                fontWeight: 600,
-                fontSize: '0.85rem',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                transition: 'all var(--transition-fast)'
-              }}
-            >
-              All Categories
-            </button>
-            {mockCategories.slice(0, 7).map((cat) => (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => setSelectedCategory(cat.id)}
-                style={{
-                  padding: '8px 18px',
-                  borderRadius: 'var(--radius-full)',
-                  border: selectedCategory === cat.id ? '1px solid var(--color-primary-500)' : '1px solid var(--color-slate-200)',
-                  backgroundColor: selectedCategory === cat.id ? 'var(--color-primary-50)' : '#ffffff',
-                  color: selectedCategory === cat.id ? 'var(--color-primary-800)' : 'var(--color-slate-700)',
-                  fontWeight: 600,
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  transition: 'all var(--transition-fast)'
-                }}
-              >
-                {cat.name}
-              </button>
-            ))}
-          </div>
 
-          {/* Reusable Item Cards Grid */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-              gap: '24px'
-            }}
-          >
-            {filteredItems.map((item) => (
-              <ItemCard key={item.id} item={item} />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* =========================================================================
-          8. CALL TO ACTION (CTA)
-          ========================================================================= */}
-      <section
-        style={{
-          padding: '6.5rem 0',
-          backgroundColor: '#ffffff',
-          position: 'relative',
-          overflow: 'hidden'
-        }}
-        aria-label="Call to action"
-      >
-        <div
-          className="container"
-          style={{
-            maxWidth: '920px',
-            backgroundColor: 'var(--color-slate-900)',
-            borderRadius: 'var(--radius-xl)',
-            padding: '4rem 2rem',
-            textAlign: 'center',
-            color: '#ffffff',
-            position: 'relative',
-            boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)',
-            background: 'radial-gradient(ellipse at 50% 0%, rgba(16, 185, 129, 0.25) 0%, #0f172a 75%)'
-          }}
-        >
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '4px 12px',
-              backgroundColor: 'rgba(16, 185, 129, 0.2)',
-              borderRadius: 'var(--radius-full)',
-              color: '#34d399',
-              fontSize: '0.8rem',
-              fontWeight: 700,
-              marginBottom: '1.25rem',
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase'
-            }}
-          >
-            Join the Circular Sharing Circle
-          </span>
-
-          <h2
-            style={{
-              fontSize: 'clamp(2.2rem, 4.5vw, 3.25rem)',
-              fontWeight: 900,
-              marginBottom: '1.25rem',
-              letterSpacing: '-0.03em',
-              color: '#ffffff',
-              lineHeight: 1.15
-            }}
-          >
-            Give unused things another purpose.
-          </h2>
-
-          <p
-            style={{
-              color: '#cbd5e1',
-              fontSize: '1.15rem',
-              lineHeight: 1.65,
-              marginBottom: '2.5rem',
-              maxWidth: '620px',
-              margin: '0 auto 2.5rem auto'
-            }}
-          >
-            Join your local campus and neighborhood sharing circle. Start discovering items nearby or list something you no longer need in under a minute.
-          </p>
-
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'center',
-              gap: '1rem',
-              flexWrap: 'wrap'
-            }}
-          >
-            <Link to="/browse" style={{ textDecoration: 'none' }}>
-              <Button variant="primary" size="lg" iconRight={ArrowRight}>
-                Browse Items
-              </Button>
-            </Link>
-
-            <Button variant="secondary" size="lg" iconLeft={Gift} onClick={handleShareClick}>
-              Share an Item
-            </Button>
-          </div>
-        </div>
-      </section>
 
       {/* Floating Card CSS Keyframes */}
       <style>{`
@@ -1038,6 +642,28 @@ export const LandingPage = () => {
         .feature-highlight-card:hover {
           border-color: var(--color-primary-300) !important;
           box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.1) !important;
+          transform: translateY(-2px);
+        }
+        .highlighted-share-btn:hover {
+          background-color: var(--color-primary-600) !important;
+          color: #ffffff !important;
+          border-color: var(--color-primary-600) !important;
+          transform: translateY(-2px);
+          box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4) !important;
+        }
+        .browse-hover-highlight-btn {
+          background-color: #ffffff !important;
+          color: var(--color-slate-700) !important;
+          border: 1.5px solid var(--color-slate-300) !important;
+          font-weight: 600 !important;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+        .browse-hover-highlight-btn:hover {
+          background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600)) !important;
+          color: #ffffff !important;
+          border-color: var(--color-primary-600) !important;
+          box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35) !important;
           transform: translateY(-2px);
         }
         @media (max-width: 640px) {

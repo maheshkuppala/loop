@@ -50,252 +50,43 @@ export const mockUsers = {
 
 export const mockItems = [
   {
-    id: 'item-01',
-    title: 'Casio FX-991ES Plus Scientific Calculator',
-    description: 'Natural textbook display, 417 functions. Used for 2 semesters in engineering exams, perfectly functioning with fresh battery and slide-on hard case.',
-    category: 'education',
-    condition: 'like_new',
-    sharingType: 'borrow',
-    images: [
-      'https://images.unsplash.com/photo-1594980596870-8aa52a78d8cd?w=600&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=600&auto=format&fit=crop&q=80'
-    ],
-    location: 'Koramangala 4th Block, Bengaluru (~1.2 km)',
-    city: 'Bengaluru',
-    availability: 'Available now (Borrow up to 3 months)',
-    expiry: '2026-11-30',
-    status: 'AVAILABLE',
-    owner: {
-      id: 'usr-102',
-      name: 'Rohan Verma',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
-      trustScore: 98,
-      rating: 4.9,
-      reviewsCount: 34,
-      responseRate: '15 mins'
-    },
-    createdAt: '2026-09-08T10:30:00Z',
-    viewsCount: 142,
-    savesCount: 18
-  },
-  {
-    id: 'item-02',
-    title: 'University Physics & Calculus 14th Edition Set',
-    description: 'Hardcover engineering textbooks with complete solution summaries. In good condition with minimal pencil highlighting on early chapters.',
-    category: 'books',
-    condition: 'good',
-    sharingType: 'give_away',
-    images: [
-      'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=600&auto=format&fit=crop&q=80'
-    ],
-    location: 'HSR Layout Sector 2, Bengaluru (~2.5 km)',
-    city: 'Bengaluru',
-    availability: 'Immediate handover',
-    expiry: '2026-12-15',
-    status: 'AVAILABLE',
-    owner: {
-      id: 'usr-103',
-      name: 'Ananya Deshmukh',
-      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80',
-      trustScore: 95,
-      rating: 4.8,
-      reviewsCount: 22,
-      responseRate: '1 hour'
-    },
-    createdAt: '2026-09-09T14:15:00Z',
-    viewsCount: 210,
-    savesCount: 31
-  },
-  {
-    id: 'item-03',
-    title: 'Ergonomic Mesh Study Chair with Lumbar Support',
-    description: 'Adjustable height and 3D armrests. Moving out of apartment next month, giving away to someone who needs a comfortable study setup.',
-    category: 'furniture',
-    condition: 'good',
-    sharingType: 'give_away',
-    images: [
-      'https://images.unsplash.com/photo-1580481077195-c99dfcf33be0?w=600&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1505843490538-5133c6c7d0e1?w=600&auto=format&fit=crop&q=80'
-    ],
-    location: 'Whitefield, Bengaluru (~6.8 km)',
-    city: 'Bengaluru',
-    availability: 'Pickup this weekend',
-    expiry: '2026-10-01',
-    status: 'AVAILABLE',
-    owner: {
-      id: 'usr-104',
-      name: 'Vikram Joshi',
-      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80',
-      trustScore: 92,
-      rating: 4.7,
-      reviewsCount: 16,
-      responseRate: '30 mins'
-    },
-    createdAt: '2026-09-10T09:00:00Z',
-    viewsCount: 380,
-    savesCount: 54
-  },
-  {
-    id: 'item-04',
-    title: 'SS Kashmir Willow Cricket Bat with Bat Cover & Gloves',
-    description: 'Pre-knocked, full-size men\'s bat, well-maintained with toe guard and grip. Ideal for weekend community tournaments. Available to borrow for match weekends.',
-    category: 'sports',
-    condition: 'good',
-    sharingType: 'borrow',
-    images: [
-      'https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=600&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=600&auto=format&fit=crop&q=80'
-    ],
-    location: 'Jayanagar 5th Block, Bengaluru (~3.4 km)',
-    city: 'Bengaluru',
-    availability: 'Available for short-term borrow',
-    expiry: '2026-11-20',
-    status: 'AVAILABLE',
-    owner: {
-      id: 'usr-105',
-      name: 'Karthik Rao',
-      avatar: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=120&auto=format&fit=crop&q=80',
-      trustScore: 97,
-      rating: 4.9,
-      reviewsCount: 29,
-      responseRate: '45 mins'
-    },
-    createdAt: '2026-09-07T16:20:00Z',
-    viewsCount: 175,
-    savesCount: 12
-  },
-  {
-    id: 'item-05',
-    title: 'Anker Soundcore 2 Portable Bluetooth Speaker',
-    description: '12W stereo sound, 24-hour battery life, IPX7 waterproof. Wanting to exchange for a mechanical keyboard or guitar tuner.',
+    id: 'itm_realme_1791465161247',
+    _id: 'itm_realme_1791465161247',
+    title: 'Realme 12+ 5G (Pioneer Green, 8GB RAM, 256GB Storage)',
+    description: 'Brand new Realme 12+ 5G smartphone in excellent condition. Comes with original box, 67W SUPERVOOC fast charger, and clear case. Shared with community.',
     category: 'electronics',
     condition: 'like_new',
-    sharingType: 'exchange',
-    images: [
-      'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=600&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1545454675-3531b543be5d?w=600&auto=format&fit=crop&q=80'
-    ],
-    location: 'Indiranagar 100ft Road, Bengaluru (~0.9 km)',
-    city: 'Bengaluru',
-    availability: 'Looking for exchange',
-    expiry: '2026-10-31',
-    status: 'AVAILABLE',
-    owner: {
-      id: 'usr-101', // Current user's shared item
-      name: 'Aarav Sharma',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
-      trustScore: 96,
-      rating: 4.9,
-      reviewsCount: 28,
-      responseRate: '10 mins'
-    },
-    createdAt: '2026-09-10T18:00:00Z',
-    viewsCount: 198,
-    savesCount: 24
-  },
-  {
-    id: 'item-06',
-    title: 'Adjustable LED Desk Lamp with 5 Brightness Modes',
-    description: 'Touch control, USB charging port, eye-protection warm/cool lighting. In brand new condition with original box.',
-    category: 'education',
-    condition: 'new',
     sharingType: 'give_away',
     images: [
-      'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=600&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1534349762230-e0cadf78f5da?w=600&auto=format&fit=crop&q=80'
+      'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=800&auto=format&fit=crop&q=80'
     ],
-    location: 'BTM Layout 2nd Stage, Bengaluru (~4.1 km)',
+    location: 'Indiranagar 100ft Road, Bengaluru (~0.5 km)',
     city: 'Bengaluru',
-    availability: 'Ready for handover',
-    expiry: '2026-11-15',
+    availability: 'Available',
     status: 'AVAILABLE',
     owner: {
-      id: 'usr-106',
-      name: 'Meera Sen',
-      avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120&auto=format&fit=crop&q=80',
-      trustScore: 94,
-      rating: 4.8,
-      reviewsCount: 19,
-      responseRate: '2 hours'
-    },
-    createdAt: '2026-09-11T08:00:00Z',
-    viewsCount: 245,
-    savesCount: 41
-  },
-  {
-    id: 'item-07',
-    title: 'Catan (Settlers of Catan) 5th Edition Board Game',
-    description: 'Complete base set with all resource cards, wooden settlement pieces, tiles, and dice. Pristine condition. Looking to exchange for Ticket to Ride or Wingspan.',
-    category: 'games',
-    condition: 'like_new',
-    sharingType: 'exchange',
-    images: [
-      'https://images.unsplash.com/photo-1610890716171-6b1bb98ffd09?w=600&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1606167668584-78701c57f13d?w=600&auto=format&fit=crop&q=80'
-    ],
-    location: 'Malleshwaram, Bengaluru (~5.2 km)',
-    city: 'Bengaluru',
-    availability: 'Exchange or lend for weekend game nights',
-    expiry: '2026-10-25',
-    status: 'AVAILABLE',
-    owner: {
-      id: 'usr-107',
-      name: 'Nikhil Saxena',
-      avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=120&auto=format&fit=crop&q=80',
-      trustScore: 99,
+      id: 'usr-admin-01',
+      name: 'System Admin',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
+      trustScore: 98,
       rating: 5.0,
-      reviewsCount: 42,
-      responseRate: '20 mins'
+      reviewsCount: 10
     },
-    createdAt: '2026-09-06T12:00:00Z',
-    viewsCount: 160,
-    savesCount: 27
+    createdAt: new Date().toISOString(),
+    viewsCount: 1,
+    savesCount: 0
   },
   {
-    id: 'item-08',
-    title: 'Bosch Professional Cordless Impact Drill & Bit Set',
-    description: '18V cordless drill with 2 lithium-ion batteries, charger, and 33-piece masonry/wood drill bit case. Available for 2-3 day DIY home improvement projects.',
-    category: 'tools',
+    id: 'itm_002',
+    title: 'Modern Ergonomic Chair',
+    description: 'Comfortable mesh desk chair with adjustable lumbar support.',
+    category: 'furniture',
     condition: 'good',
     sharingType: 'borrow',
-    images: [
-      'https://images.unsplash.com/photo-1504148455328-c376907d081c?w=600&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1581147036324-c17ac41dfa6c?w=600&auto=format&fit=crop&q=80'
-    ],
-    location: 'JP Nagar Phase 3, Bengaluru (~3.9 km)',
-    city: 'Bengaluru',
-    availability: 'Borrow for short DIY projects',
-    expiry: '2026-12-31',
-    status: 'AVAILABLE',
-    owner: {
-      id: 'usr-108',
-      name: 'Sunil Kumar',
-      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=120&auto=format&fit=crop&q=80',
-      trustScore: 96,
-      rating: 4.8,
-      reviewsCount: 31,
-      responseRate: '35 mins'
-    },
-    createdAt: '2026-09-05T15:45:00Z',
-    viewsCount: 290,
-    savesCount: 38
-  },
-  {
-    id: 'item-09',
-    title: 'Wildcraft 55L Trekking Rucksack with Rain Cover',
-    description: 'Internal frame hiking backpack with padded hip belt. Used for one Himalayas trek, thoroughly cleaned and in great condition.',
-    category: 'sports',
-    condition: 'like_new',
-    sharingType: 'borrow',
-    images: [
-      'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=600&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1622560480605-d83c853bc5c3?w=600&auto=format&fit=crop&q=80'
-    ],
-    location: 'Koramangala 1st Block, Bengaluru (~1.8 km)',
-    city: 'Bengaluru',
-    availability: 'Borrow for upcoming weekend treks',
-    expiry: '2026-11-10',
+    images: ['https://images.unsplash.com/photo-1580481072645-022f9a6d83d0?w=800&auto=format&fit=crop&q=80'],
+    location: 'Gachibowli, Hyderabad',
+    city: 'Hyderabad',
+    availability: 'Available',
     status: 'AVAILABLE',
     owner: {
       id: 'usr-109',
@@ -588,12 +379,12 @@ export const mockAdminStats = {
 };
 
 export const mockCommunityImpact = {
-  itemsReused: '1,275+',
-  peopleHelped: '850+',
-  booksShared: '420+',
-  electronicsShared: '310+',
-  clothesShared: '190+',
-  co2SavedKg: '3,840 kg'
+  itemsReused: '0',
+  peopleHelped: '0',
+  booksShared: '0',
+  electronicsShared: '0',
+  clothesShared: '0',
+  co2SavedKg: '0 kg'
 };
 
 export const mockTransactions = [

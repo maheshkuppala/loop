@@ -2,6 +2,8 @@ const WantedItem = require('../models/WantedItem');
 const User = require('../models/User');
 const mongoose = require('mongoose');
 const matchingService = require('../services/matchingService');
+const { query: pgQuery } = require('../config/postgres');
+const { invalidateDashboardCache } = require('../services/adminDashboardService');
 
 /**
  * Wanted Item Controller
@@ -239,6 +241,66 @@ exports.createWantedItem = async (req, res) => {
     });
 
     await wantedItem.save();
+
+    // Save directly to Neon PostgreSQL wanted_items table
+    try {
+      const wantedId = wantedItem._id ? wantedItem._id.toString() : `wnt_${Date.now()}`;
+      const pgRequesterId = req.user?.id || req.user?._id || (requesterId ? requesterId.toString() : 'usr-admin-01');
+
+      // Ensure user exists in Neon PG
+      await pgQuery(
+        `INSERT INTO users (id, name, email, password, role)
+         VALUES ($1, $2, $3, 'hashed_placeholder', 'customer')
+         ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, email = EXCLUDED.email;`,
+        [pgRequesterId, req.user?.name || 'Community Member', req.user?.email || `user_${Date.now()}@example.com`]
+      ).catch(() => {});
+
+      await pgQuery(
+        `INSERT INTO wanted_items (
+          id, title, description, category, subcategory, quantity,
+          preferred_sharing_type, condition_preference, city, district, state, locality,
+          approximate_address, latitude, longitude, urgency, required_by, expires_at,
+          images, status, requester_id
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6,
+          $7, $8, $9, $10, $11, $12,
+          $13, $14, $15, $16, $17, $18,
+          $19::jsonb, $20, $21
+        ) ON CONFLICT (id) DO UPDATE SET
+          title = EXCLUDED.title,
+          description = EXCLUDED.description,
+          status = EXCLUDED.status,
+          updated_at = CURRENT_TIMESTAMP;`,
+        [
+          wantedId,
+          trimmedTitle,
+          trimmedDescription,
+          category.toLowerCase().trim(),
+          subcategory ? subcategory.trim() : 'General',
+          parsedQuantity,
+          normalizedSharingType,
+          normalizedCondition,
+          locationObj.city,
+          locationObj.district,
+          locationObj.state,
+          locationObj.locality,
+          locationObj.approximateAddress,
+          geoCoords[1],
+          geoCoords[0],
+          normalizedUrgency,
+          parsedRequiredBy,
+          parsedExpiresAt,
+          JSON.stringify(formattedImages),
+          'ACTIVE',
+          pgRequesterId
+        ]
+      );
+    } catch (pgErr) {
+      console.warn('[wantedController] Neon PG insert wanted item notice:', pgErr.message);
+    }
+
+    // Invalidate Admin Dashboard cache so real-time counters update immediately
+    invalidateDashboardCache();
 
     // Populate requester details for immediate client display
     await wantedItem.populate('requester', 'name avatar trustScore rating email');

@@ -15,6 +15,7 @@ import AdminTable from '../../components/admin/AdminTable';
 import AdminPagination from '../../components/admin/AdminPagination';
 import AdminSearch from '../../components/admin/AdminSearch';
 import AdminFilterBar from '../../components/admin/AdminFilterBar';
+import AdminStatCard from '../../components/admin/AdminStatCard';
 import StatusBadge from '../../components/admin/StatusBadge';
 import ConfirmDialog from '../../components/admin/ConfirmDialog';
 import Avatar from '../../components/common/Avatar';
@@ -28,6 +29,7 @@ export const AdminUsersPage = () => {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [stats, setStats] = useState({ totalUsers: 0, activeUsers: 0, suspendedUsers: 0, administrators: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [notification, setNotification] = useState(null);
 
@@ -56,6 +58,9 @@ export const AdminUsersPage = () => {
         setUsers(res.data.users || []);
         setTotal(res.data.total || 0);
         setTotalPages(res.data.totalPages || 1);
+        if (res.data.stats) {
+          setStats(res.data.stats);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch users:', err);
@@ -258,6 +263,42 @@ export const AdminUsersPage = () => {
         <p style={{ color: '#94a3b8', fontSize: '0.875rem', margin: 0 }}>
           Manage registered members, inspect circulation activity, and administer account standing.
         </p>
+      </div>
+
+      {/* Summary Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+        <AdminStatCard
+          title="Total Users"
+          value={stats.totalUsers}
+          subtitle="Registered platform members"
+          icon={Users}
+          color="#38bdf8"
+          isLoading={isLoading}
+        />
+        <AdminStatCard
+          title="Active Users"
+          value={stats.activeUsers}
+          subtitle="Good standing accounts"
+          icon={UserCheck}
+          color="#34d399"
+          isLoading={isLoading}
+        />
+        <AdminStatCard
+          title="Suspended Users"
+          value={stats.suspendedUsers}
+          subtitle="Restricted account status"
+          icon={UserX}
+          color="#f87171"
+          isLoading={isLoading}
+        />
+        <AdminStatCard
+          title="Administrators"
+          value={stats.administrators}
+          subtitle="Admin & Super Admin accounts"
+          icon={Shield}
+          color="#818cf8"
+          isLoading={isLoading}
+        />
       </div>
 
       {notification && (

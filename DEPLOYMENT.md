@@ -114,6 +114,7 @@ In the **Environment Variables** section, add:
 | :--- | :--- |
 | `VITE_API_URL` | `https://<your-backend-app>.onrender.com/api` |
 | `VITE_SOCKET_URL` | `https://<your-backend-app>.onrender.com` |
+| `VITE_GOOGLE_MAPS_API_KEY` | Your Google Cloud Maps Platform Browser API Key |
 
 *Ensure there are NO trailing slashes on `VITE_SOCKET_URL` and that `VITE_API_URL` ends with `/api`.*
 

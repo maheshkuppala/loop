@@ -1,5 +1,6 @@
 import api from './api';
 import { mockItems, mockCategories } from '../data/mockData';
+import { recordImpactAction } from '../utils/communityImpactTracker';
 
 /**
  * Item Service
@@ -36,13 +37,8 @@ export const itemService = {
         images: (item.images || []).map((img) => (typeof img === 'string' ? img : img.url || ''))
       }));
 
-      // Merge with mockItems to ensure items from requests & community stories are always included
-      const existingTitles = new Set(normalizedApi.map((i) => (i.title || '').toLowerCase().trim()));
-      const supplementaryMock = mockItems.filter(
-        (m) => !existingTitles.has((m.title || '').toLowerCase().trim())
-      );
-
-      allItems = [...normalizedApi, ...supplementaryMock];
+      // Use strictly real backend database items
+      allItems = normalizedApi;
     } catch {
       allItems = [...mockItems];
     }
@@ -56,7 +52,10 @@ export const itemService = {
         const inTitle = item.title?.toLowerCase().includes(query);
         const inDesc = item.description?.toLowerCase().includes(query);
         const inCat = item.category?.toLowerCase().includes(query);
-        const inLoc = item.location?.toLowerCase().includes(query);
+        const locStr = typeof item.location === 'string'
+          ? item.location
+          : (item.location?.city || item.location?.locality || item.city || item.locality || '');
+        const inLoc = locStr.toLowerCase().includes(query);
         return inTitle || inDesc || inCat || inLoc;
       });
     }
@@ -169,8 +168,15 @@ export const itemService = {
    * Fetch single item by ID
    */
   getItemById: async (id) => {
-    // 1. Check mock items first
-    const mockMatch = mockItems.find((i) => i.id === id || i._id === id);
+    // 1. Check mock items first (by id, _id, slug, or slugified title)
+    const cleanId = String(id || '').toLowerCase().trim();
+    const mockMatch = mockItems.find(
+      (i) =>
+        i.id === id ||
+        i._id === id ||
+        (i.slug && i.slug.toLowerCase() === cleanId) ||
+        (i.title && i.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') === cleanId)
+    );
     if (mockMatch) {
       return {
         ...mockMatch,
@@ -197,17 +203,34 @@ export const itemService = {
   },
 
   /**
-   * Fetch related items in the same category
+   * Fetch similar / related items matching category, subcategory, brand, condition, or sharing type
+   * Prioritizes AVAILABLE items over reserved/reused ones
+   */
+  getSimilarItems: async (id, params = {}) => {
+    try {
+      const endpoint = id ? `/items/${id}/similar` : '/items/similar';
+      const response = await api.get(endpoint, { params });
+      return response.data?.items || (Array.isArray(response.data) ? response.data : []);
+    } catch {
+      let filtered = mockItems.filter((i) => i.id !== id && i._id !== id);
+      if (params.category) {
+        const catList = filtered.filter((i) => i.category === params.category);
+        if (catList.length > 0) filtered = catList;
+      }
+      filtered.sort((a, b) => {
+        const availA = a.availability === 'Available' || a.status === 'AVAILABLE' ? 1 : 0;
+        const availB = b.availability === 'Available' || b.status === 'AVAILABLE' ? 1 : 0;
+        return availB - availA;
+      });
+      return filtered.slice(0, params.limit || 8);
+    }
+  },
+
+  /**
+   * Fetch related items in the same category (alias for getSimilarItems)
    */
   getRelatedItems: async (id, category) => {
-    try {
-      const response = await api.get(`/items/${id}/related`, { params: { category } });
-      return response.data;
-    } catch {
-      return mockItems
-        .filter((i) => i.id !== id && (!category || i.category === category))
-        .slice(0, 4);
-    }
+    return itemService.getSimilarItems(id, { category, limit: 6 });
   },
 
   /**
@@ -237,8 +260,10 @@ export const itemService = {
           ...serverItem
         };
         mockItems.unshift(normalized);
+        recordImpactAction({ category: itemData.category, quantity: 1, type: itemData.sharingType || 'share' });
         return response.data;
       }
+      recordImpactAction({ category: itemData.category, quantity: 1, type: itemData.sharingType || 'share' });
       return response.data;
     } catch (err) {
       // In development fallback, create real structured item object
@@ -286,6 +311,7 @@ export const itemService = {
       };
 
       mockItems.unshift(newItem);
+      recordImpactAction({ category: itemData.category, quantity: 1, type: itemData.sharingType || 'share' });
 
       return {
         success: true,

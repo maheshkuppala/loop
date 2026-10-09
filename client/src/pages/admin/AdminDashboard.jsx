@@ -68,7 +68,7 @@ export const AdminDashboard = () => {
             Platform Overview
           </h1>
           <p style={{ color: '#94a3b8', fontSize: '0.9rem', margin: 0 }}>
-            Real-time MongoDB statistics, platform governance, and moderation status.
+            Real-time PostgreSQL statistics, platform governance, and moderation status.
           </p>
         </div>
 

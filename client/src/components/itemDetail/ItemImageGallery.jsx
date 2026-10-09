@@ -349,18 +349,40 @@ export const ItemImageGallery = ({ images = [], itemTitle = 'Item Image' }) => {
       )}
 
       <style>{`
+        .main-image-container {
+          transform-style: preserve-3d;
+          perspective: 1000px;
+          transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+          will-change: transform;
+        }
+        .main-image-container:hover {
+          transform: perspective(1000px) translateZ(24px) scale(1.025);
+          box-shadow: 0 16px 36px -6px rgba(16, 185, 129, 0.25), 0 8px 16px rgba(15, 23, 42, 0.08) !important;
+          border-color: #10b981 !important;
+        }
         .main-image-container:hover .gallery-main-img {
-          transform: scale(1.02);
+          transform: scale(1.06) translateZ(10px);
         }
         .gallery-arrow-btn:hover {
-          transform: translateY(-50%) scale(1.08) !important;
+          transform: translateY(-50%) scale(1.12) !important;
           background-color: #ffffff !important;
         }
+        .gallery-thumb {
+          transition: transform 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+        }
         .gallery-thumb:hover {
-          opacity: 0.9;
+          transform: translateY(-3px) scale(1.05);
+          opacity: 1;
         }
         .lightbox-close-btn:hover {
           background-color: rgba(255, 255, 255, 0.3) !important;
+        }
+        @keyframes zoom3dIn {
+          0% { opacity: 0; transform: scale(0.88) translateZ(-50px); }
+          100% { opacity: 1; transform: scale(1) translateZ(0); }
+        }
+        .lightbox-3d-content {
+          animation: zoom3dIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
       `}</style>
     </div>

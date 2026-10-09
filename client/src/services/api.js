@@ -65,9 +65,13 @@ apiClient.interceptors.response.use(
       if (error.response.status === 401) {
         message = 'Your session has expired. Please log in again.';
         if (typeof window !== 'undefined') {
-          localStorage.removeItem('looop_token');
-          localStorage.removeItem('looop_user');
-          window.dispatchEvent(new CustomEvent('looop:session_expired'));
+          const token = localStorage.getItem('looop_token') || '';
+          const isDemoToken = token.startsWith('looop_demo_') || token.startsWith('mock_token_');
+          if (!isDemoToken) {
+            localStorage.removeItem('looop_token');
+            localStorage.removeItem('looop_user');
+            window.dispatchEvent(new CustomEvent('looop:session_expired'));
+          }
         }
       } else {
         message = error.response.data?.message || error.response.data?.error || `Server responded with status ${error.response.status}`;

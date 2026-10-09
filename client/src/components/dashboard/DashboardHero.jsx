@@ -118,7 +118,7 @@ export const DashboardHero = ({ user }) => {
               color: '#ffffff'
             }}
           >
-            Welcome back, {displayName} 👋
+            Welcome to LOOOP, {displayName} 👋
           </h1>
 
           <p

@@ -16,7 +16,7 @@ import {
 import Modal from '../common/Modal';
 import Button from '../common/Button';
 import Badge from '../common/Badge';
-import { formatSharingType, formatCondition } from '../../utils/formatters';
+import { formatSharingType, formatCondition, formatLocation } from '../../utils/formatters';
 import { useAuth } from '../../context/AuthContext';
 import { itemService } from '../../services/itemService';
 
@@ -81,7 +81,9 @@ export const RequestItemModal = ({
     setValidationError('');
 
     if (!isLoggedIn) {
-      navigate(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+      const currentUrl = window.location.pathname + window.location.search;
+      const separator = currentUrl.includes('?') ? '&' : '?';
+      navigate(`/login?redirect=${encodeURIComponent(`${currentUrl}${separator}action=request`)}`);
       return;
     }
 
@@ -159,7 +161,7 @@ export const RequestItemModal = ({
               iconRight={ArrowRight}
               onClick={() => {
                 onClose();
-                navigate(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+                navigate(`/login?redirect=${encodeURIComponent(window.location.pathname + '?action=request')}`);
               }}
             >
               Log In to LOOOP
@@ -172,7 +174,7 @@ export const RequestItemModal = ({
               iconLeft={UserPlus}
               onClick={() => {
                 onClose();
-                navigate(`/register?redirect=${encodeURIComponent(window.location.pathname)}`);
+                navigate(`/register?redirect=${encodeURIComponent(window.location.pathname + '?action=request')}`);
               }}
             >
               Create a Free Account
@@ -273,7 +275,7 @@ export const RequestItemModal = ({
                   <span>•</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
                     <MapPin size={12} color="var(--color-primary-600)" />
-                    {item.location.locality || item.location.city || item.location}
+                    {formatLocation(item.location)}
                   </span>
                 </>
               )}
@@ -387,7 +389,7 @@ export const RequestItemModal = ({
             rows={4}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder="Tell the owner why you need this item..."
+            placeholder="Why would you like to reuse this item?"
             maxLength={2000}
             style={{
               width: '100%',

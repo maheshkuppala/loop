@@ -14,6 +14,7 @@ import {
   Tag
 } from 'lucide-react';
 import Badge from '../common/Badge';
+import { formatLocation } from '../../utils/formatters';
 
 export const LiveListingPreview = ({
   title = '',
@@ -312,7 +313,7 @@ export const LiveListingPreview = ({
             >
               <MapPin size={14} color="#059669" flexShrink={0} />
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {location || 'Neighborhood Area'} &bull; ~1 km
+                {formatLocation(location, 'Neighborhood Area')} &bull; ~1 km
               </span>
             </div>
 

@@ -12,7 +12,7 @@ import {
   Tag,
   Sparkles
 } from 'lucide-react';
-import { formatSharingType, formatCondition, formatDate } from '../../utils/formatters';
+import { formatSharingType, formatCondition, formatDate, formatLocation } from '../../utils/formatters';
 import Badge from '../common/Badge';
 
 export const ItemHeaderInfo = ({ item }) => {
@@ -187,7 +187,7 @@ export const ItemHeaderInfo = ({ item }) => {
       >
         <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
           <MapPin size={16} color="#059669" />
-          <span>{item.location}</span>
+          <span>{formatLocation(item.location)}</span>
         </span>
 
         <span>•</span>
