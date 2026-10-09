@@ -21,9 +21,9 @@ const getPoolConfig = () => {
     return {
       connectionString,
       ssl: isSslRequired ? { rejectUnauthorized: false } : false,
-      max: parseInt(process.env.PG_MAX_POOL || '20', 10),
+      max: parseInt(process.env.PG_MAX_POOL || '30', 10),
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000
+      connectionTimeoutMillis: 15000
     };
   }
 
@@ -35,9 +35,9 @@ const getPoolConfig = () => {
     password: process.env.PGPASSWORD || 'postgres',
     database: process.env.PGDATABASE || 'looop',
     ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false,
-    max: parseInt(process.env.PG_MAX_POOL || '20', 10),
+    max: parseInt(process.env.PG_MAX_POOL || '30', 10),
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000
+    connectionTimeoutMillis: 15000
   };
 };
 
