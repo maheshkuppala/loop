@@ -135,14 +135,43 @@ class BrevoProvider extends EmailProvider {
    * Dispatch Transactional Email via Brevo API v3
    */
   async sendTransactionalEmail({ toEmail, recipientName = 'LOOOP Member', subject, htmlContent, textContent, templateKey }) {
-    const health = await this.getProviderHealth();
-    if (!health.isReady) {
-      console.warn(`[BrevoProvider Reject] Email to ${toEmail} suppressed. Status: ${health.statusState}. Details: ${health.details}`);
+    const isDeliveryEnabled = process.env.EMAIL_DELIVERY_ENABLED === 'true';
+    const isSuspended = process.env.BREVO_ACCOUNT_SUSPENDED === 'true';
+    const apiKey = this.getApiKey();
+
+    if (isSuspended) {
       return {
         success: false,
-        errorCode: health.statusState,
-        errorMessage: health.details,
-        statusState: health.statusState
+        errorCode: 'ACCOUNT_RESTRICTED',
+        errorMessage: 'Brevo account is flagged as restricted/suspended. Operational reinstatement required.',
+        statusState: 'ACCOUNT_RESTRICTED'
+      };
+    }
+
+    if (!isDeliveryEnabled) {
+      return {
+        success: false,
+        errorCode: 'CONFIGURATION_MISSING',
+        errorMessage: 'EMAIL_DELIVERY_ENABLED is set to false in server environment.',
+        statusState: 'CONFIGURATION_MISSING'
+      };
+    }
+
+    if (!apiKey || apiKey.includes('your_brevo')) {
+      return {
+        success: false,
+        errorCode: 'CONFIGURATION_MISSING',
+        errorMessage: 'Brevo API key is not configured or uses placeholder value.',
+        statusState: 'CONFIGURATION_MISSING'
+      };
+    }
+
+    if (apiKey.startsWith('xsmtpsib-')) {
+      return {
+        success: false,
+        errorCode: 'ACCOUNT_RESTRICTED',
+        errorMessage: "Provided key starts with 'xsmtpsib-' (SMTP Relay Password). Brevo REST API requires an API Key starting with 'xkeysib-' from Brevo Dashboard -> SMTP & API -> API Keys.",
+        statusState: 'ACCOUNT_RESTRICTED'
       };
     }
 

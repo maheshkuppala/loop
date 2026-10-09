@@ -223,27 +223,7 @@ async function dispatchEmail({
   // 4. Render Email Template
   const { subject, html } = renderEmailTemplate(templateKey, templateData, recipientName);
 
-  // 5. Check Provider Health State
-  const providerHealth = await activeProvider.getProviderHealth();
-
-  if (!providerHealth.isReady) {
-    // Record rejection in outbox
-    await updateOutboxRecord(outboxId, {
-      status: 'FAILED',
-      errorCode: providerHealth.statusState,
-      errorMessage: providerHealth.details,
-      attemptCount: 1
-    });
-
-    return {
-      success: false,
-      errorCode: providerHealth.statusState,
-      errorMessage: providerHealth.details,
-      statusState: providerHealth.statusState
-    };
-  }
-
-  // 6. Attempt Dispatch
+  // 5. Attempt Dispatch via Active Provider
   await updateOutboxRecord(outboxId, { status: 'PROCESSING', attemptCount: 1 });
 
   const result = await activeProvider.sendTransactionalEmail({
