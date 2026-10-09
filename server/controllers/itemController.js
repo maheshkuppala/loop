@@ -862,57 +862,133 @@ exports.discoverItems = async (req, res) => {
 
     // 1. Attempt to query Neon PostgreSQL Database Backend
     try {
-      let whereClause = "WHERE i.status = 'active' AND i.availability = 'Available'";
-      const params = [userLat, userLon];
-      let paramIdx = 3;
+      const whereConditions = [
+        "LOWER(i.status) = 'active'",
+        "LOWER(i.availability) = 'available'"
+      ];
+      const countParams = [];
 
       if (category && category !== 'all') {
-        whereClause += ` AND LOWER(i.category) = $${paramIdx++}`;
-        params.push(category.toLowerCase().trim());
+        const catClean = category.toLowerCase().trim();
+        if (catClean === 'clothing' || catClean === 'clothes') {
+          whereConditions.push("(LOWER(i.category) ILIKE '%cloth%' OR LOWER(i.category) ILIKE '%apparel%')");
+        } else if (catClean === 'home' || catClean === 'furniture' || catClean === 'kitchen') {
+          whereConditions.push("(LOWER(i.category) ILIKE '%home%' OR LOWER(i.category) ILIKE '%furniture%' OR LOWER(i.category) ILIKE '%kitchen%')");
+        } else if (catClean === 'books' || catClean === 'study_materials' || catClean === 'study materials') {
+          whereConditions.push("(LOWER(i.category) ILIKE '%book%' OR LOWER(i.category) ILIKE '%study%' OR LOWER(i.category) ILIKE '%education%')");
+        } else if (catClean === 'tools') {
+          whereConditions.push("(LOWER(i.category) ILIKE '%tool%' OR LOWER(i.category) ILIKE '%diy%')");
+        } else if (catClean === 'sports') {
+          whereConditions.push("(LOWER(i.category) ILIKE '%sport%' OR LOWER(i.category) ILIKE '%outdoor%')");
+        } else if (catClean === 'toys') {
+          whereConditions.push("(LOWER(i.category) ILIKE '%toy%' OR LOWER(i.category) ILIKE '%game%')");
+        } else if (catClean === 'electronics') {
+          whereConditions.push("(LOWER(i.category) ILIKE '%electronic%' OR LOWER(i.category) ILIKE '%gadget%')");
+        } else {
+          countParams.push(`%${catClean}%`);
+          whereConditions.push(`LOWER(i.category) ILIKE $${countParams.length}`);
+        }
       }
+
       if (sharingType && sharingType !== 'all') {
-        whereClause += ` AND LOWER(i.sharing_type) = $${paramIdx++}`;
-        params.push(sharingType.toLowerCase().trim());
+        const stClean = sharingType.toLowerCase().trim();
+        if (stClean === 'give_away' || stClean === 'giveaway' || stClean === 'free') {
+          whereConditions.push("LOWER(i.sharing_type) IN ('give_away', 'giveaway', 'free')");
+        } else {
+          countParams.push(stClean);
+          whereConditions.push(`LOWER(i.sharing_type) = $${countParams.length}`);
+        }
       }
+
       if (condition && condition !== 'all') {
-        whereClause += ` AND LOWER(i.condition) = $${paramIdx++}`;
-        params.push(condition.toLowerCase().trim());
+        countParams.push(`%${condition.toLowerCase().trim()}%`);
+        whereConditions.push(`LOWER(i.condition) ILIKE $${countParams.length}`);
       }
+
       if (city && city.trim() && city.toLowerCase() !== 'all') {
-        whereClause += ` AND (LOWER(i.city) ILIKE $${paramIdx} OR LOWER(i.locality) ILIKE $${paramIdx})`;
-        params.push(`%${city.toLowerCase().trim()}%`);
-        paramIdx++;
+        countParams.push(`%${city.toLowerCase().trim()}%`);
+        const cIdx = countParams.length;
+        whereConditions.push(`(LOWER(i.city) ILIKE $${cIdx} OR LOWER(i.locality) ILIKE $${cIdx} OR LOWER(i.approximate_address) ILIKE $${cIdx} OR LOWER(i.state) ILIKE $${cIdx})`);
       }
+
       if (search && search.trim()) {
-        whereClause += ` AND (i.title ILIKE $${paramIdx} OR i.description ILIKE $${paramIdx} OR i.locality ILIKE $${paramIdx} OR i.city ILIKE $${paramIdx})`;
-        params.push(`%${search.trim()}%`);
-        paramIdx++;
+        countParams.push(`%${search.trim()}%`);
+        const sIdx = countParams.length;
+        whereConditions.push(`(i.title ILIKE $${sIdx} OR i.description ILIKE $${sIdx} OR i.locality ILIKE $${sIdx} OR i.city ILIKE $${sIdx})`);
       }
 
-      // Only restrict by geospatial radius if:
-      // 1. Valid coordinates are passed
-      // 2. Sort is 'nearest' OR explicitly requesting location radius without conflicting city filter
-      if (hasValidCoords && parsedRadius && (sort === 'nearest' || !city || city.toLowerCase() === 'all')) {
-        whereClause += ` AND (
-          6371 * 2 * ASIN(SQRT(
-            POWER(SIN(RADIANS(($1::double precision - i.latitude) / 2)), 2) +
-            COS(RADIANS($1::double precision)) * COS(RADIANS(i.latitude)) *
-            POWER(SIN(RADIANS(($2::double precision - i.longitude) / 2)), 2)
-          ))
-        ) <= $${paramIdx++}`;
-        params.push(parsedRadius);
-      }
-
-      const countSql = `SELECT COUNT(*)::int as total FROM items i ${whereClause};`;
-      const countRes = await pgQuery(countSql, params);
+      const countWhere = `WHERE ${whereConditions.join(' AND ')}`;
+      const countSql = `SELECT COUNT(*)::int as total FROM items i ${countWhere};`;
+      const countRes = await pgQuery(countSql, countParams);
       const pgTotal = countRes?.rows?.[0]?.total || 0;
 
+      // Data query with distance calculation
+      // $1 = userLat, $2 = userLon
+      const dataWhereConditions = [
+        "LOWER(i.status) = 'active'",
+        "LOWER(i.availability) = 'available'"
+      ];
+      const dataParams = [userLat, userLon];
+
+      if (category && category !== 'all') {
+        const catClean = category.toLowerCase().trim();
+        if (catClean === 'clothing' || catClean === 'clothes') {
+          dataWhereConditions.push("(LOWER(i.category) ILIKE '%cloth%' OR LOWER(i.category) ILIKE '%apparel%')");
+        } else if (catClean === 'home' || catClean === 'furniture' || catClean === 'kitchen') {
+          dataWhereConditions.push("(LOWER(i.category) ILIKE '%home%' OR LOWER(i.category) ILIKE '%furniture%' OR LOWER(i.category) ILIKE '%kitchen%')");
+        } else if (catClean === 'books' || catClean === 'study_materials' || catClean === 'study materials') {
+          dataWhereConditions.push("(LOWER(i.category) ILIKE '%book%' OR LOWER(i.category) ILIKE '%study%' OR LOWER(i.category) ILIKE '%education%')");
+        } else if (catClean === 'tools') {
+          dataWhereConditions.push("(LOWER(i.category) ILIKE '%tool%' OR LOWER(i.category) ILIKE '%diy%')");
+        } else if (catClean === 'sports') {
+          dataWhereConditions.push("(LOWER(i.category) ILIKE '%sport%' OR LOWER(i.category) ILIKE '%outdoor%')");
+        } else if (catClean === 'toys') {
+          dataWhereConditions.push("(LOWER(i.category) ILIKE '%toy%' OR LOWER(i.category) ILIKE '%game%')");
+        } else if (catClean === 'electronics') {
+          dataWhereConditions.push("(LOWER(i.category) ILIKE '%electronic%' OR LOWER(i.category) ILIKE '%gadget%')");
+        } else {
+          dataParams.push(`%${catClean}%`);
+          dataWhereConditions.push(`LOWER(i.category) ILIKE $${dataParams.length}`);
+        }
+      }
+
+      if (sharingType && sharingType !== 'all') {
+        const stClean = sharingType.toLowerCase().trim();
+        if (stClean === 'give_away' || stClean === 'giveaway' || stClean === 'free') {
+          dataWhereConditions.push("LOWER(i.sharing_type) IN ('give_away', 'giveaway', 'free')");
+        } else {
+          dataParams.push(stClean);
+          dataWhereConditions.push(`LOWER(i.sharing_type) = $${dataParams.length}`);
+        }
+      }
+
+      if (condition && condition !== 'all') {
+        dataParams.push(`%${condition.toLowerCase().trim()}%`);
+        dataWhereConditions.push(`LOWER(i.condition) ILIKE $${dataParams.length}`);
+      }
+
+      if (city && city.trim() && city.toLowerCase() !== 'all') {
+        dataParams.push(`%${city.toLowerCase().trim()}%`);
+        const cIdx = dataParams.length;
+        dataWhereConditions.push(`(LOWER(i.city) ILIKE $${cIdx} OR LOWER(i.locality) ILIKE $${cIdx} OR LOWER(i.approximate_address) ILIKE $${cIdx} OR LOWER(i.state) ILIKE $${cIdx})`);
+      }
+
+      if (search && search.trim()) {
+        dataParams.push(`%${search.trim()}%`);
+        const sIdx = dataParams.length;
+        dataWhereConditions.push(`(i.title ILIKE $${sIdx} OR i.description ILIKE $${sIdx} OR i.locality ILIKE $${sIdx} OR i.city ILIKE $${sIdx})`);
+      }
+
       let orderSql = "ORDER BY i.created_at DESC";
-      if (sort === 'nearest') {
+      if (sort === 'nearest' || hasValidCoords) {
         orderSql = "ORDER BY distance_km ASC, i.created_at DESC";
       } else if (sort === 'updated') {
         orderSql = "ORDER BY i.updated_at DESC";
       }
+
+      dataParams.push(parsedLimit, skip);
+      const limitIdx = dataParams.length - 1;
+      const offsetIdx = dataParams.length;
 
       const dataSql = `
         SELECT 
@@ -931,12 +1007,11 @@ exports.discoverItems = async (req, res) => {
           ) AS distance_km
         FROM items i
         LEFT JOIN users u ON i.owner_id = u.id
-        ${whereClause}
+        WHERE ${dataWhereConditions.join(' AND ')}
         ${orderSql}
-        LIMIT $${paramIdx++} OFFSET $${paramIdx++};
+        LIMIT $${limitIdx} OFFSET $${offsetIdx};
       `;
 
-      const dataParams = [...params, parsedLimit, skip];
       const dataRes = await pgQuery(dataSql, dataParams);
 
       if (dataRes && dataRes.rows && dataRes.rows.length > 0) {

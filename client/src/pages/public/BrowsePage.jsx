@@ -21,6 +21,7 @@ import {
 import { itemService } from '../../services/itemService';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useAuth } from '../../context/AuthContext';
+import { useLocationContext } from '../../context/LocationContext';
 import { SORT_OPTIONS, DISTANCE_OPTIONS } from '../../constants/categories';
 
 // Browse Subcomponents
@@ -40,6 +41,7 @@ export const BrowsePage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { location } = useLocationContext();
 
   // 1. Read Filter State from URL Query Parameters
   const searchQueryParam = searchParams.get('search') || '';
@@ -191,8 +193,8 @@ export const BrowsePage = () => {
         condition: conditionParam,
         city: cityParam || undefined,
         radius: radiusParam !== 'all' ? radiusParam : 25,
-        latitude: latParam || undefined,
-        longitude: lonParam || undefined,
+        latitude: latParam || (location?.latitude ? String(location.latitude) : undefined),
+        longitude: lonParam || (location?.longitude ? String(location.longitude) : undefined),
         sort: sortParam,
         page: pageParam,
         limit: 12
@@ -224,6 +226,8 @@ export const BrowsePage = () => {
     radiusParam,
     latParam,
     lonParam,
+    location?.latitude,
+    location?.longitude,
     sortParam,
     pageParam
   ]);
