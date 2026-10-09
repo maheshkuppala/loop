@@ -1,9 +1,10 @@
 -- ============================================================================
 -- LOOOP Platform - Complete PostgreSQL Database Schema
 -- Circular Economy & Community Goods Sharing Platform
+-- Professional Production Ready Schema Definition
 -- ============================================================================
 
--- Enable UUID extension if available
+-- Enable UUID & Crypto extensions if available
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
@@ -29,11 +30,14 @@ CREATE TABLE IF NOT EXISTS users (
   reviews_count INT DEFAULT 0,
   response_rate VARCHAR(50) DEFAULT 'Under 1 hour',
   verified BOOLEAN DEFAULT TRUE,
+  points INT DEFAULT 100,
   reset_password_token VARCHAR(255),
   reset_password_expires TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS points INT DEFAULT 100;
 
 CREATE INDEX IF NOT EXISTS idx_users_role_status ON users(role, account_status);
 CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at DESC);
@@ -58,7 +62,7 @@ CREATE INDEX IF NOT EXISTS idx_categories_slug ON categories(slug);
 CREATE INDEX IF NOT EXISTS idx_categories_status ON categories(status);
 
 -- ----------------------------------------------------------------------------
--- 3. ITEMS TABLE
+-- 3. ITEMS TABLE (Product Catalog & Shared Goods)
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS items (
   id VARCHAR(64) PRIMARY KEY,
@@ -98,7 +102,7 @@ CREATE INDEX IF NOT EXISTS idx_items_status_created ON items(status, created_at 
 CREATE INDEX IF NOT EXISTS idx_items_city ON items(city, status);
 
 -- ----------------------------------------------------------------------------
--- 4. WANTED ITEMS TABLE
+-- 4. WANTED ITEMS TABLE (Community Requests)
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS wanted_items (
   id VARCHAR(64) PRIMARY KEY,
@@ -247,9 +251,12 @@ CREATE TABLE IF NOT EXISTS messages (
   sender_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   text TEXT NOT NULL,
   read_by_ids TEXT[] DEFAULT '{}',
+  status VARCHAR(20) DEFAULT 'ACTIVE',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'ACTIVE';
 
 CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conversation_id, created_at ASC);
 
@@ -278,11 +285,14 @@ CREATE INDEX IF NOT EXISTS idx_reviews_reviewer ON reviews(reviewer_id, created_
 CREATE TABLE IF NOT EXISTS reports (
   id VARCHAR(64) PRIMARY KEY,
   reporter_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  target_type VARCHAR(20) NOT NULL, -- USER or ITEM
+  target_type VARCHAR(20) NOT NULL, -- USER, ITEM, REQUEST, TRANSACTION
   target_user_id VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL,
   target_item_id VARCHAR(64) REFERENCES items(id) ON DELETE SET NULL,
+  target_request_id VARCHAR(64) REFERENCES requests(id) ON DELETE SET NULL,
+  target_transaction_id VARCHAR(64) REFERENCES transactions(id) ON DELETE SET NULL,
   reason VARCHAR(255) NOT NULL,
   description TEXT DEFAULT '',
+  severity VARCHAR(20) DEFAULT 'MEDIUM',
   status VARCHAR(20) DEFAULT 'PENDING',
   resolution_notes TEXT DEFAULT '',
   action_taken VARCHAR(100) DEFAULT '',
@@ -292,11 +302,15 @@ CREATE TABLE IF NOT EXISTS reports (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+ALTER TABLE reports ADD COLUMN IF NOT EXISTS severity VARCHAR(20) DEFAULT 'MEDIUM';
+ALTER TABLE reports ADD COLUMN IF NOT EXISTS target_request_id VARCHAR(64) REFERENCES requests(id) ON DELETE SET NULL;
+ALTER TABLE reports ADD COLUMN IF NOT EXISTS target_transaction_id VARCHAR(64) REFERENCES transactions(id) ON DELETE SET NULL;
+
 CREATE INDEX IF NOT EXISTS idx_reports_reporter ON reports(reporter_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status, created_at DESC);
 
 -- ----------------------------------------------------------------------------
--- 12. SAVED ITEMS TABLE
+-- 12. SAVED ITEMS TABLE (Bookmarks)
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS saved_items (
   id VARCHAR(64) PRIMARY KEY,
@@ -439,3 +453,71 @@ CREATE TABLE IF NOT EXISTS admin_settings (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX IF NOT EXISTS idx_admin_settings_key ON admin_settings(key);
+
+-- ----------------------------------------------------------------------------
+-- 19. POINTS LEDGER TABLE (Eco-Points & Rewards System)
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS points_ledger (
+  id VARCHAR(64) PRIMARY KEY,
+  user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  amount INT NOT NULL,
+  type VARCHAR(30) NOT NULL,
+  reason VARCHAR(255) DEFAULT '',
+  transaction_id VARCHAR(64) REFERENCES transactions(id) ON DELETE SET NULL,
+  item_id VARCHAR(64) REFERENCES items(id) ON DELETE SET NULL,
+  balance_after INT DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_points_user ON points_ledger(user_id, created_at DESC);
+
+-- ----------------------------------------------------------------------------
+-- 20. OTP TOKENS TABLE (Security & Verification)
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS otp_tokens (
+  id VARCHAR(64) PRIMARY KEY,
+  user_id VARCHAR(64) REFERENCES users(id) ON DELETE CASCADE,
+  email VARCHAR(255) NOT NULL,
+  purpose VARCHAR(50) NOT NULL,
+  hashed_otp VARCHAR(255) NOT NULL,
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  failed_attempts INT DEFAULT 0,
+  resend_count INT DEFAULT 0,
+  consumed_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_otp_email_purpose ON otp_tokens(email, purpose);
+
+-- ----------------------------------------------------------------------------
+-- 21. EMAIL OUTBOX TABLE (Transactional Mail & Delivery Tracking)
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS email_outbox (
+  id VARCHAR(64) PRIMARY KEY,
+  event_type VARCHAR(100) NOT NULL,
+  deduplication_key VARCHAR(255),
+  recipient_user_id VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL,
+  recipient_email VARCHAR(255) NOT NULL,
+  template_key VARCHAR(100) NOT NULL,
+  template_data JSONB DEFAULT '{}'::jsonb,
+  status VARCHAR(30) DEFAULT 'PENDING',
+  attempt_count INT DEFAULT 0,
+  next_attempt_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  provider_message_id VARCHAR(255),
+  last_error_code VARCHAR(100),
+  last_error_message TEXT,
+  sent_at TIMESTAMP WITH TIME ZONE,
+  delivered_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_outbox_status ON email_outbox(status, next_attempt_at);
+CREATE INDEX IF NOT EXISTS idx_email_outbox_dedupe ON email_outbox(deduplication_key);
+
+-- ============================================================================
+-- End of Schema Definition
+-- ============================================================================
