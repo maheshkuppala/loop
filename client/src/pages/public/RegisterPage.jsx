@@ -548,6 +548,44 @@ export const RegisterPage = () => {
             </div>
           )}
 
+          {/* Duplicate Email Welcome Back Alert Banner */}
+          {isDuplicateEmail && (
+            <div
+              style={{
+                padding: '14px 16px',
+                borderRadius: '14px',
+                backgroundColor: '#ecfdf5',
+                border: '1.5px solid #a7f3d0',
+                color: '#065f46',
+                fontSize: '0.875rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                marginBottom: '1.25rem',
+                boxSizing: 'border-box'
+              }}
+              role="alert"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '0.95rem' }}>
+                <CheckCircle2 size={20} style={{ color: '#059669', flexShrink: 0 }} />
+                <span>Welcome Back! Account Already Registered</span>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.825rem', color: '#047857', lineHeight: 1.4 }}>
+                An account with <strong>{email.trim()}</strong> is already active and saved in our database. Click below to sign in.
+              </p>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={() => navigate(`/login?email=${encodeURIComponent(email.trim())}`)}
+                style={{ marginTop: '4px', borderRadius: '10px', alignSelf: 'flex-start' }}
+                iconRight={ArrowRight}
+              >
+                Sign In to Your Account
+              </Button>
+            </div>
+          )}
+
           {regStep === 'otp' ? (
             /* Step 2: Brevo Email OTP Verification */
             <div>

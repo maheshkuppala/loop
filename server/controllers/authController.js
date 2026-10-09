@@ -60,6 +60,9 @@ exports.login = async (req, res) => {
           trustScore: row.trust_score,
           rating: row.rating
         };
+
+        // Immediately update last active timestamp in Neon PostgreSQL database
+        await pgQuery('UPDATE users SET updated_at = NOW() WHERE id = $1', [row.id]).catch(() => {});
       }
     } catch (pgErr) {
       // Ignore PG error and fallback to Mongo
@@ -98,23 +101,32 @@ exports.login = async (req, res) => {
       });
     }
 
-    const token = generateToken(user._id || user.id, user.role);
+    // Ensure user account exists in Neon PostgreSQL database
+    try {
+      await pgQuery(
+        `INSERT INTO users (id, name, email, password, role, avatar, account_status, verified, trust_score, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, 'active', true, $7, NOW(), NOW())
+         ON CONFLICT (email) DO UPDATE SET updated_at = NOW();`,
+        [
+          String(user._id || user.id),
+          user.name || 'LOOOP Member',
+          cleanEmail,
+          user.password,
+          user.role || 'customer',
+          user.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
+          user.trustScore || 100
+        ]
+      );
+    } catch (pgUpsertErr) {
+      console.warn('[authController] Login DB sync notice:', pgUpsertErr.message);
+    }
 
-    // Dispatch Login Alert Email asynchronously
-    sendLooopEmail({
-      toEmail: user.email,
-      recipientName: user.name || 'LOOOP Member',
-      templateType: 'loginAlert',
-      templateParams: {
-        device: req.headers['user-agent']?.includes('Mobile') ? 'Mobile Browser' : 'Chrome on Windows',
-        date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-      }
-    }).catch((err) => console.warn('Login alert email dispatch notice:', err.message));
+    const token = generateToken(user._id || user.id, user.role);
 
     return res.status(200).json({
       success: true,
-      message: 'Signed in successfully.',
+      message: `Welcome back, ${user.name || 'Member'}!`,
+      alreadyExists: true,
       token,
       user: {
         id: user._id || user.id,

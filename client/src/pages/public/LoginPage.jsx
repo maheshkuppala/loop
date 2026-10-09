@@ -172,9 +172,10 @@ export const LoginPage = () => {
 
   const handleAuthSuccess = (userData, authToken, welcomeName) => {
     login(userData, authToken);
+    const displayName = welcomeName || userData.name || (userData.email ? userData.email.split('@')[0] : 'Member');
     addToast({
-      title: 'Welcome to LOOOP!',
-      message: `Signed in successfully as ${welcomeName || userData.name || userData.email}.`,
+      title: `Welcome Back, ${displayName}! 👋`,
+      message: `Welcome back, ${displayName}! Your account has been recognized and signed in successfully.`,
       variant: 'success'
     });
 
