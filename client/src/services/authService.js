@@ -246,39 +246,37 @@ export const authService = {
   /**
    * Send 6-digit OTP verification code via Brevo / Email
    * @param {string} email
+   * @param {string} purpose
    */
   sendOtp: async (email, purpose = 'EMAIL_VERIFICATION') => {
     const cleanEmail = (email || '').trim().toLowerCase();
+
+    // 1. Try standard API client
     try {
       const response = await api.post('/auth/otp/send', { email: cleanEmail, purpose });
       return response.data;
     } catch (err) {
-      const status = err.status || err.response?.status;
-      const errStr = String(err.message || '');
-      const isFallbackNeeded = status === 405 || status === 404 || !status || errStr.includes('405') || errStr.includes('404') || errStr.includes('Cannot connect') || errStr.includes('status');
+      console.warn('[authService.sendOtp] Primary API attempt failed:', err.message);
+    }
 
-      if (isFallbackNeeded) {
-        console.warn('[LOOOP Auth] Static server 405 or backend offline. Activating resilient fallback OTP for:', cleanEmail);
-        const fallbackOtp = Math.floor(100000 + Math.random() * 900000).toString();
-        try {
-          sessionStorage.setItem(`looop_fallback_otp_${cleanEmail}`, JSON.stringify({
-            otp: fallbackOtp,
-            createdAt: Date.now()
-          }));
-        } catch (sErr) {
-          console.warn('[LOOOP Auth] Session storage write error:', sErr);
-        }
-        return {
-          success: true,
-          message: 'A 6-digit verification code has been dispatched.',
-          statusState: 'ACCEPTED_BY_PROVIDER',
-          demoCode: fallbackOtp
-        };
+    // 2. Direct fallback attempt to backend server port 5000 (prevents Vite 405 static route interference)
+    try {
+      const directRes = await fetch('http://localhost:5000/api/auth/otp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, purpose })
+      });
+
+      const data = await directRes.json().catch(() => ({}));
+      if (directRes.ok && data.success) {
+        return data;
       }
 
-      const serverMessage = err.response?.data?.message || err.message || 'Failed to send verification email.';
-      console.error('[authService.sendOtp Error]', serverMessage);
-      throw new Error(serverMessage);
+      const errMsg = data.message || `Server error (${directRes.status})`;
+      throw new Error(errMsg);
+    } catch (directErr) {
+      console.error('[authService.sendOtp] Direct backend fallback error:', directErr.message);
+      throw new Error(directErr.message || 'Failed to dispatch verification email via Brevo server.');
     }
   },
 
@@ -286,43 +284,49 @@ export const authService = {
    * Verify 6-digit OTP verification code
    * @param {string} email
    * @param {string} otp
+   * @param {Object} options
    */
   verifyOtp: async (email, otp, options = {}) => {
     const cleanEmail = (email || '').trim().toLowerCase();
     const cleanOtp = (otp || '').trim();
+    const purpose = options.purpose || 'EMAIL_VERIFICATION';
+    const isRegistration = !!options.isRegistration;
 
+    // 1. Try standard API client
     try {
-      const response = await api.post('/auth/otp/verify', { 
-        email: cleanEmail, 
+      const response = await api.post('/auth/otp/verify', {
+        email: cleanEmail,
         otp: cleanOtp,
-        purpose: options.purpose || 'EMAIL_VERIFICATION',
-        isRegistration: !!options.isRegistration 
+        purpose,
+        isRegistration
       });
       return response.data;
     } catch (err) {
-      const status = err.status || err.response?.status;
-      const errStr = String(err.message || '');
-      const isFallbackNeeded = status === 405 || status === 404 || !status || errStr.includes('405') || errStr.includes('404') || errStr.includes('Cannot connect');
+      console.warn('[authService.verifyOtp] Primary API attempt failed:', err.message);
+    }
 
-      if (isFallbackNeeded) {
-        try {
-          const storedRaw = sessionStorage.getItem(`looop_fallback_otp_${cleanEmail}`);
-          if (storedRaw) {
-            const stored = JSON.parse(storedRaw);
-            if (stored.otp === cleanOtp || cleanOtp.length === 6) {
-              return { success: true, message: 'OTP verified successfully.' };
-            }
-          }
-        } catch (sErr) {
-          // Fall through to error
-        }
-        if (cleanOtp.length === 6) {
-          return { success: true, message: 'OTP verified successfully.' };
-        }
+    // 2. Direct fallback attempt to backend server port 5000
+    try {
+      const directRes = await fetch('http://localhost:5000/api/auth/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: cleanEmail,
+          otp: cleanOtp,
+          purpose,
+          isRegistration
+        })
+      });
+
+      const data = await directRes.json().catch(() => ({}));
+      if (directRes.ok && data.success) {
+        return data;
       }
 
-      const serverMessage = err.response?.data?.message || err.message || 'Verification failed. Please check the code and try again.';
-      throw new Error(serverMessage);
+      const errMsg = data.message || 'Verification failed. Please check the code and try again.';
+      throw new Error(errMsg);
+    } catch (directErr) {
+      throw new Error(directErr.message || 'Verification failed. Could not connect to backend server.');
     }
   },
 
