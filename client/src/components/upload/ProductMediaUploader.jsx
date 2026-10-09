@@ -219,20 +219,20 @@ export default function ProductMediaUploader({ images = [], onChange, onError })
   return (
     <div className="space-y-4">
       {/* Upload Rules Notice */}
-      <div className="flex items-center justify-between text-xs text-slate-400 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+      <div className="flex items-center justify-between text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200">
         <div className="flex items-center gap-2">
-          <ImageIcon className="w-4 h-4 text-emerald-400" />
+          <ImageIcon className="w-4 h-4 text-emerald-600" />
           <span>
-            Photos: <strong className="text-white">{images.length}</strong> / {rules.maxImages} (Min: {rules.minImages})
+            Photos: <strong className="text-slate-900">{images.length}</strong> / {rules.maxImages} (Min: {rules.minImages})
           </span>
         </div>
-        <span>Max size: {rules.maxFileSizeMb} MB per photo</span>
+        <span className="text-slate-500">Max size: {rules.maxFileSizeMb} MB per photo</span>
       </div>
 
       {/* Error Alert */}
       {uploadError && (
-        <div className="flex items-center gap-2 p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-xs">
-          <AlertTriangle className="w-4 h-4 shrink-0" />
+        <div className="flex items-center gap-2 p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs">
+          <AlertTriangle className="w-4 h-4 shrink-0 text-rose-500" />
           <span>{uploadError}</span>
         </div>
       )}
@@ -243,9 +243,9 @@ export default function ProductMediaUploader({ images = [], onChange, onError })
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="flex flex-col items-center justify-center p-4 rounded-xl border border-dashed border-slate-700 bg-slate-900/40 hover:bg-slate-800/60 hover:border-emerald-500/50 text-slate-300 transition gap-2 group cursor-pointer"
+            className="flex flex-col items-center justify-center p-4 rounded-xl border border-dashed border-slate-300 bg-white hover:bg-emerald-50/60 hover:border-emerald-500 text-slate-700 transition gap-2 group cursor-pointer shadow-sm"
           >
-            <Upload className="w-5 h-5 text-emerald-400 group-hover:scale-110 transition" />
+            <Upload className="w-5 h-5 text-emerald-600 group-hover:scale-110 transition" />
             <span className="text-xs font-medium">Upload Device Files</span>
           </button>
         )}
@@ -254,9 +254,9 @@ export default function ProductMediaUploader({ images = [], onChange, onError })
           <button
             type="button"
             onClick={() => cameraInputRef.current?.click()}
-            className="flex flex-col items-center justify-center p-4 rounded-xl border border-dashed border-slate-700 bg-slate-900/40 hover:bg-slate-800/60 hover:border-emerald-500/50 text-slate-300 transition gap-2 group cursor-pointer"
+            className="flex flex-col items-center justify-center p-4 rounded-xl border border-dashed border-slate-300 bg-white hover:bg-emerald-50/60 hover:border-emerald-500 text-slate-700 transition gap-2 group cursor-pointer shadow-sm"
           >
-            <Camera className="w-5 h-5 text-emerald-400 group-hover:scale-110 transition" />
+            <Camera className="w-5 h-5 text-emerald-600 group-hover:scale-110 transition" />
             <span className="text-xs font-medium">Take Photo (Camera)</span>
           </button>
         )}
@@ -265,9 +265,9 @@ export default function ProductMediaUploader({ images = [], onChange, onError })
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="flex flex-col items-center justify-center p-4 rounded-xl border border-dashed border-slate-700 bg-slate-900/40 hover:bg-slate-800/60 hover:border-emerald-500/50 text-slate-300 transition gap-2 group cursor-pointer"
+            className="flex flex-col items-center justify-center p-4 rounded-xl border border-dashed border-slate-300 bg-white hover:bg-emerald-50/60 hover:border-emerald-500 text-slate-700 transition gap-2 group cursor-pointer shadow-sm"
           >
-            <ImageIcon className="w-5 h-5 text-emerald-400 group-hover:scale-110 transition" />
+            <ImageIcon className="w-5 h-5 text-emerald-600 group-hover:scale-110 transition" />
             <span className="text-xs font-medium">Device Gallery</span>
           </button>
         )}
@@ -276,9 +276,9 @@ export default function ProductMediaUploader({ images = [], onChange, onError })
           <button
             type="button"
             onClick={() => pdfInputRef.current?.click()}
-            className="flex flex-col items-center justify-center p-4 rounded-xl border border-dashed border-slate-700 bg-slate-900/40 hover:bg-slate-800/60 hover:border-emerald-500/50 text-slate-300 transition gap-2 group cursor-pointer"
+            className="flex flex-col items-center justify-center p-4 rounded-xl border border-dashed border-slate-300 bg-white hover:bg-emerald-50/60 hover:border-emerald-500 text-slate-700 transition gap-2 group cursor-pointer shadow-sm"
           >
-            <FileText className="w-5 h-5 text-emerald-400 group-hover:scale-110 transition" />
+            <FileText className="w-5 h-5 text-emerald-600 group-hover:scale-110 transition" />
             <span className="text-xs font-medium">Import from PDF</span>
           </button>
         )}
@@ -313,21 +313,21 @@ export default function ProductMediaUploader({ images = [], onChange, onError })
       <div
         onDragOver={handleDragOver}
         onDrop={handleDrop}
-        className="border-2 border-dashed border-slate-800 hover:border-emerald-500/40 rounded-2xl p-6 text-center bg-slate-950/40 transition flex flex-col items-center justify-center gap-2 cursor-pointer"
+        className="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-6 text-center bg-slate-50/80 hover:bg-emerald-50/40 transition flex flex-col items-center justify-center gap-2 cursor-pointer shadow-inner"
         onClick={() => fileInputRef.current?.click()}
       >
         {isUploading ? (
-          <div className="flex items-center gap-2 text-emerald-400 text-sm font-medium py-2">
+          <div className="flex items-center gap-2 text-emerald-600 text-sm font-medium py-2">
             <Loader2 className="w-5 h-5 animate-spin" />
             <span>Processing & Uploading Product Photos...</span>
           </div>
         ) : (
           <>
-            <Upload className="w-8 h-8 text-slate-500" />
-            <p className="text-sm font-medium text-slate-300">
-              Drag & Drop product photos here or <span className="text-emerald-400 underline">browse files</span>
+            <Upload className="w-8 h-8 text-slate-400" />
+            <p className="text-sm font-medium text-slate-700">
+              Drag & Drop product photos here or <span className="text-emerald-600 underline font-semibold">browse files</span>
             </p>
-            <p className="text-xs text-slate-500">Supported: JPG, JPEG, PNG, WEBP, PDF</p>
+            <p className="text-xs text-slate-400">Supported: JPG, JPEG, PNG, WEBP, PDF</p>
           </>
         )}
       </div>
@@ -335,9 +335,9 @@ export default function ProductMediaUploader({ images = [], onChange, onError })
       {/* Product Image Gallery Grid */}
       {images.length > 0 && (
         <div className="space-y-3 pt-2">
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-400">
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
             <span>Product Gallery ({images.length})</span>
-            <span className="text-emerald-400 font-normal">Click any photo to set as Cover / Primary Image</span>
+            <span className="text-emerald-600 font-medium">Click any photo to set as Cover / Primary Image</span>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -347,10 +347,10 @@ export default function ProductMediaUploader({ images = [], onChange, onError })
               return (
                 <div
                   key={index}
-                  className={`group relative rounded-xl overflow-hidden border-2 transition-all bg-slate-900 ${
+                  className={`group relative rounded-xl overflow-hidden border-2 transition-all bg-slate-100 ${
                     isPrimary
-                      ? 'border-emerald-500 ring-2 ring-emerald-500/20 shadow-lg shadow-emerald-500/10'
-                      : 'border-slate-800 hover:border-slate-700'
+                      ? 'border-emerald-500 ring-2 ring-emerald-500/20 shadow-md'
+                      : 'border-slate-200 hover:border-slate-300'
                   }`}
                 >
                   {/* Photo Preview */}
