@@ -7,6 +7,7 @@ const Conversation = require('../models/Conversation');
 const conversationService = require('../services/conversationService');
 const notificationService = require('../services/notificationService');
 const mongoose = require('mongoose');
+const { query: pgQuery } = require('../config/postgres');
 
 /**
  * Request Controller
@@ -163,6 +164,33 @@ exports.createRequest = async (req, res) => {
       });
 
       await newRequest.save();
+
+      // Save directly to Neon PostgreSQL requests table
+      try {
+        const pgReqId = newRequest._id ? newRequest._id.toString() : `req_${Date.now()}`;
+        await pgQuery(
+          `INSERT INTO requests (
+            id, item_id, wanted_item_id, requester_id, owner_id, type,
+            message, expected_return_date, offered_item_id, status, created_at, updated_at
+          ) VALUES (
+            $1, $2, NULL, $3, $4, $5,
+            $6, $7, $8, 'PENDING', NOW(), NOW()
+          ) ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, updated_at = NOW();`,
+          [
+            pgReqId,
+            item._id ? item._id.toString() : null,
+            userId ? userId.toString() : 'usr-demo-001',
+            item.owner ? item.owner.toString() : 'usr-admin-01',
+            resolvedType || 'REQUEST_ITEM',
+            trimmedMessage,
+            parsedReturnDate,
+            validOfferedItem ? validOfferedItem.toString() : null
+          ]
+        );
+        console.log(`[Neon PostgreSQL] Request saved to database with ID: ${pgReqId}`);
+      } catch (pgReqErr) {
+        console.warn('[requestController] PG request save notice:', pgReqErr.message);
+      }
 
       await newRequest.populate([
         { path: 'item', select: 'title images sharingType condition location' },
