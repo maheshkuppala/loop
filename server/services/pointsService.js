@@ -3,7 +3,7 @@ const User = require('../models/User');
 const PointsLedger = require('../models/PointsLedger');
 const AdminSetting = require('../models/AdminSetting');
 const notificationService = require('./notificationService');
-const { sendLooopEmail } = require('./brevoService');
+const emailService = require('./emailService');
 
 /**
  * LOOOP Points Service
@@ -141,17 +141,13 @@ class PointsService {
 
       // 5. Transactional Email for Points Earned
       if (recipientUser.email) {
-        sendLooopEmail({
+        emailService.sendTransactionCompletedEmail({
           toEmail: recipientUser.email,
           recipientName: recipientUser.name || 'Member',
-          templateType: 'pointsEarnedCustomer',
-          templateParams: {
-            pointsAmount: reward,
-            itemTitle,
-            transactionType: isBorrow ? 'Borrowing' : 'Reuse',
-            newBalance,
-            appUrl: process.env.CLIENT_URL || 'http://localhost:3000'
-          }
+          recipientUserId: recipientUser._id || recipientUser.id,
+          partnerName: 'LOOOP Member',
+          itemTitle,
+          pointsEarned: reward
         }).catch((err) => console.error('[PointsService] Email dispatch error:', err.message));
       }
 

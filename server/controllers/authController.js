@@ -7,6 +7,8 @@ const { getJwtSecret } = require('../utils/jwtConfig');
 const { query: pgQuery } = require('../config/postgres');
 const { invalidateDashboardCache } = require('../services/adminDashboardService');
 const { invalidateAnalyticsCache } = require('../services/adminAnalyticsService');
+const emailService = require('../services/emailService');
+const otpService = require('../services/otpService');
 
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
@@ -100,16 +102,13 @@ exports.login = async (req, res) => {
 
     const token = generateToken(user._id || user.id, user.role);
 
-    // Dispatch Login Alert Email asynchronously
-    sendLooopEmail({
+    // Dispatch Login Alert Email asynchronously via centralized emailService
+    emailService.sendLoginSecurityAlert({
       toEmail: user.email,
       recipientName: user.name || 'LOOOP Member',
-      templateType: 'loginAlert',
-      templateParams: {
-        device: req.headers['user-agent']?.includes('Mobile') ? 'Mobile Browser' : 'Chrome on Windows',
-        date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-      }
+      device: req.headers?.['user-agent']?.includes('Mobile') ? 'Mobile Browser' : 'Chrome on Windows',
+      date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
     }).catch((err) => console.warn('Login alert email dispatch notice:', err.message));
 
     return res.status(200).json({
@@ -264,11 +263,11 @@ exports.register = async (req, res) => {
     try {
       await pgQuery(
         `INSERT INTO users (id, name, email, password, role, account_status, verified, trust_score, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, 'active', true, 100, NOW(), NOW())
+         VALUES ($1, $2, $3, $4, $5, 'active', false, 100, NOW(), NOW())
          ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name, password = EXCLUDED.password, role = EXCLUDED.role, updated_at = NOW();`,
         [assignedId, cleanName, cleanEmail, hashedPassword, roleToAssign]
       );
-      console.log(`[Neon PostgreSQL] User registered and saved to database with ID: ${assignedId}`);
+      console.log(`[Neon PostgreSQL] User registered (unverified) with ID: ${assignedId}`);
     } catch (pgErr) {
       console.error('[Neon PostgreSQL] Registration save error:', pgErr.message);
     }
@@ -277,14 +276,30 @@ exports.register = async (req, res) => {
     invalidateDashboardCache();
     invalidateAnalyticsCache();
 
-    const token = generateToken(assignedId, roleToAssign);
+    // 4. Generate secure verification OTP & attempt email dispatch
+    const otpRes = await otpService.createOtpToken({ userId: assignedId, email: cleanEmail, purpose: 'EMAIL_VERIFICATION' });
+    let deliveryNotice = null;
+    if (otpRes.success) {
+      const emailRes = await emailService.sendVerificationEmail({
+        toEmail: cleanEmail,
+        recipientName: cleanName,
+        otpCode: otpRes.rawOtp
+      });
+      if (!emailRes.success) {
+        deliveryNotice = emailRes.errorMessage || 'Email service unavailable.';
+      }
+    } else {
+      deliveryNotice = otpRes.message;
+    }
 
-    // NOTE: Welcome email is sent AFTER OTP verification, not here.
-    // See verifyOtp handler for the welcome email dispatch.
+    const token = generateToken(assignedId, roleToAssign);
 
     return res.status(201).json({
       success: true,
-      message: 'Account created successfully.',
+      message: deliveryNotice
+        ? `Account created successfully. Note: ${deliveryNotice}`
+        : 'Account created successfully. Please enter the verification code sent to your email.',
+      emailDeliveryUnavailable: Boolean(deliveryNotice),
       token,
       user: {
         id: assignedId,
@@ -292,6 +307,7 @@ exports.register = async (req, res) => {
         name: cleanName,
         email: cleanEmail,
         role: roleToAssign,
+        verified: false,
         trustScore: 100
       }
     });
@@ -329,40 +345,42 @@ exports.forgotPassword = async (req, res) => {
       });
     }
 
-    const user = await User.findOne({ email: cleanEmail });
+    let user = null;
+    try {
+      const pgRes = await pgQuery('SELECT id, name, email, account_status FROM users WHERE LOWER(email) = $1 LIMIT 1', [cleanEmail]);
+      if (pgRes.rows.length > 0) user = pgRes.rows[0];
+    } catch {}
 
-    let rawToken = null;
-
-    if (user && user.accountStatus !== 'suspended') {
-      rawToken = crypto.randomBytes(32).toString('hex');
-      const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
-
-      user.resetPasswordToken = hashedToken;
-      user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour validity
-      await user.save();
-
-      // Dispatch Forgot Password Email asynchronously
-      sendLooopEmail({
-        toEmail: cleanEmail,
-        recipientName: user.name || 'LOOOP Member',
-        templateType: 'forgotPassword',
-        templateParams: {
-          resetUrl: `https://loop-five-azure.vercel.app/reset-password?token=${rawToken}`
-        }
-      }).catch((err) => console.warn('Forgot password email dispatch notice:', err.message));
-    }
-
-    // Anti-enumeration: Return generic success regardless of account existence
     const responsePayload = {
       success: true,
       message: 'If an account exists with this email address, password reset instructions have been dispatched.'
     };
 
-    // For test and development environments, expose rawToken to allow automated end-to-end verification
-    if (process.env.NODE_ENV !== 'production' && rawToken) {
-      responsePayload.resetToken = rawToken;
+    if (user && user.account_status !== 'suspended') {
+      const otpRes = await otpService.createOtpToken({
+        userId: user.id,
+        email: cleanEmail,
+        purpose: 'PASSWORD_RESET',
+        expiryMinutes: 15
+      });
+
+      if (otpRes.success) {
+        const appUrl = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:3000';
+        const resetUrl = `${appUrl}/reset-password?code=${otpRes.rawOtp}&email=${encodeURIComponent(cleanEmail)}`;
+        await emailService.sendPasswordResetEmail({
+          toEmail: cleanEmail,
+          recipientName: user.name || 'LOOOP Member',
+          resetUrl,
+          expiryMinutes: 15
+        });
+
+        if (process.env.NODE_ENV !== 'production') {
+          responsePayload.resetToken = otpRes.rawOtp;
+        }
+      }
     }
 
+    // Anti-enumeration: Return generic success regardless of account existence
     return res.status(200).json(responsePayload);
   } catch (error) {
     console.error('Forgot password error:', error);
@@ -375,13 +393,14 @@ exports.forgotPassword = async (req, res) => {
 
 exports.resetPassword = async (req, res) => {
   try {
-    const token = req.params?.token || req.body?.token;
-    const { password } = req.body || {};
+    const { email, code, token, password } = req.body || {};
+    const resetCode = code || token || req.params?.token;
+    const targetEmail = email || req.body?.email;
 
-    if (!token) {
+    if (!resetCode) {
       return res.status(400).json({
         success: false,
-        message: 'Password reset token is required.'
+        message: 'Password reset code is required.'
       });
     }
 
@@ -392,32 +411,54 @@ exports.resetPassword = async (req, res) => {
       });
     }
 
-    const hashedToken = crypto.createHash('sha256').update(String(token).trim()).digest('hex');
+    let cleanEmail = targetEmail ? String(targetEmail).toLowerCase().trim() : '';
 
-    const user = await User.findOne({
-      resetPasswordToken: hashedToken,
-      resetPasswordExpires: { $gt: new Date() }
-    }).select('+password');
+    if (!cleanEmail && resetCode) {
+      try {
+        const hashedInput = otpService.hashOtp(resetCode);
+        const otpCheck = await pgQuery(
+          `SELECT email FROM otp_tokens WHERE hashed_otp = $1 AND purpose = 'PASSWORD_RESET' AND consumed_at IS NULL LIMIT 1`,
+          [hashedInput]
+        );
+        if (otpCheck.rows.length > 0) {
+          cleanEmail = otpCheck.rows[0].email;
+        }
+      } catch (err) {}
+    }
 
-    if (!user) {
+    if (!cleanEmail || !EMAIL_REGEX.test(cleanEmail)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid or expired password reset token.'
+        message: 'Valid email address or reset token is required.'
+      });
+    }
+    const verifyRes = await otpService.verifyOtpToken({
+      email: cleanEmail,
+      otp: resetCode,
+      purpose: 'PASSWORD_RESET'
+    });
+
+    if (!verifyRes.success) {
+      return res.status(400).json({
+        success: false,
+        message: verifyRes.message || 'Invalid or expired password reset code.'
       });
     }
 
-    // Update password & clear single-use token fields
-    user.password = await bcrypt.hash(password, 10);
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpires = undefined;
-    await user.save();
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await pgQuery('UPDATE users SET password = $1, updated_at = NOW() WHERE LOWER(email) = $2', [hashedPassword, cleanEmail]);
 
-    // Dispatch Password Changed Security Email asynchronously
-    sendLooopEmail({
-      toEmail: user.email,
-      recipientName: user.name || 'LOOOP Member',
-      templateType: 'securityPasswordChanged'
-    }).catch((err) => console.warn('Security password changed email dispatch notice:', err.message));
+    if (mongoose.connection && mongoose.connection.readyState === 1) {
+      try {
+        await User.updateOne({ email: cleanEmail }, { password: hashedPassword });
+      } catch {}
+    }
+
+    emailService.sendSecurityNotificationEmail({
+      toEmail: cleanEmail,
+      recipientName: 'LOOOP Member',
+      actionDescription: 'Your password was changed successfully.'
+    }).catch(err => console.warn('[Security Notification Warning]:', err.message));
 
     return res.status(200).json({
       success: true,
@@ -479,63 +520,51 @@ exports.getMe = async (req, res) => {
   }
 };
 
-const { sendOtpEmail, sendLooopEmail } = require('../services/brevoService');
-const otpMemoryCache = new Map();
-
-const otpRateLimiter = new Map(); // email -> { count, windowStart }
-
 exports.sendOtp = async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email, purpose = 'EMAIL_VERIFICATION' } = req.body;
     if (!email || !EMAIL_REGEX.test(String(email).trim())) {
       return res.status(400).json({ success: false, message: 'Valid email address is required.' });
     }
 
     const cleanEmail = String(email).toLowerCase().trim();
 
-    // Rate limiting: max 5 OTP requests per hour, min 30s between requests
-    const rateEntry = otpRateLimiter.get(cleanEmail);
-    const now = Date.now();
-    if (rateEntry) {
-      const timeSinceLast = now - rateEntry.lastSent;
-      if (timeSinceLast < 30000) {
-        const waitSec = Math.ceil((30000 - timeSinceLast) / 1000);
-        return res.status(429).json({ 
-          success: false, 
-          message: `Please wait ${waitSec} seconds before requesting a new code.`,
-          retryAfter: waitSec
-        });
-      }
-      // Reset window every hour
-      if (now - rateEntry.windowStart > 3600000) {
-        rateEntry.count = 0;
-        rateEntry.windowStart = now;
-      }
-      if (rateEntry.count >= 5) {
-        return res.status(429).json({ 
-          success: false, 
-          message: 'Too many verification code requests. Please try again later.' 
-        });
-      }
-      rateEntry.count += 1;
-      rateEntry.lastSent = now;
-    } else {
-      otpRateLimiter.set(cleanEmail, { count: 1, windowStart: now, lastSent: now });
+    // Create cryptographically secure OTP record in DB
+    const otpRes = await otpService.createOtpToken({
+      userId: req.user?.id,
+      email: cleanEmail,
+      purpose
+    });
+
+    if (!otpRes.success) {
+      return res.status(otpRes.statusCode || 400).json({
+        success: false,
+        message: otpRes.message,
+        retryAfter: otpRes.retryAfter
+      });
     }
 
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = Date.now() + 5 * 60 * 1000;
+    // Dispatch verification email via active provider
+    const emailRes = await emailService.sendVerificationEmail({
+      toEmail: cleanEmail,
+      recipientName: 'LOOOP Member',
+      otpCode: otpRes.rawOtp,
+      expiryMinutes: otpRes.expiryMinutes
+    });
 
-    otpMemoryCache.set(cleanEmail, { code, expiresAt, attempts: 0 });
-
-    console.log(`[AUTH] OTP generated for ${cleanEmail}`);
-    const brevoResult = await sendOtpEmail(cleanEmail, code);
-    console.log(`[EMAIL] OTP email dispatched for ${cleanEmail} (simulated: ${!!brevoResult.simulated})`);
+    if (!emailRes.success) {
+      // DO NOT fake success if provider rejected or is suspended!
+      const isRestricted = emailRes.statusState === 'ACCOUNT_RESTRICTED' || emailRes.statusState === 'CONFIGURATION_MISSING';
+      return res.status(isRestricted ? 503 : 500).json({
+        success: false,
+        statusState: emailRes.statusState || 'PROVIDER_UNAVAILABLE',
+        message: `Verification code could not be delivered: ${emailRes.errorMessage || 'Email service restricted or unconfigured.'}`
+      });
+    }
 
     return res.status(200).json({
       success: true,
-      message: 'A 6-digit verification code has been sent to your email.',
-      simulated: !!brevoResult.simulated
+      message: 'A 6-digit verification code has been sent to your email.'
     });
   } catch (error) {
     console.error('[AUTH] sendOtp error:', error);
@@ -545,50 +574,25 @@ exports.sendOtp = async (req, res) => {
 
 exports.verifyOtp = async (req, res) => {
   try {
-    const { email, otp, isRegistration } = req.body;
+    const { email, otp, isRegistration, purpose = 'EMAIL_VERIFICATION' } = req.body;
     if (!email || !otp) {
       return res.status(400).json({ success: false, message: 'Email and verification code are required.' });
     }
 
     const cleanEmail = String(email).toLowerCase().trim();
-    const cleanOtp = String(otp).trim();
 
-    // Check OTP attempt limits (max 5 attempts per code)
-    const stored = otpMemoryCache.get(cleanEmail);
-    if (!stored) {
-      console.log(`[AUTH] OTP verification failed - no code found for ${cleanEmail}`);
-      return res.status(400).json({ success: false, message: 'No verification code found. Please request a new one.' });
-    }
+    const verifyRes = await otpService.verifyOtpToken({
+      email: cleanEmail,
+      otp,
+      purpose
+    });
 
-    // Track attempts
-    if (!stored.attempts) stored.attempts = 0;
-    stored.attempts += 1;
-
-    if (stored.attempts > 5) {
-      otpMemoryCache.delete(cleanEmail);
-      console.log(`[AUTH] OTP blocked - too many attempts for ${cleanEmail}`);
-      return res.status(429).json({ success: false, message: 'Too many attempts. Please request a new verification code.' });
-    }
-
-    // Check expiration
-    if (stored.expiresAt < Date.now()) {
-      otpMemoryCache.delete(cleanEmail);
-      console.log(`[AUTH] OTP expired for ${cleanEmail}`);
-      return res.status(400).json({ success: false, message: 'Your verification code has expired. Please request a new one.' });
-    }
-
-    // Verify the code (NO backdoor bypass)
-    if (stored.code !== cleanOtp) {
-      console.log(`[AUTH] OTP mismatch for ${cleanEmail} (attempt ${stored.attempts}/5)`);
-      return res.status(400).json({ 
-        success: false, 
-        message: `Invalid verification code. Please try again. (${5 - stored.attempts} attempts remaining)` 
+    if (!verifyRes.success) {
+      return res.status(400).json({
+        success: false,
+        message: verifyRes.message
       });
     }
-
-    // OTP is valid - delete it to prevent reuse
-    otpMemoryCache.delete(cleanEmail);
-    console.log(`[AUTH] OTP verified successfully for ${cleanEmail}`);
 
     // Look up user
     let user = null;
@@ -599,15 +603,7 @@ exports.verifyOtp = async (req, res) => {
       }
     } catch {}
 
-    if (!user && mongoose.connection && mongoose.connection.readyState === 1) {
-      try {
-        user = await User.findOne({ email: cleanEmail });
-      } catch {}
-    }
-
     if (!user) {
-      // Pure email verification for registration: user not yet created in DB
-      console.log(`[AUTH] Email verified (pre-registration) for ${cleanEmail}`);
       return res.status(200).json({
         success: true,
         verified: true,
@@ -615,32 +611,26 @@ exports.verifyOtp = async (req, res) => {
       });
     }
 
-    // Mark email as verified in PG
+    // Mark email as verified in PostgreSQL
     try {
-      await pgQuery('UPDATE users SET verified = true WHERE LOWER(email) = $1', [cleanEmail]);
+      await pgQuery('UPDATE users SET verified = true, updated_at = NOW() WHERE LOWER(email) = $1', [cleanEmail]);
     } catch {}
 
-    // Mark email as verified in Mongo
     if (mongoose.connection && mongoose.connection.readyState === 1) {
       try {
         await User.updateOne({ email: cleanEmail }, { verified: true });
       } catch {}
     }
 
-    console.log(`[AUTH] Account activated for ${cleanEmail}`);
-
     const token = generateToken(user.id || user._id, user.role);
 
-    // Send welcome email AFTER successful OTP verification (for new registrations)
+    // Send welcome email after registration verification
     if (isRegistration) {
-      console.log(`[EMAIL] Welcome email requested for ${cleanEmail}`);
-      const appUrl = process.env.CLIENT_URL || process.env.APP_URL || 'https://loop-five-azure.vercel.app';
-      sendLooopEmail({
+      emailService.sendWelcomeEmail({
         toEmail: cleanEmail,
         recipientName: user.name || 'LOOOP Member',
-        templateType: 'welcomeAccountCreated',
-        templateParams: { appUrl }
-      }).catch((err) => console.warn('[EMAIL] Welcome email dispatch notice:', err.message));
+        recipientUserId: user.id
+      }).catch(err => console.warn('[Welcome Email Warning]:', err.message));
     }
 
     return res.status(200).json({
@@ -653,6 +643,7 @@ exports.verifyOtp = async (req, res) => {
         name: user.name || cleanEmail,
         email: cleanEmail,
         role: user.role,
+        verified: true,
         avatar: user.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
         trustScore: 100
       }

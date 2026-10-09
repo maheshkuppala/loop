@@ -6,6 +6,7 @@ const User = require('../models/User');
 const Conversation = require('../models/Conversation');
 const conversationService = require('../services/conversationService');
 const notificationService = require('../services/notificationService');
+const emailService = require('../services/emailService');
 const mongoose = require('mongoose');
 
 /**
@@ -207,20 +208,16 @@ exports.createRequest = async (req, res) => {
         console.warn('Initial chat setup warning:', chatErr.message);
       }
 
-      // Trigger transactional email to item owner
+      // Trigger transactional email to item owner via centralized emailService
       if (newRequest.owner?.email) {
-        const { sendLooopEmail } = require('../services/brevoService');
-        sendLooopEmail({
+        emailService.sendRequestReceivedEmail({
           toEmail: newRequest.owner.email,
           recipientName: newRequest.owner.name || 'Owner',
-          templateType: 'newRequestOwner',
-          templateParams: {
-            requesterName: newRequest.requester?.name || 'Community Member',
-            itemTitle: item.title,
-            requestType: resolvedType === 'BORROW' ? 'Borrow' : 'Reuse',
-            message: trimmedMessage,
-            appUrl: process.env.CLIENT_URL || 'http://localhost:3000'
-          }
+          recipientUserId: newRequest.owner._id || newRequest.owner.id,
+          requesterName: newRequest.requester?.name || 'Community Member',
+          itemTitle: item.title,
+          requestType: resolvedType === 'BORROW' ? 'Borrow' : 'Reuse',
+          message: trimmedMessage
         }).catch((e) => console.error('Email dispatch error:', e.message));
       }
 
@@ -631,18 +628,14 @@ exports.acceptRequest = async (req, res) => {
       conversation
     }).catch((err) => console.error('Notification trigger error:', err.message));
 
-    // Send email notification to requester
+    // Send email notification to requester via emailService
     if (request.requester?.email) {
-      const { sendLooopEmail } = require('../services/brevoService');
-      sendLooopEmail({
+      emailService.sendRequestAcceptedEmail({
         toEmail: request.requester.email,
         recipientName: request.requester.name || 'Member',
-        templateType: 'requestAcceptedCustomer',
-        templateParams: {
-          ownerName: request.owner?.name || 'Item Owner',
-          itemTitle: item ? item.title : 'the product',
-          appUrl: process.env.CLIENT_URL || 'http://localhost:3000'
-        }
+        recipientUserId: request.requester._id || request.requester.id,
+        ownerName: request.owner?.name || 'Item Owner',
+        itemTitle: item ? item.title : 'the product'
       }).catch((e) => console.error('Email dispatch error:', e.message));
     }
 
@@ -730,19 +723,15 @@ exports.declineRequest = async (req, res) => {
       actor: req.user
     }).catch((err) => console.error('Notification trigger error:', err.message));
 
-    // Send email notification to requester
+    // Send email notification to requester via emailService
     if (request.requester?.email) {
-      const { sendLooopEmail } = require('../services/brevoService');
-      sendLooopEmail({
+      emailService.sendRequestDeclinedEmail({
         toEmail: request.requester.email,
         recipientName: request.requester.name || 'Member',
-        templateType: 'requestDeclinedCustomer',
-        templateParams: {
-          ownerName: request.owner?.name || 'Item Owner',
-          itemTitle: request.item?.title || 'the product',
-          reason: reason ? String(reason).trim() : '',
-          appUrl: process.env.CLIENT_URL || 'http://localhost:3000'
-        }
+        recipientUserId: request.requester._id || request.requester.id,
+        ownerName: request.owner?.name || 'Item Owner',
+        itemTitle: request.item?.title || 'the product',
+        reason: reason ? String(reason).trim() : ''
       }).catch((e) => console.error('Email dispatch error:', e.message));
     }
 

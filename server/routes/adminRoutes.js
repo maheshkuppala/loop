@@ -70,4 +70,10 @@ router.patch('/impact/factors/:id', impactController.updateImpactFactor);
 router.delete('/impact/factors/:id', impactController.deleteImpactFactor);
 router.post('/impact/recalculate/:transactionId', impactController.recalculateTransactionImpact);
 
+// 13. Transactional Email System Diagnostics & Test
+router.get('/email/diagnostics', adminController.getEmailDiagnostics);
+router.post('/email/test', adminController.sendTestEmail);
+router.post('/email/outbox/process', adminController.processEmailOutboxQueue);
+
 module.exports = router;
+

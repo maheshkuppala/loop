@@ -1521,3 +1521,107 @@ exports.adminCompleteTransaction = async (req, res) => {
   }
 };
 
+// -------------------------------------------------------------
+// 13. EMAIL SYSTEM DIAGNOSTICS & GOVERNANCE
+// -------------------------------------------------------------
+const emailService = require('../services/emailService');
+
+exports.getEmailDiagnostics = async (req, res) => {
+  try {
+    const health = await emailService.getHealthStatus();
+
+    // Fetch recent 20 sanitized outbox records
+    let recentOutbox = [];
+    try {
+      const outboxRes = await pgQuery(
+        `SELECT id, event_type, recipient_email, template_key, status, attempt_count, next_attempt_at, provider_message_id, last_error_code, last_error_message, created_at, sent_at, delivered_at 
+         FROM email_outbox 
+         ORDER BY created_at DESC 
+         LIMIT 20`
+      );
+      recentOutbox = outboxRes.rows;
+    } catch (dbErr) {
+      console.warn('[Admin Email Diagnostics] Outbox fetch warning:', dbErr.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      diagnostics: {
+        provider: health.providerName,
+        deliveryEnabled: health.deliveryEnabled,
+        statusState: health.statusState,
+        isReady: health.isReady,
+        details: health.details,
+        senderEmail: health.senderEmail,
+        outboxStats: health.outboxStats,
+        recentOutbox,
+        timestamp: health.timestamp
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching email diagnostics:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve email system diagnostics.'
+    });
+  }
+};
+
+exports.sendTestEmail = async (req, res) => {
+  try {
+    const { testRecipientEmail } = req.body;
+    if (!testRecipientEmail) {
+      return res.status(400).json({ success: false, message: 'Test recipient email address is required.' });
+    }
+
+    const result = await emailService.sendAdminTestEmail({ testRecipientEmail });
+
+    await logAction({
+      adminId: req.admin?._id || req.user?._id || 'admin',
+      action: 'ADMIN_EMAIL_TEST_DISPATCH',
+      targetType: 'EMAIL_SERVICE',
+      targetId: testRecipientEmail,
+      metadata: { success: result.success, statusState: result.statusState, errorCode: result.errorCode },
+      ipAddress: req.ip
+    });
+
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        statusState: result.statusState,
+        message: result.message || `Test email failed: Provider state is ${result.statusState}`
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Test email successfully queued and dispatched through authorized provider.',
+      result
+    });
+  } catch (error) {
+    console.error('Error sending admin test email:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to dispatch admin test email.'
+    });
+  }
+};
+
+exports.processEmailOutboxQueue = async (req, res) => {
+  try {
+    const result = await emailService.processOutboxQueue(20);
+    return res.status(200).json({
+      success: true,
+      message: 'Email outbox queue processing completed.',
+      result
+    });
+  } catch (error) {
+    console.error('Error processing email outbox queue:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to process email outbox queue.'
+    });
+  }
+};
+
+

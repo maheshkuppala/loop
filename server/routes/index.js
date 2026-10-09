@@ -20,9 +20,11 @@ const impactRoutes = require('./impactRoutes');
 const pointsRoutes = require('./pointsRoutes');
 const locationRoutes = require('./locationRoutes');
 const mapRoutes = require('./mapRoutes');
+const webhookRoutes = require('./webhookRoutes');
 
 // Health and Diagnostics
 router.use('/health', healthRoutes);
+router.use('/webhooks', webhookRoutes);
 
 // Admin Portal REST API
 router.use('/admin', adminRoutes);

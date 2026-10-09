@@ -247,53 +247,15 @@ export const authService = {
    * Send 6-digit OTP verification code via Brevo / Email
    * @param {string} email
    */
-  sendOtp: async (email) => {
+  sendOtp: async (email, purpose = 'EMAIL_VERIFICATION') => {
     const cleanEmail = (email || '').trim().toLowerCase();
     try {
-      const response = await api.post('/auth/otp/send', { email: cleanEmail });
+      const response = await api.post('/auth/otp/send', { email: cleanEmail, purpose });
       return response.data;
-    } catch {
-      // Direct Brevo API dispatch fallback
-      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      sessionStorage.setItem(`looop_otp_${cleanEmail}`, generatedOtp);
-
-      try {
-        const emailData = looopEmailTemplates.otpEmail({ name: cleanEmail.split('@')[0], otpCode: generatedOtp, expiry: '10 minutes' });
-        const brevoPayload = {
-          sender: { name: 'LOOOP Community', email: 'looop.support@gmail.com' },
-          to: [{ email: cleanEmail }],
-          subject: emailData.subject,
-          htmlContent: emailData.html
-        };
-
-        const clientBrevoKey = import.meta.env?.VITE_BREVO_API_KEY;
-        if (clientBrevoKey) {
-          const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-            method: 'POST',
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-              'api-key': clientBrevoKey
-            },
-            body: JSON.stringify(brevoPayload)
-          });
-
-          if (res.ok) {
-            return {
-              success: true,
-              message: 'Verification code sent to your email via Brevo.'
-            };
-          }
-        }
-      } catch (brevoErr) {
-        console.warn('Direct Brevo client dispatch failed:', brevoErr);
-      }
-
-      return {
-        success: true,
-        message: 'Verification code generated.',
-        simulated: true
-      };
+    } catch (err) {
+      const serverMessage = err.response?.data?.message || err.message || 'Failed to send verification email.';
+      const statusState = err.response?.data?.statusState || 'PROVIDER_UNAVAILABLE';
+      throw new Error(serverMessage);
     }
   },
 
@@ -310,44 +272,13 @@ export const authService = {
       const response = await api.post('/auth/otp/verify', { 
         email: cleanEmail, 
         otp: cleanOtp,
+        purpose: options.purpose || 'EMAIL_VERIFICATION',
         isRegistration: !!options.isRegistration 
       });
       return response.data;
-    } catch {
-      const saved = sessionStorage.getItem(`looop_otp_${cleanEmail}`);
-      const isValid = saved ? cleanOtp === saved : false;
-
-      if (!isValid) {
-        throw new Error('Invalid verification code. Please check and try again.');
-      }
-
-      // Check if user already exists in Neon DB or LocalStorage (for login OTP case)
-      let existingUser = null;
-      try {
-        existingUser = await neonDb.getUserByEmail(cleanEmail);
-      } catch (dbErr) {
-        // Ignore
-      }
-
-      if (!existingUser) {
-        const localUsers = getLocalUsers();
-        existingUser = localUsers.find((u) => u.email.toLowerCase() === cleanEmail);
-      }
-
-      if (existingUser) {
-        return {
-          success: true,
-          token: `looop_token_otp_${Date.now()}`,
-          user: existingUser
-        };
-      }
-
-      // Pure email verification for registration: DO NOT pre-create user in database!
-      return {
-        success: true,
-        verified: true,
-        message: 'Email address verified successfully.'
-      };
+    } catch (err) {
+      const serverMessage = err.response?.data?.message || err.message || 'Verification failed. Please check the code and try again.';
+      throw new Error(serverMessage);
     }
   },
 
@@ -586,34 +517,8 @@ export const authService = {
    * Dispatch a pleasant Welcome Email via Brevo when user signs in
    */
   sendLoginWelcomeEmail: async (user) => {
-    if (!user || !user.email) return;
-    const cleanEmail = (user.email || '').trim().toLowerCase();
-    const cleanName = (user.name || user.displayName || cleanEmail.split('@')[0]).trim();
-
-    try {
-      const emailData = looopEmailTemplates.welcomeAccountCreated({ name: cleanName });
-      const brevoPayload = {
-        sender: { name: 'LOOOP Community', email: 'looop.support@gmail.com' },
-        to: [{ email: cleanEmail, name: cleanName }],
-        subject: emailData.subject,
-        htmlContent: emailData.html
-      };
-
-      const clientBrevoKey = import.meta.env?.VITE_BREVO_API_KEY;
-      if (clientBrevoKey) {
-        await fetch('https://api.brevo.com/v3/smtp/email', {
-          method: 'POST',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'api-key': clientBrevoKey
-          },
-          body: JSON.stringify(brevoPayload)
-        });
-      }
-    } catch (err) {
-      console.warn('[LOOOP Auth] Welcome email dispatch notice:', err.message);
-    }
+    // Welcome email is handled automatically by the backend email service on verified registration
+    return;
   },
 
   /**

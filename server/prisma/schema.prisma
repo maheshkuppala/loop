@@ -28,7 +28,7 @@ model User {
   rating                Float     @default(0)
   reviewsCount          Int       @default(0)
   responseRate          String    @default("Under 1 hour")
-  verified              Boolean   @default(true)
+  verified              Boolean   @default(false)
   resetPasswordToken    String?
   resetPasswordExpires  DateTime?
   createdAt             DateTime  @default(now())
@@ -507,3 +507,47 @@ model AdminSetting {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+model OtpToken {
+  id             String    @id @default(cuid())
+  userId         String?
+  email          String
+  purpose        String    // EMAIL_VERIFICATION, PASSWORD_RESET, EMAIL_CHANGE, SENSITIVE_ACTION
+  hashedOtp      String
+  expiresAt      DateTime
+  failedAttempts Int       @default(0)
+  resendCount    Int       @default(0)
+  consumedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([email, purpose])
+  @@index([userId, purpose])
+  @@index([expiresAt])
+}
+
+model EmailOutbox {
+  id                String    @id @default(cuid())
+  eventType         String
+  deduplicationKey  String?   @unique
+  recipientUserId   String?
+  recipientEmail    String
+  templateKey       String
+  templateData      Json
+  status            String    @default("PENDING") // PENDING, PROCESSING, ACCEPTED_BY_PROVIDER, DELIVERED, BOUNCED, COMPLAINED, FAILED, CANCELLED
+  attemptCount      Int       @default(0)
+  nextAttemptAt     DateTime  @default(now())
+  providerMessageId String?
+  lastErrorCode     String?
+  lastErrorMessage  String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+
+  @@index([status, nextAttemptAt])
+  @@index([recipientEmail])
+  @@index([recipientUserId])
+  @@index([createdAt(sort: Desc)])
+}
+

@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS users (
   rating NUMERIC(3,2) DEFAULT 0.0,
   reviews_count INT DEFAULT 0,
   response_rate VARCHAR(50) DEFAULT 'Under 1 hour',
-  verified BOOLEAN DEFAULT TRUE,
+  verified BOOLEAN DEFAULT FALSE,
   reset_password_token VARCHAR(255),
   reset_password_expires TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -439,3 +439,53 @@ CREATE TABLE IF NOT EXISTS admin_settings (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ----------------------------------------------------------------------------
+-- 19. OTP TOKENS TABLE
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS otp_tokens (
+  id VARCHAR(64) PRIMARY KEY,
+  user_id VARCHAR(64),
+  email VARCHAR(255) NOT NULL,
+  purpose VARCHAR(50) NOT NULL,
+  hashed_otp VARCHAR(255) NOT NULL,
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  failed_attempts INT DEFAULT 0,
+  resend_count INT DEFAULT 0,
+  consumed_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_otp_email_purpose ON otp_tokens(email, purpose);
+CREATE INDEX IF NOT EXISTS idx_otp_user_purpose ON otp_tokens(user_id, purpose);
+CREATE INDEX IF NOT EXISTS idx_otp_expires ON otp_tokens(expires_at);
+
+-- ----------------------------------------------------------------------------
+-- 20. EMAIL OUTBOX TABLE
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS email_outbox (
+  id VARCHAR(64) PRIMARY KEY,
+  event_type VARCHAR(100) NOT NULL,
+  deduplication_key VARCHAR(255) UNIQUE,
+  recipient_user_id VARCHAR(64),
+  recipient_email VARCHAR(255) NOT NULL,
+  template_key VARCHAR(100) NOT NULL,
+  template_data JSONB NOT NULL DEFAULT '{}'::jsonb,
+  status VARCHAR(30) DEFAULT 'PENDING',
+  attempt_count INT DEFAULT 0,
+  next_attempt_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  provider_message_id VARCHAR(255),
+  last_error_code VARCHAR(100),
+  last_error_message TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  sent_at TIMESTAMP WITH TIME ZONE,
+  delivered_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX IF NOT EXISTS idx_outbox_status_next ON email_outbox(status, next_attempt_at);
+CREATE INDEX IF NOT EXISTS idx_outbox_email ON email_outbox(recipient_email);
+CREATE INDEX IF NOT EXISTS idx_outbox_user ON email_outbox(recipient_user_id);
+CREATE INDEX IF NOT EXISTS idx_outbox_created ON email_outbox(created_at DESC);
+
