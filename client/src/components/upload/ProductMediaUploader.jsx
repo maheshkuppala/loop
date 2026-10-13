@@ -219,14 +219,18 @@ export default function ProductMediaUploader({ images = [], onChange, onError })
   return (
     <div className="space-y-4">
       {/* Upload Rules Notice */}
-      <div className="flex items-center justify-between text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200">
+      <div className="flex items-center justify-between text-xs text-slate-600 bg-slate-50/80 px-4 py-2.5 rounded-xl border border-slate-200/80">
         <div className="flex items-center gap-2">
-          <ImageIcon className="w-4 h-4 text-emerald-600" />
+          <div className="w-5 h-5 rounded-md bg-emerald-100 flex items-center justify-center text-emerald-700">
+            <ImageIcon className="w-3.5 h-3.5" />
+          </div>
           <span>
-            Photos: <strong className="text-slate-900">{images.length}</strong> / {rules.maxImages} (Min: {rules.minImages})
+            Photos: <strong className="text-slate-900 font-bold">{images.length}</strong> / {rules.maxImages} <span className="text-slate-400 font-normal">(Min required: {rules.minImages})</span>
           </span>
         </div>
-        <span className="text-slate-500">Max size: {rules.maxFileSizeMb} MB per photo</span>
+        <span className="text-slate-500 font-medium bg-white px-2.5 py-1 rounded-md border border-slate-200/60 shadow-2xs">
+          Max {rules.maxFileSizeMb} MB per file
+        </span>
       </div>
 
       {/* Error Alert */}
@@ -237,50 +241,88 @@ export default function ProductMediaUploader({ images = [], onChange, onError })
         </div>
       )}
 
-      {/* Multi-Source Media Picker Buttons */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {rules.deviceFileAllowed && (
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="flex flex-col items-center justify-center p-4 rounded-xl border border-dashed border-slate-300 bg-white hover:bg-emerald-50/60 hover:border-emerald-500 text-slate-700 transition gap-2 group cursor-pointer shadow-sm"
-          >
-            <Upload className="w-5 h-5 text-emerald-600 group-hover:scale-110 transition" />
-            <span className="text-xs font-medium">Upload Device Files</span>
-          </button>
-        )}
+      {/* Modern Multi-Source Upload Dropzone */}
+      <div
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        onClick={() => fileInputRef.current?.click()}
+        className="group relative border-2 border-dashed border-slate-200 hover:border-emerald-500 rounded-2xl p-7 text-center bg-gradient-to-b from-slate-50/70 to-white hover:from-emerald-50/30 hover:to-white transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md"
+      >
+        {isUploading ? (
+          <div className="flex flex-col items-center justify-center py-6 gap-3">
+            <div className="w-12 h-12 rounded-full bg-emerald-100/80 flex items-center justify-center text-emerald-600 animate-pulse">
+              <Loader2 className="w-6 h-6 animate-spin" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-800">Processing & Uploading Product Photos...</p>
+              <p className="text-xs text-slate-500 mt-0.5">Optimizing and storing high-resolution images</p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center gap-3">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 group-hover:scale-105 group-hover:bg-emerald-500 group-hover:text-white transition-all duration-200 shadow-sm">
+              <Upload className="w-6 h-6" />
+            </div>
 
-        {rules.cameraAllowed && (
-          <button
-            type="button"
-            onClick={() => cameraInputRef.current?.click()}
-            className="flex flex-col items-center justify-center p-4 rounded-xl border border-dashed border-slate-300 bg-white hover:bg-emerald-50/60 hover:border-emerald-500 text-slate-700 transition gap-2 group cursor-pointer shadow-sm"
-          >
-            <Camera className="w-5 h-5 text-emerald-600 group-hover:scale-110 transition" />
-            <span className="text-xs font-medium">Take Photo (Camera)</span>
-          </button>
-        )}
+            <div>
+              <p className="text-base font-bold text-slate-800">
+                Drag and drop your photos here, or <span className="text-emerald-600 underline font-extrabold group-hover:text-emerald-700">browse files</span>
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                Supported formats: JPG, PNG, WEBP, PDF &bull; Max {rules.maxFileSizeMb} MB per photo
+              </p>
+            </div>
 
-        {rules.galleryAllowed && (
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="flex flex-col items-center justify-center p-4 rounded-xl border border-dashed border-slate-300 bg-white hover:bg-emerald-50/60 hover:border-emerald-500 text-slate-700 transition gap-2 group cursor-pointer shadow-sm"
-          >
-            <ImageIcon className="w-5 h-5 text-emerald-600 group-hover:scale-110 transition" />
-            <span className="text-xs font-medium">Device Gallery</span>
-          </button>
-        )}
+            {/* Quick Upload Action Buttons Bar */}
+            <div
+              className="flex flex-wrap items-center justify-center gap-2 mt-2 pt-3 border-t border-slate-100/80 w-full max-w-lg"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {rules.deviceFileAllowed && (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 text-slate-700 text-xs font-semibold shadow-xs transition"
+                >
+                  <Upload className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Choose Files</span>
+                </button>
+              )}
 
-        {rules.pdfAllowed && (
-          <button
-            type="button"
-            onClick={() => pdfInputRef.current?.click()}
-            className="flex flex-col items-center justify-center p-4 rounded-xl border border-dashed border-slate-300 bg-white hover:bg-emerald-50/60 hover:border-emerald-500 text-slate-700 transition gap-2 group cursor-pointer shadow-sm"
-          >
-            <FileText className="w-5 h-5 text-emerald-600 group-hover:scale-110 transition" />
-            <span className="text-xs font-medium">Import from PDF</span>
-          </button>
+              {rules.cameraAllowed && (
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 text-slate-700 text-xs font-semibold shadow-xs transition"
+                >
+                  <Camera className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Take Photo</span>
+                </button>
+              )}
+
+              {rules.galleryAllowed && (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 text-slate-700 text-xs font-semibold shadow-xs transition"
+                >
+                  <ImageIcon className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Photo Library</span>
+                </button>
+              )}
+
+              {rules.pdfAllowed && (
+                <button
+                  type="button"
+                  onClick={() => pdfInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 text-slate-700 text-xs font-semibold shadow-xs transition"
+                >
+                  <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Import from PDF</span>
+                </button>
+              )}
+            </div>
+          </div>
         )}
       </div>
 
@@ -308,29 +350,6 @@ export default function ProductMediaUploader({ images = [], onChange, onError })
         className="hidden"
         onChange={(e) => e.target.files?.[0] && setPdfFileToExtract(e.target.files[0])}
       />
-
-      {/* Drag & Drop Target Zone */}
-      <div
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
-        className="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-6 text-center bg-slate-50/80 hover:bg-emerald-50/40 transition flex flex-col items-center justify-center gap-2 cursor-pointer shadow-inner"
-        onClick={() => fileInputRef.current?.click()}
-      >
-        {isUploading ? (
-          <div className="flex items-center gap-2 text-emerald-600 text-sm font-medium py-2">
-            <Loader2 className="w-5 h-5 animate-spin" />
-            <span>Processing & Uploading Product Photos...</span>
-          </div>
-        ) : (
-          <>
-            <Upload className="w-8 h-8 text-slate-400" />
-            <p className="text-sm font-medium text-slate-700">
-              Drag & Drop product photos here or <span className="text-emerald-600 underline font-semibold">browse files</span>
-            </p>
-            <p className="text-xs text-slate-400">Supported: JPG, JPEG, PNG, WEBP, PDF</p>
-          </>
-        )}
-      </div>
 
       {/* Product Image Gallery Grid */}
       {images.length > 0 && (
