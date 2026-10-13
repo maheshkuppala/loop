@@ -200,12 +200,15 @@ export const ShareItemPage = () => {
     if (step === 2) {
       setTouched((prev) => ({ ...prev, images: true }));
       if (images.length === 0) {
+        setErrors((prev) => ({ ...prev, images: 'Please upload at least one photo before proceeding.' }));
         addToast({
-          title: 'No Photos Added',
-          message: 'Adding at least one photo helps your item get discovered faster.',
-          variant: 'info'
+          title: 'Photo Required',
+          message: 'Please upload at least one photo of your item to continue.',
+          variant: 'danger'
         });
+        return false;
       }
+      setErrors((prev) => ({ ...prev, images: '' }));
       return true;
     }
     if (step === 3) {
@@ -893,16 +896,29 @@ export const ShareItemPage = () => {
                   <Button type="button" variant="outline" onClick={handlePrevStep} iconLeft={ArrowLeft}>
                     Previous: Item Basics
                   </Button>
-                  <Button
-                    type="button"
-                    variant="primary"
-                    size="lg"
-                    onClick={handleNextStep}
-                    iconRight={ArrowRight}
-                    style={{ minWidth: '170px', justifyContent: 'center' }}
-                  >
-                    Next: Sharing Type
-                  </Button>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                    <Button
+                      type="button"
+                      variant="primary"
+                      size="lg"
+                      onClick={handleNextStep}
+                      iconRight={ArrowRight}
+                      disabled={images.length === 0}
+                      style={{
+                        minWidth: '170px',
+                        justifyContent: 'center',
+                        opacity: images.length === 0 ? 0.6 : 1,
+                        cursor: images.length === 0 ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      Next: Sharing Type
+                    </Button>
+                    {images.length === 0 && (
+                      <span style={{ fontSize: '0.75rem', color: '#dc2626', fontWeight: 600 }}>
+                        * Upload at least 1 photo to proceed
+                      </span>
+                    )}
+                  </div>
                 </div>
               </Card>
             </div>
